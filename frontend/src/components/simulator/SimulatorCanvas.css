@@ -1,6 +1,31 @@
 .simulator-canvas-container {
   display: flex;
   height: 100%;
+  position: relative;
+}
+
+/* Add Component Button */
+.add-component-btn {
+  padding: 8px 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.add-component-btn:hover {
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transform: translateY(-1px);
+}
+
+.add-component-btn:active {
+  transform: translateY(0);
 }
 
 .simulator-canvas {

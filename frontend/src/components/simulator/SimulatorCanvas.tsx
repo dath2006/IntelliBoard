@@ -1,15 +1,13 @@
 import { useSimulatorStore, ARDUINO_POSITION } from '../../store/useSimulatorStore';
 import React, { useEffect, useState, useRef } from 'react';
 import { ArduinoUno } from '../components-wokwi/ArduinoUno';
-import { LED } from '../components-wokwi/LED';
-import { Resistor } from '../components-wokwi/Resistor';
-import { Pushbutton } from '../components-wokwi/Pushbutton';
-import { Potentiometer } from '../components-wokwi/Potentiometer';
-import { ComponentPalette } from './ComponentPalette';
+import { ComponentPickerModal } from '../ComponentPickerModal';
+import { DynamicComponent, createComponentFromMetadata } from '../DynamicComponent';
+import { ComponentRegistry } from '../../services/ComponentRegistry';
 import { PinSelector } from './PinSelector';
 import { WireLayer } from './WireLayer';
 import { PinOverlay } from './PinOverlay';
-import type { ComponentTemplate } from '../../types/components';
+import type { ComponentMetadata } from '../../types/component-metadata';
 import './SimulatorCanvas.css';
 
 export const SimulatorCanvas = () => {
@@ -32,8 +30,9 @@ export const SimulatorCanvas = () => {
   const wireInProgress = useSimulatorStore((s) => s.wireInProgress);
   const recalculateAllWirePositions = useSimulatorStore((s) => s.recalculateAllWirePositions);
 
-  // Component palette drag
-  const [draggedTemplate, setDraggedTemplate] = useState<ComponentTemplate | null>(null);
+  // Component picker modal
+  const [showComponentPicker, setShowComponentPicker] = useState(false);
+  const [registry] = useState(() => ComponentRegistry.getInstance());
 
   // Component selection
   const [selectedComponentId, setSelectedComponentId] = useState<string | null>(null);
@@ -99,37 +98,27 @@ export const SimulatorCanvas = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [selectedComponentId, removeComponent]);
 
-  // Drag & drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'copy';
+  // Handle component selection from modal
+  const handleSelectComponent = (metadata: ComponentMetadata) => {
+    // Calculate grid position to avoid overlapping
+    // Use existing components count to determine position
+    const componentsCount = components.length;
+    const gridSize = 250; // Space between components
+    const cols = 3; // Components per row
+
+    const col = componentsCount % cols;
+    const row = Math.floor(componentsCount / cols);
+
+    const x = 400 + (col * gridSize);
+    const y = 100 + (row * gridSize);
+
+    const component = createComponentFromMetadata(metadata, x, y);
+    addComponent(component as any);
+    setShowComponentPicker(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    if (!draggedTemplate) return;
-
-    const canvasRect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - canvasRect.left;
-    const y = e.clientY - canvasRect.top;
-
-    const newComponent = {
-      id: `${draggedTemplate.type}-${Date.now()}`,
-      type: draggedTemplate.type,
-      x,
-      y,
-      properties: {
-        ...draggedTemplate.defaultProperties,
-        state: false,
-      },
-    };
-
-    addComponent(newComponent as any);
-    setDraggedTemplate(null);
-  };
-
-  // Component selection
-  const handleComponentClick = (componentId: string, event: React.MouseEvent) => {
+  // Component selection (double click to open pin selector)
+  const handleComponentDoubleClick = (componentId: string, event: React.MouseEvent) => {
     event.stopPropagation();
     setSelectedComponentId(componentId);
     setPinSelectorPos({ x: event.clientX, y: event.clientY });
@@ -232,85 +221,36 @@ export const SimulatorCanvas = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [wireInProgress, cancelWireCreation]);
 
-  // Render component
+  // Render component using dynamic renderer
   const renderComponent = (component: any) => {
+    const metadata = registry.getById(component.metadataId);
+    if (!metadata) {
+      console.warn(`Metadata not found for component: ${component.metadataId}`);
+      return null;
+    }
+
     const isSelected = selectedComponentId === component.id;
     const isHovered = hoveredComponentId === component.id;
     const showPinsForComponent = isHovered || wireInProgress !== null;
 
-    const commonProps = {
-      id: component.id,
-      x: 0,  // Position handled by wrapper div - don't double-position
-      y: 0,
-    };
-
-    const wrapperStyle = {
-      position: 'absolute' as const,
-      left: `${component.x}px`,
-      top: `${component.y}px`,
-      cursor: draggedComponentId === component.id ? 'grabbing' : 'grab',
-      border: isSelected ? '2px dashed #007acc' : '2px solid transparent',
-      borderRadius: '4px',
-      padding: '4px',
-      userSelect: 'none' as const,
-    };
-
     return (
       <React.Fragment key={component.id}>
-        <div
-          style={wrapperStyle}
-          onClick={(e) => handleComponentClick(component.id, e)}
-          onMouseDown={(e) => handleComponentMouseDown(component.id, e)}
+        <DynamicComponent
+          id={component.id}
+          metadata={metadata}
+          properties={component.properties}
+          x={component.x}
+          y={component.y}
+          isSelected={isSelected}
+          onMouseDown={(e) => {
+            handleComponentMouseDown(component.id, e);
+          }}
+          onDoubleClick={(e) => {
+            handleComponentDoubleClick(component.id, e);
+          }}
           onMouseEnter={() => setHoveredComponentId(component.id)}
           onMouseLeave={() => setHoveredComponentId(null)}
-        >
-        {component.type === 'led' && (
-          <>
-            <LED
-              {...commonProps}
-              color={component.properties.color as any}
-              value={component.properties.state || false}
-            />
-            <div className="component-label">
-              {component.properties.pin !== undefined
-                ? `Pin ${component.properties.pin}`
-                : 'No pin'}
-            </div>
-          </>
-        )}
-        {component.type === 'resistor' && (
-          <>
-            <Resistor {...commonProps} value={component.properties.value || 220} />
-            <div className="component-label">
-              {component.properties.value || 220}Ω
-            </div>
-          </>
-        )}
-        {component.type === 'pushbutton' && (
-          <>
-            <Pushbutton
-              {...commonProps}
-              color={component.properties.color as any}
-              pressed={component.properties.state || false}
-            />
-            <div className="component-label">
-              {component.properties.pin !== undefined
-                ? `Pin ${component.properties.pin}`
-                : 'No pin'}
-            </div>
-          </>
-        )}
-        {component.type === 'potentiometer' && (
-          <>
-            <Potentiometer {...commonProps} value={component.properties.value || 50} />
-            <div className="component-label">
-              {component.properties.pin !== undefined
-                ? `Pin A${component.properties.pin - 14}`
-                : 'No pin'}
-            </div>
-          </>
-        )}
-        </div>
+        />
 
         {/* Pin overlay for wire creation */}
         <PinOverlay
@@ -326,14 +266,18 @@ export const SimulatorCanvas = () => {
 
   return (
     <div className="simulator-canvas-container">
-      {/* Component Palette */}
-      <ComponentPalette onDragStart={setDraggedTemplate} />
-
       {/* Main Canvas */}
       <div className="simulator-canvas">
         <div className="canvas-header">
           <h3>Arduino Simulator</h3>
           <div className="canvas-header-info">
+            <button
+              className="add-component-btn"
+              onClick={() => setShowComponentPicker(true)}
+              title="Add Component"
+            >
+              + Add Component
+            </button>
             <span className={`status-indicator ${running ? 'running' : 'stopped'}`}>
               {running ? 'Running' : 'Stopped'}
             </span>
@@ -343,8 +287,6 @@ export const SimulatorCanvas = () => {
         <div
           ref={canvasRef}
           className="canvas-content"
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
           onMouseMove={handleCanvasMouseMove}
           onMouseUp={handleCanvasMouseUp}
           onClick={() => setSelectedComponentId(null)}
@@ -379,16 +321,23 @@ export const SimulatorCanvas = () => {
         <PinSelector
           componentId={selectedComponentId}
           componentType={
-            components.find((c) => c.id === selectedComponentId)?.type || 'unknown'
+            components.find((c) => c.id === selectedComponentId)?.metadataId || 'unknown'
           }
           currentPin={
-            components.find((c) => c.id === selectedComponentId)?.properties.pin
+            components.find((c) => c.id === selectedComponentId)?.properties.pin as number | undefined
           }
           onPinSelect={handlePinSelect}
           onClose={() => setShowPinSelector(false)}
           position={pinSelectorPos}
         />
       )}
+
+      {/* Component Picker Modal */}
+      <ComponentPickerModal
+        isOpen={showComponentPicker}
+        onClose={() => setShowComponentPicker(false)}
+        onSelectComponent={handleSelectComponent}
+      />
     </div>
   );
 };

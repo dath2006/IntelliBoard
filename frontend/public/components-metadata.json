@@ -1,0 +1,1707 @@
+{
+  "version": "1.0.0",
+  "generatedAt": "2026-03-03T20:10:47.821Z",
+  "components": [
+    {
+      "id": "arduino-mega",
+      "tagName": "wokwi-arduino-mega",
+      "name": "Arduino Mega",
+      "category": "boards",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ARDUINO-MEGA\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "led13",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledRX",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledTX",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "resetPressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "led13": false,
+        "ledRX": false,
+        "ledTX": false,
+        "ledPower": false,
+        "resetPressed": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "arduino-mega",
+        "arduino mega",
+        "arduino",
+        "mega"
+      ]
+    },
+    {
+      "id": "arduino-nano",
+      "tagName": "wokwi-arduino-nano",
+      "name": "Arduino Nano",
+      "category": "boards",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ARDUINO-NANO\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "led13",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledRX",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledTX",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "resetPressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "led13": false,
+        "ledRX": false,
+        "ledTX": false,
+        "ledPower": false,
+        "resetPressed": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "arduino-nano",
+        "arduino nano",
+        "arduino",
+        "nano"
+      ]
+    },
+    {
+      "id": "arduino-uno",
+      "tagName": "wokwi-arduino-uno",
+      "name": "Arduino Uno",
+      "category": "boards",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ARDUINO-UNO\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "led13",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledRX",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledTX",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "resetPressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "led13": false,
+        "ledRX": false,
+        "ledTX": false,
+        "ledPower": false,
+        "resetPressed": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "arduino-uno",
+        "arduino uno",
+        "arduino",
+        "uno"
+      ]
+    },
+    {
+      "id": "esp32-devkit-v1",
+      "tagName": "wokwi-esp32-devkit-v1",
+      "name": "ESP32 Devkit V1",
+      "category": "boards",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ESP32-DEVKIT-V1\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "led1",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "led1": false,
+        "ledPower": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "esp32-devkit-v1",
+        "esp32 devkit v1",
+        "esp32",
+        "devkit",
+        "v1"
+      ]
+    },
+    {
+      "id": "ili9341",
+      "tagName": "wokwi-ili9341",
+      "name": "ILI9341",
+      "category": "displays",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ILI9341\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "flipHorizontal",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "flipVertical",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "flipHorizontal": false,
+        "flipVertical": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "ili9341"
+      ]
+    },
+    {
+      "id": "lcd2004",
+      "tagName": "wokwi-lcd2004",
+      "name": "LCD2004",
+      "category": "displays",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        LCD2004\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "lcd2004"
+      ]
+    },
+    {
+      "id": "ssd1306",
+      "tagName": "wokwi-ssd1306",
+      "name": "SSD1306",
+      "category": "displays",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        SSD1306\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "imageData",
+          "type": "string",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "ssd1306"
+      ]
+    },
+    {
+      "id": "dip-switch-8",
+      "tagName": "wokwi-dip-switch-8",
+      "name": "DIP Switch 8",
+      "category": "input",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DIP-SWITCH-8\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "values",
+          "type": "string",
+          "defaultValue": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "pinCount": 0,
+      "tags": [
+        "dip-switch-8",
+        "dip switch 8",
+        "dip",
+        "switch",
+        "8"
+      ]
+    },
+    {
+      "id": "membrane-keypad",
+      "tagName": "wokwi-membrane-keypad",
+      "name": "Membrane Keypad",
+      "category": "input",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        MEMBRANE-KEYPAD\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "columns",
+          "type": "string",
+          "defaultValue": "4",
+          "control": "text"
+        },
+        {
+          "name": "connector",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "keys",
+          "type": "string",
+          "defaultValue": [
+            "1",
+            "2",
+            "3",
+            "A",
+            "4",
+            "5",
+            "6",
+            "B",
+            "7",
+            "8",
+            "9",
+            "C",
+            "*",
+            "0",
+            "#",
+            "D"
+          ],
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "columns": "4",
+        "connector": false,
+        "keys": [
+          "1",
+          "2",
+          "3",
+          "A",
+          "4",
+          "5",
+          "6",
+          "B",
+          "7",
+          "8",
+          "9",
+          "C",
+          "*",
+          "0",
+          "#",
+          "D"
+        ]
+      },
+      "pinCount": 15,
+      "tags": [
+        "membrane-keypad",
+        "membrane keypad",
+        "membrane",
+        "keypad"
+      ]
+    },
+    {
+      "id": "potentiometer",
+      "tagName": "wokwi-potentiometer",
+      "name": "Potentiometer",
+      "category": "input",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        POTENTIOMETER\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "min",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "max",
+          "type": "string",
+          "defaultValue": 1023,
+          "control": "text"
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "step",
+          "type": "string",
+          "defaultValue": 1,
+          "control": "text"
+        },
+        {
+          "name": "startDegree",
+          "type": "string",
+          "defaultValue": -135,
+          "control": "text"
+        },
+        {
+          "name": "endDegree",
+          "type": "string",
+          "defaultValue": 135,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "min": 0,
+        "max": 1023,
+        "value": 0,
+        "step": 1,
+        "startDegree": -135,
+        "endDegree": 135
+      },
+      "pinCount": 0,
+      "tags": [
+        "potentiometer"
+      ]
+    },
+    {
+      "id": "pushbutton",
+      "tagName": "wokwi-pushbutton",
+      "name": "Pushbutton",
+      "category": "input",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        PUSHBUTTON\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "color",
+          "type": "string",
+          "defaultValue": "red",
+          "control": "text"
+        },
+        {
+          "name": "pressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "defaultValue": "",
+          "control": "text"
+        },
+        {
+          "name": "xray",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "color": "red",
+        "pressed": false,
+        "label": "",
+        "xray": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "pushbutton"
+      ]
+    },
+    {
+      "id": "slide-switch",
+      "tagName": "wokwi-slide-switch",
+      "name": "Slide Switch",
+      "category": "input",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        SLIDE-SWITCH\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": 0
+      },
+      "pinCount": 0,
+      "tags": [
+        "slide-switch",
+        "slide switch",
+        "slide",
+        "switch"
+      ]
+    },
+    {
+      "id": "biaxial-stepper",
+      "tagName": "wokwi-biaxial-stepper",
+      "name": "Biaxial Stepper",
+      "category": "motors",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        BIAXIAL-STEPPER\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "outerHandLength",
+          "type": "string",
+          "defaultValue": 30,
+          "control": "text"
+        },
+        {
+          "name": "outerHandAngle",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "outerHandColor",
+          "type": "string",
+          "defaultValue": "gold",
+          "control": "text"
+        },
+        {
+          "name": "outerHandShape",
+          "type": "string",
+          "defaultValue": "plain",
+          "control": "text"
+        },
+        {
+          "name": "innerHandLength",
+          "type": "string",
+          "defaultValue": 30,
+          "control": "text"
+        },
+        {
+          "name": "innerHandAngle",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "innerHandColor",
+          "type": "string",
+          "defaultValue": "silver",
+          "control": "text"
+        },
+        {
+          "name": "innerHandShape",
+          "type": "string",
+          "defaultValue": "plain",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "outerHandLength": 30,
+        "outerHandAngle": 0,
+        "outerHandColor": "gold",
+        "outerHandShape": "plain",
+        "innerHandLength": 30,
+        "innerHandAngle": 0,
+        "innerHandColor": "silver",
+        "innerHandShape": "plain"
+      },
+      "pinCount": 9,
+      "tags": [
+        "biaxial-stepper",
+        "biaxial stepper",
+        "biaxial",
+        "stepper"
+      ]
+    },
+    {
+      "id": "servo",
+      "tagName": "wokwi-servo",
+      "name": "Servo",
+      "category": "motors",
+      "description": "The angle of the servo (0-180 degrees)",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        SERVO\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "angle",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "horn",
+          "type": "string",
+          "defaultValue": "single",
+          "control": "text"
+        },
+        {
+          "name": "hornColor",
+          "type": "string",
+          "defaultValue": "#ccc",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "angle": 0,
+        "horn": "single",
+        "hornColor": "#ccc"
+      },
+      "pinCount": 0,
+      "tags": [
+        "servo"
+      ]
+    },
+    {
+      "id": "7segment",
+      "tagName": "wokwi-7segment",
+      "name": "7 Segment",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        7SEGMENT\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "color",
+          "type": "string",
+          "defaultValue": "red",
+          "control": "text"
+        },
+        {
+          "name": "offColor",
+          "type": "string",
+          "defaultValue": "#444",
+          "control": "text"
+        },
+        {
+          "name": "background",
+          "type": "string",
+          "defaultValue": "black",
+          "control": "text"
+        },
+        {
+          "name": "digits",
+          "type": "string",
+          "defaultValue": 1,
+          "control": "text"
+        },
+        {
+          "name": "colon",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "colonValue",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "pins",
+          "type": "string",
+          "defaultValue": "top",
+          "control": "text"
+        },
+        {
+          "name": "values",
+          "type": "number",
+          "defaultValue": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "control": "range"
+        }
+      ],
+      "defaultValues": {
+        "color": "red",
+        "offColor": "#444",
+        "background": "black",
+        "digits": 1,
+        "colon": false,
+        "colonValue": false,
+        "pins": "top",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "pinCount": 47,
+      "tags": [
+        "7segment",
+        "7 segment",
+        "7",
+        "segment"
+      ]
+    },
+    {
+      "id": "analog-joystick",
+      "tagName": "wokwi-analog-joystick",
+      "name": "Analog Joystick",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ANALOG-JOYSTICK\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "xValue",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "yValue",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "pressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "xValue": 0,
+        "yValue": 0,
+        "pressed": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "analog-joystick",
+        "analog joystick",
+        "analog",
+        "joystick"
+      ]
+    },
+    {
+      "id": "big-sound-sensor",
+      "tagName": "wokwi-big-sound-sensor",
+      "name": "Big Sound Sensor",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        BIG-SOUND-SENSOR\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "led1",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "led2",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "led1": false,
+        "led2": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "big-sound-sensor",
+        "big sound sensor",
+        "big",
+        "sound",
+        "sensor"
+      ]
+    },
+    {
+      "id": "ds1307",
+      "tagName": "wokwi-ds1307",
+      "name": "DS1307",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DS1307\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "ds1307"
+      ]
+    },
+    {
+      "id": "flame-sensor",
+      "tagName": "wokwi-flame-sensor",
+      "name": "Flame Sensor",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        FLAME-SENSOR\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledSignal",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "ledPower": false,
+        "ledSignal": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "flame-sensor",
+        "flame sensor",
+        "flame",
+        "sensor"
+      ]
+    },
+    {
+      "id": "gas-sensor",
+      "tagName": "wokwi-gas-sensor",
+      "name": "Gas Sensor",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        GAS-SENSOR\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledD0",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "ledPower": false,
+        "ledD0": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "gas-sensor",
+        "gas sensor",
+        "gas",
+        "sensor"
+      ]
+    },
+    {
+      "id": "heart-beat-sensor",
+      "tagName": "wokwi-heart-beat-sensor",
+      "name": "Heart Beat Sensor",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        HEART-BEAT-SENSOR\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "heart-beat-sensor",
+        "heart beat sensor",
+        "heart",
+        "beat",
+        "sensor"
+      ]
+    },
+    {
+      "id": "hx711",
+      "tagName": "wokwi-hx711",
+      "name": "HX711",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        HX711\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "type",
+          "type": "string",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "hx711"
+      ]
+    },
+    {
+      "id": "ks2e-m-dc5",
+      "tagName": "wokwi-ks2e-m-dc5",
+      "name": "KS2E-M-DC5",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        KS2E-M-DC5\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "ks2e-m-dc5",
+        "ks2e",
+        "m",
+        "dc5"
+      ]
+    },
+    {
+      "id": "ky-040",
+      "tagName": "wokwi-ky-040",
+      "name": "KY040",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        KY-040\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "angle",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "stepSize",
+          "type": "string",
+          "defaultValue": 18,
+          "control": "text"
+        },
+        {
+          "name": "pressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "angle": 0,
+        "stepSize": 18,
+        "pressed": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "ky-040",
+        "ky040",
+        "ky",
+        "040"
+      ]
+    },
+    {
+      "id": "led-ring",
+      "tagName": "wokwi-led-ring",
+      "name": "LED Ring",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        LED-RING\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "pixels",
+          "type": "string",
+          "defaultValue": 16,
+          "control": "text"
+        },
+        {
+          "name": "pixelSpacing",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "background",
+          "type": "string",
+          "defaultValue": "#363",
+          "control": "text"
+        },
+        {
+          "name": "animation",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "pixels": 16,
+        "pixelSpacing": 0,
+        "background": "#363",
+        "animation": false
+      },
+      "pinCount": 5,
+      "tags": [
+        "led-ring",
+        "led ring",
+        "led",
+        "ring"
+      ]
+    },
+    {
+      "id": "microsd-card",
+      "tagName": "wokwi-microsd-card",
+      "name": "microSD Card",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        MICROSD-CARD\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "microsd-card",
+        "microsd card",
+        "microsd",
+        "card"
+      ]
+    },
+    {
+      "id": "nano-rp2040-connect",
+      "tagName": "wokwi-nano-rp2040-connect",
+      "name": "Nano RP2040 Connect",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        NANO-RP2040-CONNECT\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "ledRed",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "ledGreen",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "ledBlue",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "ledBuiltIn",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "ledRed": 0,
+        "ledGreen": 0,
+        "ledBlue": 0,
+        "ledBuiltIn": false,
+        "ledPower": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "nano-rp2040-connect",
+        "nano rp2040 connect",
+        "nano",
+        "rp2040",
+        "connect"
+      ]
+    },
+    {
+      "id": "neopixel-matrix",
+      "tagName": "wokwi-neopixel-matrix",
+      "name": "NeoPixel Matrix",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        NEOPIXEL-MATRIX\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "rows",
+          "type": "string",
+          "defaultValue": 8,
+          "control": "text"
+        },
+        {
+          "name": "cols",
+          "type": "string",
+          "defaultValue": 8,
+          "control": "text"
+        },
+        {
+          "name": "rowSpacing",
+          "type": "string",
+          "defaultValue": 1,
+          "control": "text"
+        },
+        {
+          "name": "colSpacing",
+          "type": "string",
+          "defaultValue": 1,
+          "control": "text"
+        },
+        {
+          "name": "blurLight",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "animation",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "rows": 8,
+        "cols": 8,
+        "rowSpacing": 1,
+        "colSpacing": 1,
+        "blurLight": false,
+        "animation": false
+      },
+      "pinCount": 5,
+      "tags": [
+        "neopixel-matrix",
+        "neopixel matrix",
+        "neopixel",
+        "matrix"
+      ]
+    },
+    {
+      "id": "pushbutton-6mm",
+      "tagName": "wokwi-pushbutton-6mm",
+      "name": "Pushbutton 6mm",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        PUSHBUTTON-6MM\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "color",
+          "type": "string",
+          "defaultValue": "red",
+          "control": "text"
+        },
+        {
+          "name": "pressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "defaultValue": "",
+          "control": "text"
+        },
+        {
+          "name": "xray",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "color": "red",
+        "pressed": false,
+        "label": "",
+        "xray": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "pushbutton-6mm",
+        "pushbutton 6mm",
+        "pushbutton",
+        "6mm"
+      ]
+    },
+    {
+      "id": "rotary-dialer",
+      "tagName": "wokwi-rotary-dialer",
+      "name": "Rotary Dialer",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ROTARY-DIALER\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "rotary-dialer",
+        "",
+        "rotary",
+        "dialer"
+      ]
+    },
+    {
+      "id": "slide-potentiometer",
+      "tagName": "wokwi-slide-potentiometer",
+      "name": "Slide Potentiometer",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        SLIDE-POTENTIOMETER\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "travelLength",
+          "type": "string",
+          "defaultValue": 30,
+          "control": "text"
+        },
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "min",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "max",
+          "type": "string",
+          "defaultValue": 100,
+          "control": "text"
+        },
+        {
+          "name": "step",
+          "type": "string",
+          "defaultValue": 2,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "travelLength": 30,
+        "value": 0,
+        "min": 0,
+        "max": 100,
+        "step": 2
+      },
+      "pinCount": 3,
+      "tags": [
+        "slide-potentiometer",
+        "slide potentiometer",
+        "slide",
+        "potentiometer"
+      ]
+    },
+    {
+      "id": "small-sound-sensor",
+      "tagName": "wokwi-small-sound-sensor",
+      "name": "Small Sound Sensor",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        SMALL-SOUND-SENSOR\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledSignal",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "ledPower": false,
+        "ledSignal": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "small-sound-sensor",
+        "small sound sensor",
+        "small",
+        "sound",
+        "sensor"
+      ]
+    },
+    {
+      "id": "tilt-switch",
+      "tagName": "wokwi-tilt-switch",
+      "name": "Tilt Switch",
+      "category": "other",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        TILT-SWITCH\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "tilt-switch",
+        "tilt switch",
+        "tilt",
+        "switch"
+      ]
+    },
+    {
+      "id": "buzzer",
+      "tagName": "wokwi-buzzer",
+      "name": "Buzzer",
+      "category": "output",
+      "description": "Whether the buzzer is currently emitting a signal",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        BUZZER\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "hasSignal",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "hasSignal": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "buzzer"
+      ]
+    },
+    {
+      "id": "led",
+      "tagName": "wokwi-led",
+      "name": "LED",
+      "category": "output",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        LED\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "brightness",
+          "type": "string",
+          "defaultValue": 1,
+          "control": "text"
+        },
+        {
+          "name": "color",
+          "type": "string",
+          "defaultValue": "red",
+          "control": "text"
+        },
+        {
+          "name": "lightColor",
+          "type": "string",
+          "defaultValue": null,
+          "control": "text"
+        },
+        {
+          "name": "label",
+          "type": "string",
+          "defaultValue": "",
+          "control": "text"
+        },
+        {
+          "name": "flip",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": false,
+        "brightness": 1,
+        "color": "red",
+        "lightColor": null,
+        "label": "",
+        "flip": false
+      },
+      "pinCount": 2,
+      "tags": [
+        "led"
+      ]
+    },
+    {
+      "id": "led-bar-graph",
+      "tagName": "wokwi-led-bar-graph",
+      "name": "Led Bar Graph",
+      "category": "output",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        LED-BAR-GRAPH\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "color",
+          "type": "string",
+          "defaultValue": "red",
+          "control": "text"
+        },
+        {
+          "name": "offColor",
+          "type": "string",
+          "defaultValue": "#444",
+          "control": "text"
+        },
+        {
+          "name": "values",
+          "type": "number",
+          "defaultValue": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "control": "range"
+        }
+      ],
+      "defaultValues": {
+        "color": "red",
+        "offColor": "#444",
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      "pinCount": 0,
+      "tags": [
+        "led-bar-graph",
+        "led bar graph",
+        "led",
+        "bar",
+        "graph"
+      ]
+    },
+    {
+      "id": "neopixel",
+      "tagName": "wokwi-neopixel",
+      "name": "Neopixel",
+      "category": "output",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        NEOPIXEL\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "r",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "g",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "b",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "r": 0,
+        "g": 0,
+        "b": 0
+      },
+      "pinCount": 0,
+      "tags": [
+        "neopixel"
+      ]
+    },
+    {
+      "id": "rgb-led",
+      "tagName": "wokwi-rgb-led",
+      "name": "RGB Led",
+      "category": "output",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        RGB-LED\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "ledRed",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "ledGreen",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        },
+        {
+          "name": "ledBlue",
+          "type": "string",
+          "defaultValue": 0,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "ledRed": 0,
+        "ledGreen": 0,
+        "ledBlue": 0
+      },
+      "pinCount": 0,
+      "tags": [
+        "rgb-led",
+        "rgb led",
+        "rgb",
+        "led"
+      ]
+    },
+    {
+      "id": "franzininho",
+      "tagName": "wokwi-franzininho",
+      "name": "Franzininho",
+      "category": "passive",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        FRANZININHO\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "led1",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "resetPressed",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "led1": false,
+        "ledPower": false,
+        "resetPressed": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "franzininho"
+      ]
+    },
+    {
+      "id": "ir-receiver",
+      "tagName": "wokwi-ir-receiver",
+      "name": "IR Receiver",
+      "category": "passive",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        IR-RECEIVER\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "ir-receiver",
+        "ir receiver",
+        "ir",
+        "receiver"
+      ]
+    },
+    {
+      "id": "ir-remote",
+      "tagName": "wokwi-ir-remote",
+      "name": "IR Remote",
+      "category": "passive",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        IR-REMOTE\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "ir-remote",
+        "ir remote",
+        "ir",
+        "remote"
+      ]
+    },
+    {
+      "id": "resistor",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor",
+      "category": "passive",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        RESISTOR\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1000",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1000"
+      },
+      "pinCount": 0,
+      "tags": [
+        "resistor"
+      ]
+    },
+    {
+      "id": "dht22",
+      "tagName": "wokwi-dht22",
+      "name": "DHT22",
+      "category": "sensors",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DHT22\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "dht22"
+      ]
+    },
+    {
+      "id": "hc-sr04",
+      "tagName": "wokwi-hc-sr04",
+      "name": "HC-SR04",
+      "category": "sensors",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        HC-SR04\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "hc-sr04",
+        "hc",
+        "sr04"
+      ]
+    },
+    {
+      "id": "mpu6050",
+      "tagName": "wokwi-mpu6050",
+      "name": "MPU6050",
+      "category": "sensors",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        MPU6050\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "led1",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "led1": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "mpu6050"
+      ]
+    },
+    {
+      "id": "ntc-temperature-sensor",
+      "tagName": "wokwi-ntc-temperature-sensor",
+      "name": "NTC Temperature Sensor",
+      "category": "sensors",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        NTC-TEMPERATURE-SENSOR\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "ntc-temperature-sensor",
+        "ntc temperature sensor",
+        "ntc",
+        "temperature",
+        "sensor"
+      ]
+    },
+    {
+      "id": "photoresistor-sensor",
+      "tagName": "wokwi-photoresistor-sensor",
+      "name": "Photoresistor Sensor",
+      "category": "sensors",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        PHOTORESISTOR-SENSOR\n      </text>\n    </svg>",
+      "properties": [
+        {
+          "name": "ledDO",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        },
+        {
+          "name": "ledPower",
+          "type": "string",
+          "defaultValue": false,
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "ledDO": false,
+        "ledPower": false
+      },
+      "pinCount": 0,
+      "tags": [
+        "photoresistor-sensor",
+        "photoresistor sensor",
+        "photoresistor",
+        "sensor"
+      ]
+    },
+    {
+      "id": "pir-motion-sensor",
+      "tagName": "wokwi-pir-motion-sensor",
+      "name": "PIR Motion Sensor",
+      "category": "sensors",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        PIR-MOTION-SENSOR\n      </text>\n    </svg>",
+      "properties": [],
+      "defaultValues": {},
+      "pinCount": 0,
+      "tags": [
+        "pir-motion-sensor",
+        "pir motion sensor",
+        "pir",
+        "motion",
+        "sensor"
+      ]
+    }
+  ]
+}

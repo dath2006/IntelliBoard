@@ -4,8 +4,9 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "generate:metadata": "cd .. && npx tsx scripts/generate-component-metadata.ts",
+    "dev": "npm run generate:metadata && vite",
+    "build": "npm run generate:metadata && tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -9,15 +9,10 @@ export const ARDUINO_POSITION = { x: 50, y: 50 };
 
 interface Component {
   id: string;
-  type: 'led' | 'resistor' | 'pushbutton' | 'potentiometer';
+  metadataId: string;  // References ComponentMetadata by ID (e.g., 'led', 'dht22')
   x: number;
   y: number;
-  properties: {
-    color?: string;
-    value?: number;
-    pin?: number;
-    state?: boolean;
-  };
+  properties: Record<string, unknown>;  // Flexible properties for any component type
 }
 
 interface SimulatorState {
@@ -79,7 +74,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     components: [
       {
         id: 'led-builtin',
-        type: 'led',
+        metadataId: 'led',
         x: 350,
         y: 100,
         properties: {

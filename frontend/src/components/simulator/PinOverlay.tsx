@@ -49,8 +49,8 @@ export const PinOverlay: React.FC<PinOverlayProps> = ({
     <div
       style={{
         position: 'absolute',
-        left: `${componentX}px`,
-        top: `${componentY}px`,
+        left: `${componentX + 6}px`, // +6px for wrapper padding (4px padding + 2px border)
+        top: `${componentY + 6}px`,
         pointerEvents: 'none',
         zIndex: 10,
       }}
@@ -64,7 +64,7 @@ export const PinOverlay: React.FC<PinOverlayProps> = ({
             key={pin.name}
             onClick={(e) => {
               e.stopPropagation();
-              onPinClick(componentId, pin.name, componentX + pinX, componentY + pinY);
+              onPinClick(componentId, pin.name, componentX + 6 + pinX, componentY + 6 + pinY);
             }}
             style={{
               position: 'absolute',
