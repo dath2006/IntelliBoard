@@ -14,6 +14,16 @@ Local Arduino emulator with code editor and visual simulator.
 - ⏳ Full emulation with avr8js (in progress)
 - ⏳ SQLite persistence (coming soon)
 
+## Screenshots
+
+<img src="doc/img1.png" alt="Arduino Emulator - Editor and Simulator" width="800"/>
+
+*Arduino emulator with Monaco code editor and visual simulator with wokwi-elements*
+
+<img src="doc/img2.png" alt="Arduino Emulator - Component Properties and Wire Editing" width="800"/>
+
+*Interactive component properties dialog and segment-based wire editing*
+
 ## Prerequisites
 
 ### 1. Node.js
@@ -245,3 +255,4 @@ MIT
 - [wokwi-elements](https://github.com/wokwi/wokwi-elements) - Web components
 - [arduino-cli](https://github.com/arduino/arduino-cli) - Arduino compiler
 - [Monaco Editor](https://microsoft.github.io/monaco-editor/) - Code editor
+
