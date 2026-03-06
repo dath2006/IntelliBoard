@@ -10,17 +10,17 @@ RUN npm install
 # Build avr8js
 COPY wokwi-libs/avr8js/ wokwi-libs/avr8js/
 WORKDIR /app/wokwi-libs/avr8js
-RUN npm install && npm run build
+RUN npm install && npm run build --if-present
 
-# Build rp2040js
+# Build rp2040js (dist may already be committed; build only if script exists)
 COPY wokwi-libs/rp2040js/ wokwi-libs/rp2040js/
 WORKDIR /app/wokwi-libs/rp2040js
-RUN npm install && npm run build
+RUN npm install && npm run build --if-present
 
 # Build wokwi-elements
 COPY wokwi-libs/wokwi-elements/ wokwi-libs/wokwi-elements/
 WORKDIR /app/wokwi-libs/wokwi-elements
-RUN npm install && npm run build
+RUN npm install && npm run build --if-present
 
 # Build frontend
 WORKDIR /app
