@@ -142,6 +142,7 @@ const modalStyles: Record<string, React.CSSProperties> = {
 
 function SetupScreen({ onDone }: { onDone: () => void }) {
   const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
   const [error, setError] = useState('');
@@ -157,7 +158,7 @@ function SetupScreen({ onDone }: { onDone: () => void }) {
     }
     setLoading(true);
     try {
-      await createFirstAdmin(username, password);
+      await createFirstAdmin(username, email, password);
       onDone();
       navigate('/login?redirect=/admin');
     } catch (err: any) {
@@ -182,6 +183,15 @@ function SetupScreen({ onDone }: { onDone: () => void }) {
             required
             autoFocus
             placeholder="admin"
+          />
+          <label style={s.label}>Email</label>
+          <input
+            style={s.input}
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            placeholder="admin@example.com"
           />
           <label style={s.label}>Password</label>
           <input

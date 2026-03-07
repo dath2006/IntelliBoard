@@ -5,6 +5,7 @@ from pydantic import BaseModel, EmailStr
 
 class AdminSetupRequest(BaseModel):
     username: str
+    email: EmailStr
     password: str
 
 

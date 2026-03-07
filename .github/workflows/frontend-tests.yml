@@ -13,13 +13,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          submodules: recursive
+        # Do NOT use submodules: recursive — the submodule pointers in this repo
+        # are stale and predate package.json. We clone the libs fresh below.
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      # Clone wokwi-libs fresh (stale submodule pointers can't be used)
+      - name: Clone wokwi-libs
+        run: |
+          git clone --depth=1 https://github.com/wokwi/avr8js.git wokwi-libs/avr8js
+          git clone --depth=1 https://github.com/wokwi/rp2040js.git wokwi-libs/rp2040js
+          git clone --depth=1 https://github.com/wokwi/wokwi-elements.git wokwi-libs/wokwi-elements
 
       # Cache wokwi-libs node_modules to speed up repeated runs
       - name: Cache wokwi-libs node_modules

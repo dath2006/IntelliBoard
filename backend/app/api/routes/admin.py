@@ -46,20 +46,14 @@ async def setup_admin(body: AdminSetupRequest, db: AsyncSession = Depends(get_db
 
     # Check uniqueness
     conflict = await db.execute(
-        select(User).where(User.username == username)
+        select(User).where((User.username == username) | (User.email == body.email))
     )
     if conflict.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Username already taken.")
-
-    # Generate a placeholder email for the admin setup account
-    email = f"{username}@admin.local"
-    email_conflict = await db.execute(select(User).where(User.email == email))
-    if email_conflict.scalar_one_or_none():
-        email = f"{username}.admin@admin.local"
+        raise HTTPException(status_code=400, detail="Username or email already taken.")
 
     user = User(
         username=username,
-        email=email,
+        email=body.email,
         hashed_password=hash_password(body.password),
         is_admin=True,
         is_active=True,
