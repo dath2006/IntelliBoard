@@ -1,4 +1,5 @@
-import { Link } from 'react-router-dom';
+import { useState, useRef, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import './LandingPage.css';
 
@@ -330,9 +331,82 @@ const IcoSponsor = () => (
   </svg>
 );
 
+/* ── User nav dropdown ────────────────────────────────── */
+const UserMenu: React.FC = () => {
+  const user = useAuthStore((s) => s.user);
+  const logout = useAuthStore((s) => s.logout);
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  if (!user) return null;
+
+  const initials = user.username[0].toUpperCase();
+
+  return (
+    <div className="user-menu" ref={ref}>
+      <button className="user-menu-trigger" onClick={() => setOpen((v) => !v)}>
+        {user.avatar_url ? (
+          <img src={user.avatar_url} alt="" className="user-avatar" />
+        ) : (
+          <span className="user-avatar user-avatar-initials">{initials}</span>
+        )}
+        <span className="user-menu-name">{user.username}</span>
+        <svg viewBox="0 0 16 16" fill="currentColor" width="10" height="10" style={{ opacity: 0.5 }}>
+          <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="user-menu-dropdown">
+          <div className="user-menu-header">
+            {user.avatar_url ? (
+              <img src={user.avatar_url} alt="" className="user-avatar user-avatar-lg" />
+            ) : (
+              <span className="user-avatar user-avatar-initials user-avatar-lg">{initials}</span>
+            )}
+            <div>
+              <div className="user-menu-uname">{user.username}</div>
+              <div className="user-menu-email">{user.email}</div>
+            </div>
+          </div>
+          <div className="user-menu-divider" />
+          <Link to="/editor" className="user-menu-item" onClick={() => setOpen(false)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="15" height="15">
+              <polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>
+            </svg>
+            Open Editor
+          </Link>
+          <Link to={`/${user.username}`} className="user-menu-item" onClick={() => setOpen(false)}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="15" height="15">
+              <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+            </svg>
+            My Projects
+          </Link>
+          <div className="user-menu-divider" />
+          <button className="user-menu-item user-menu-signout" onClick={async () => { setOpen(false); await logout(); navigate('/'); }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" width="15" height="15">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+            Sign out
+          </button>
+        </div>
+      )}
+    </div>
+  );
+};
+
 /* ── Component ────────────────────────────────────────── */
 export const LandingPage: React.FC = () => {
   const user = useAuthStore((s) => s.user);
+  const isLoading = useAuthStore((s) => s.isLoading);
 
   return (
     <div className="landing">
@@ -347,8 +421,10 @@ export const LandingPage: React.FC = () => {
             <IcoGitHub /> GitHub
           </a>
           <Link to="/examples" className="nav-link">Examples</Link>
-          {user ? (
-            <Link to="/editor" className="nav-btn-primary">Open Editor</Link>
+          {isLoading ? (
+            <div className="nav-auth-skeleton" />
+          ) : user ? (
+            <UserMenu />
           ) : (
             <>
               <Link to="/login" className="nav-link">Sign in</Link>

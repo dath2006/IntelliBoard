@@ -168,6 +168,7 @@ async def google_callback(code: str, response: Response, db: AsyncSession = Depe
     await db.refresh(user)
 
     jwt_token = create_access_token({"sub": user.id}, expires_delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
-    redirect = RedirectResponse(url=settings.FRONTEND_URL)
+    # Send the user straight to the editor after OAuth login
+    redirect = RedirectResponse(url=f"{settings.FRONTEND_URL}/editor")
     _set_auth_cookie(redirect, jwt_token)
     return redirect
