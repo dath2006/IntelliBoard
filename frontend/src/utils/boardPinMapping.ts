@@ -51,7 +51,7 @@ const ARDUINO_UNO_ANALOG_MAP: Record<string, number> = {
 };
 
 /** All known board component IDs in the simulator */
-export const BOARD_COMPONENT_IDS = ['arduino-uno', 'nano-rp2040'];
+export const BOARD_COMPONENT_IDS = ['arduino-uno', 'arduino-nano', 'nano-rp2040'];
 
 /**
  * Check whether a componentId represents a board (not an external component).
@@ -69,7 +69,7 @@ export function isBoardComponent(componentId: string): boolean {
  * @returns Numeric pin/GPIO number, or null if unmapped
  */
 export function boardPinToNumber(boardId: string, pinName: string): number | null {
-  if (boardId === 'arduino-uno') {
+  if (boardId === 'arduino-uno' || boardId === 'arduino-nano') {
     // Try numeric (covers '0' through '13', also legacy examples using just numbers)
     const num = parseInt(pinName, 10);
     if (!isNaN(num) && num >= 0 && num <= 21) return num;

@@ -43,7 +43,7 @@ export interface VelxioComponent {
 }
 
 export interface ImportResult {
-  boardType: 'arduino-uno' | 'raspberry-pi-pico';
+  boardType: 'arduino-uno' | 'arduino-nano' | 'raspberry-pi-pico';
   boardPosition: { x: number; y: number };
   components: VelxioComponent[];
   wires: Wire[];
@@ -53,9 +53,9 @@ export interface ImportResult {
 // ── Board mappings ────────────────────────────────────────────────────────────
 
 // Wokwi board type → Velxio boardType
-const WOKWI_TYPE_TO_BOARD: Record<string, 'arduino-uno' | 'raspberry-pi-pico'> = {
+const WOKWI_TYPE_TO_BOARD: Record<string, 'arduino-uno' | 'arduino-nano' | 'raspberry-pi-pico'> = {
   'wokwi-arduino-uno': 'arduino-uno',
-  'wokwi-arduino-nano': 'arduino-uno',
+  'wokwi-arduino-nano': 'arduino-nano',
   'wokwi-arduino-mega': 'arduino-uno',
   'wokwi-raspberry-pi-pico': 'raspberry-pi-pico',
 };
@@ -63,12 +63,14 @@ const WOKWI_TYPE_TO_BOARD: Record<string, 'arduino-uno' | 'raspberry-pi-pico'> =
 // Velxio boardType → Wokwi type
 const BOARD_TO_WOKWI_TYPE: Record<string, string> = {
   'arduino-uno': 'wokwi-arduino-uno',
+  'arduino-nano': 'wokwi-arduino-nano',
   'raspberry-pi-pico': 'wokwi-raspberry-pi-pico',
 };
 
 // Velxio boardType → default Wokwi part id
 const BOARD_TO_WOKWI_ID: Record<string, string> = {
   'arduino-uno': 'uno',
+  'arduino-nano': 'nano',
   'raspberry-pi-pico': 'pico',
 };
 
@@ -140,8 +142,10 @@ export async function exportToWokwiZip(
 
   // Build connections
   const connections: [string, string, string, string[]][] = wires.map((w) => {
-    const startId = w.start.componentId === 'arduino-uno' ? boardId : w.start.componentId;
-    const endId = w.end.componentId === 'arduino-uno' ? boardId : w.end.componentId;
+    const isBoardStart = w.start.componentId === 'arduino-uno' || w.start.componentId === 'arduino-nano' || w.start.componentId === 'nano-rp2040';
+    const isBoardEnd = w.end.componentId === 'arduino-uno' || w.end.componentId === 'arduino-nano' || w.end.componentId === 'nano-rp2040';
+    const startId = isBoardStart ? boardId : w.start.componentId;
+    const endId = isBoardEnd ? boardId : w.end.componentId;
     return [
       `${startId}:${w.start.pinName}`,
       `${endId}:${w.end.pinName}`,
@@ -193,6 +197,14 @@ export async function importFromWokwiZip(file: File): Promise<ImportResult> {
   const boardType = boardPart ? WOKWI_TYPE_TO_BOARD[boardPart.type] : 'arduino-uno';
   const boardId = boardPart?.id ?? 'uno';
 
+  // Velxio internal component ID for the board element (must match DOM element id)
+  const VELXIO_BOARD_ID: Record<string, string> = {
+    'arduino-uno': 'arduino-uno',
+    'arduino-nano': 'arduino-nano',
+    'raspberry-pi-pico': 'nano-rp2040',
+  };
+  const velxioBoardId = VELXIO_BOARD_ID[boardType] ?? 'arduino-uno';
+
   // Board position from diagram (use directly as Velxio board position)
   const boardPosition = {
     x: boardPart?.left ?? 50,
@@ -221,8 +233,8 @@ export async function importFromWokwiZip(file: File): Promise<ImportResult> {
     const endPin = colonB >= 0 ? endStr.slice(colonB + 1) : '';
 
     // Remap board part id → Velxio internal board id
-    const startId = startCompRaw === boardId ? 'arduino-uno' : startCompRaw;
-    const endId = endCompRaw === boardId ? 'arduino-uno' : endCompRaw;
+    const startId = startCompRaw === boardId ? velxioBoardId : startCompRaw;
+    const endId = endCompRaw === boardId ? velxioBoardId : endCompRaw;
 
     return {
       id: `wire-${i}-${Date.now()}`,

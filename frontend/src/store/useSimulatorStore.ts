@@ -7,15 +7,17 @@ import type { RP2040I2CDevice } from '../simulation/RP2040Simulator';
 import type { Wire, WireInProgress, WireEndpoint } from '../types/wire';
 import { calculatePinPosition } from '../utils/pinPositionCalculator';
 
-export type BoardType = 'arduino-uno' | 'raspberry-pi-pico';
+export type BoardType = 'arduino-uno' | 'arduino-nano' | 'raspberry-pi-pico';
 
 export const BOARD_FQBN: Record<BoardType, string> = {
   'arduino-uno': 'arduino:avr:uno',
+  'arduino-nano': 'arduino:avr:nano:cpu=atmega328',
   'raspberry-pi-pico': 'rp2040:rp2040:rpipico',
 };
 
 export const BOARD_LABELS: Record<BoardType, string> = {
   'arduino-uno': 'Arduino Uno',
+  'arduino-nano': 'Arduino Nano',
   'raspberry-pi-pico': 'Raspberry Pi Pico',
 };
 
@@ -184,7 +186,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       if (running) {
         get().stopSimulation();
       }
-      const simulator = type === 'arduino-uno'
+      const simulator = (type === 'arduino-uno' || type === 'arduino-nano')
         ? new AVRSimulator(pinManager)
         : new RP2040Simulator(pinManager);
       // Wire serial output callback for both simulator types
@@ -200,7 +202,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
     initSimulator: () => {
       const { boardType } = get();
-      const simulator = boardType === 'arduino-uno'
+      const simulator = (boardType === 'arduino-uno' || boardType === 'arduino-nano')
         ? new AVRSimulator(pinManager)
         : new RP2040Simulator(pinManager);
       // Wire serial output callback for both simulator types

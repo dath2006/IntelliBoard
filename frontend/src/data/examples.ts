@@ -11,7 +11,7 @@ export interface ExampleProject {
   category: 'basics' | 'sensors' | 'displays' | 'communication' | 'games' | 'robotics';
   difficulty: 'beginner' | 'intermediate' | 'advanced';
   /** Target board — defaults to 'arduino-uno' if omitted */
-  boardType?: 'arduino-uno' | 'raspberry-pi-pico';
+  boardType?: 'arduino-uno' | 'arduino-nano' | 'raspberry-pi-pico';
   code: string;
   components: Array<{
     type: string;
