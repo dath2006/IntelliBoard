@@ -48,6 +48,8 @@ export interface ImportResult {
   components: VelxioComponent[];
   wires: Wire[];
   files: Array<{ name: string; content: string }>;
+  /** Standard Arduino library names parsed from libraries.txt (Wokwi-only @wokwi: entries are excluded). */
+  libraries: string[];
 }
 
 // ── Board mappings ────────────────────────────────────────────────────────────
@@ -303,5 +305,17 @@ export async function importFromWokwiZip(file: File): Promise<ImportResult> {
     return a.name.localeCompare(b.name);
   });
 
-  return { boardType, boardPosition, components, wires, files };
+  // Parse libraries.txt — skip blank lines, comments (#), and Wokwi-only entries (name@wokwi:hash)
+  const libraries: string[] = [];
+  const libEntry = zip.file('libraries.txt');
+  if (libEntry) {
+    const libText = await libEntry.async('string');
+    for (const raw of libText.split('\n')) {
+      const line = raw.trim();
+      if (!line || line.startsWith('#') || line.includes('@wokwi:')) continue;
+      libraries.push(line);
+    }
+  }
+
+  return { boardType, boardPosition, components, wires, files, libraries };
 }

@@ -3,6 +3,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSimulatorStore, BOARD_FQBN, BOARD_LABELS } from '../../store/useSimulatorStore';
 import { compileCode } from '../../services/compilation';
 import { LibraryManagerModal } from '../simulator/LibraryManagerModal';
+import { InstallLibrariesModal } from '../simulator/InstallLibrariesModal';
 import { parseCompileResult } from '../../utils/compilationLogger';
 import type { CompilationLog } from '../../utils/compilationLogger';
 import { exportToWokwiZip, importFromWokwiZip } from '../../utils/wokwiZip';
@@ -30,6 +31,8 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
   const [compiling, setCompiling] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [libManagerOpen, setLibManagerOpen] = useState(false);
+  const [pendingLibraries, setPendingLibraries] = useState<string[]>([]);
+  const [installModalOpen, setInstallModalOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const addLog = useCallback((log: CompilationLog) => {
@@ -121,6 +124,10 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
       setWires(result.wires);
       if (result.files.length > 0) loadFiles(result.files);
       setMessage({ type: 'success', text: `Imported ${file.name}` });
+      if (result.libraries.length > 0) {
+        setPendingLibraries(result.libraries);
+        setInstallModalOpen(true);
+      }
     } catch (err: any) {
       setMessage({ type: 'error', text: err?.message || 'Import failed.' });
     }
@@ -275,6 +282,11 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
       )}
 
       <LibraryManagerModal isOpen={libManagerOpen} onClose={() => setLibManagerOpen(false)} />
+      <InstallLibrariesModal
+        isOpen={installModalOpen}
+        onClose={() => setInstallModalOpen(false)}
+        libraries={pendingLibraries}
+      />
     </>
   );
 };
