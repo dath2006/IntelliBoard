@@ -215,17 +215,19 @@ const ChannelCanvas: React.FC<ChannelCanvasProps> = ({
   // Re-draw whenever data or sizing changes
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
-    const wrap   = wrapRef.current;
+    const wrap = wrapRef.current;
     if (!canvas || !wrap) return;
 
     const { width, height } = wrap.getBoundingClientRect();
     if (width === 0 || height === 0) return;
 
-    canvas.width  = Math.floor(width)  * window.devicePixelRatio;
+    canvas.width = Math.floor(width) * window.devicePixelRatio;
     canvas.height = Math.floor(height) * window.devicePixelRatio;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
     drawWaveform(canvas, samples, channel.color, windowEndMs, windowMs);
+    // Intentionally exclude canvasRef/wrapRef (stable refs) and the
+    // module-level drawWaveform function from the dependency array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [samples, channel.color, windowEndMs, windowMs]);
 
@@ -246,21 +248,22 @@ interface RulerCanvasProps {
 
 const RulerCanvas: React.FC<RulerCanvasProps> = ({ windowEndMs, windowMs, timeDivMs }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const wrapRef   = useRef<HTMLDivElement>(null);
+  const wrapRef = useRef<HTMLDivElement>(null);
 
   useLayoutEffect(() => {
     const canvas = canvasRef.current;
-    const wrap   = wrapRef.current;
+    const wrap = wrapRef.current;
     if (!canvas || !wrap) return;
 
     const { width, height } = wrap.getBoundingClientRect();
     if (width === 0 || height === 0) return;
 
-    canvas.width  = Math.floor(width)  * window.devicePixelRatio;
+    canvas.width = Math.floor(width) * window.devicePixelRatio;
     canvas.height = Math.floor(height) * window.devicePixelRatio;
     const ctx = canvas.getContext('2d');
     if (ctx) ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
     drawRuler(canvas, windowEndMs, windowMs, timeDivMs);
+    // Intentionally exclude stable canvasRef/wrapRef and module-level drawRuler.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [windowEndMs, windowMs, timeDivMs]);
 

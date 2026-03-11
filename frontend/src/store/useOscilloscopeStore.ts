@@ -103,13 +103,10 @@ export const useOscilloscopeStore = create<OscilloscopeState>((set, get) => ({
       const buf = s.samples[channelId];
       if (!buf) return s;
 
-      let next: OscSample[];
-      if (buf.length >= MAX_SAMPLES) {
-        // Drop the oldest entry (shift)
-        next = [...buf.slice(1), { timeMs, state }];
-      } else {
-        next = [...buf, { timeMs, state }];
-      }
+      // Efficient copy: one allocation instead of two (avoids spread + slice).
+      const next = buf.slice();
+      if (next.length >= MAX_SAMPLES) next.shift(); // drop oldest
+      next.push({ timeMs, state });
       return { samples: { ...s.samples, [channelId]: next } };
     });
   },
