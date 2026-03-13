@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef } from 'react';
 import { useEditorStore } from '../../store/useEditorStore';
-import { useSimulatorStore, BOARD_FQBN, BOARD_LABELS } from '../../store/useSimulatorStore';
+import { useSimulatorStore } from '../../store/useSimulatorStore';
+import { BOARD_KIND_FQBN, BOARD_KIND_LABELS } from '../../types/board';
 import { compileCode } from '../../services/compilation';
 import { LibraryManagerModal } from '../simulator/LibraryManagerModal';
 import { InstallLibrariesModal } from '../simulator/InstallLibrariesModal';
@@ -19,15 +20,21 @@ interface EditorToolbarProps {
 export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compileLogs, setCompileLogs }: EditorToolbarProps) => {
   const { files } = useEditorStore();
   const {
-    boardType,
-    setCompiledHex,
-    setCompiledBinary,
+    boards,
+    activeBoardId,
+    compileBoardProgram,
+    startBoard,
+    stopBoard,
+    resetBoard,
+    // legacy compat
     startSimulation,
     stopSimulation,
     resetSimulation,
     running,
     compiledHex,
   } = useSimulatorStore();
+
+  const activeBoard = boards.find((b) => b.id === activeBoardId) ?? boards[0];
   const [compiling, setCompiling] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [libManagerOpen, setLibManagerOpen] = useState(false);
@@ -44,8 +51,25 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
     setMessage(null);
     setConsoleOpen(true);
 
-    const fqbn = BOARD_FQBN[boardType];
-    const boardLabel = BOARD_LABELS[boardType];
+    const kind = activeBoard?.boardKind;
+
+    // Raspberry Pi 3B doesn't need arduino-cli compilation
+    if (kind === 'raspberry-pi-3') {
+      addLog({ timestamp: new Date(), type: 'info', message: 'Raspberry Pi 3B: no compilation needed — run Python scripts directly.' });
+      setMessage({ type: 'success', text: 'Ready (no compilation needed)' });
+      setCompiling(false);
+      return;
+    }
+
+    const fqbn = kind ? BOARD_KIND_FQBN[kind] : null;
+    const boardLabel = kind ? BOARD_KIND_LABELS[kind] : 'Unknown';
+
+    if (!fqbn) {
+      addLog({ timestamp: new Date(), type: 'error', message: `No FQBN for board kind: ${kind}` });
+      setMessage({ type: 'error', text: 'Unknown board' });
+      setCompiling(false);
+      return;
+    }
 
     addLog({ timestamp: new Date(), type: 'info', message: `Starting compilation for ${boardLabel} (${fqbn})...` });
 
@@ -53,20 +77,15 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
       const sketchFiles = files.map((f) => ({ name: f.name, content: f.content }));
       const result = await compileCode(sketchFiles, fqbn);
 
-      // Parse the full result into log entries
       const resultLogs = parseCompileResult(result, boardLabel);
       setCompileLogs((prev: CompilationLog[]) => [...prev, ...resultLogs]);
 
       if (result.success) {
-        if (result.hex_content) {
-          setCompiledHex(result.hex_content);
-          setMessage({ type: 'success', text: 'Compiled successfully' });
-        } else if (result.binary_content) {
-          setCompiledBinary(result.binary_content);
-          setMessage({ type: 'success', text: 'Compiled successfully' });
-        } else {
-          setMessage({ type: 'error', text: 'No output' });
+        const program = result.hex_content ?? result.binary_content ?? null;
+        if (program && activeBoardId) {
+          compileBoardProgram(activeBoardId, program);
         }
+        setMessage({ type: 'success', text: 'Compiled successfully' });
       } else {
         setMessage({ type: 'error', text: result.error || result.stderr || 'Compile failed' });
       }
@@ -80,6 +99,15 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
   };
 
   const handleRun = () => {
+    if (activeBoardId) {
+      const board = boards.find((b) => b.id === activeBoardId);
+      if (board?.boardKind === 'raspberry-pi-3' || board?.compiledProgram) {
+        startBoard(activeBoardId);
+        setMessage(null);
+        return;
+      }
+    }
+    // legacy fallback
     if (compiledHex) {
       startSimulation();
       setMessage(null);
@@ -89,20 +117,22 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
   };
 
   const handleStop = () => {
-    stopSimulation();
+    if (activeBoardId) stopBoard(activeBoardId);
+    else stopSimulation();
     setMessage(null);
   };
 
   const handleReset = () => {
-    resetSimulation();
+    if (activeBoardId) resetBoard(activeBoardId);
+    else resetSimulation();
     setMessage(null);
   };
 
   const handleExport = async () => {
     try {
-      const { components, wires, boardPosition } = useSimulatorStore.getState();
+      const { components, wires, boardPosition, boardType: legacyBoardType } = useSimulatorStore.getState();
       const projectName = files.find((f) => f.name.endsWith('.ino'))?.name.replace('.ino', '') || 'velxio-project';
-      await exportToWokwiZip(files, components, wires, boardType, projectName, boardPosition);
+      await exportToWokwiZip(files, components, wires, legacyBoardType, projectName, boardPosition);
     } catch (err) {
       setMessage({ type: 'error', text: 'Export failed.' });
     }
@@ -160,7 +190,7 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
           {/* Run */}
           <button
             onClick={handleRun}
-            disabled={running || !compiledHex}
+            disabled={running || (activeBoard?.boardKind !== 'raspberry-pi-3' && !compiledHex && !activeBoard?.compiledProgram)}
             className="tb-btn tb-btn-run"
             title="Run"
           >

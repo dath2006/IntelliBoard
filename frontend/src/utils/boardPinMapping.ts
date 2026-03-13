@@ -61,14 +61,71 @@ const ARDUINO_MEGA_ANALOG_MAP: Record<string, number> = {
   'A12': 66, 'A13': 67, 'A14': 68, 'A15': 69,
 };
 
+/**
+ * Raspberry Pi 3B physical pin number → BCM GPIO number.
+ * Power / GND / special-function pins are mapped to -1 (not a GPIO).
+ * Source: https://pinout.xyz
+ */
+export const PI3_PHYSICAL_TO_BCM: Record<number, number> = {
+  1:  -1,  // 3.3V
+  2:  -1,  // 5V
+  3:  2,   // BCM2 (SDA1)
+  4:  -1,  // 5V
+  5:  3,   // BCM3 (SCL1)
+  6:  -1,  // GND
+  7:  4,   // BCM4 (GPCLK0)
+  8:  14,  // BCM14 (TXD0 / ttyAMA0)
+  9:  -1,  // GND
+  10: 15,  // BCM15 (RXD0 / ttyAMA0)
+  11: 17,  // BCM17
+  12: 18,  // BCM18 (PWM0)
+  13: 27,  // BCM27
+  14: -1,  // GND
+  15: 22,  // BCM22
+  16: 23,  // BCM23
+  17: -1,  // 3.3V
+  18: 24,  // BCM24
+  19: 10,  // BCM10 (MOSI)
+  20: -1,  // GND
+  21: 9,   // BCM9 (MISO)
+  22: 25,  // BCM25
+  23: 11,  // BCM11 (SCLK)
+  24: 8,   // BCM8 (CE0)
+  25: -1,  // GND
+  26: 7,   // BCM7 (CE1)
+  27: -1,  // ID_SD (reserved)
+  28: -1,  // ID_SC (reserved)
+  29: 5,   // BCM5
+  30: -1,  // GND
+  31: 6,   // BCM6
+  32: 12,  // BCM12 (PWM0)
+  33: 13,  // BCM13 (PWM1)
+  34: -1,  // GND
+  35: 19,  // BCM19 (MISO1)
+  36: 16,  // BCM16 (CE2)
+  37: 26,  // BCM26
+  38: 20,  // BCM20 (MOSI1)
+  39: -1,  // GND
+  40: 21,  // BCM21 (SCLK1)
+};
+
+/** BCM GPIO number → physical pin number (reverse map) */
+export const PI3_BCM_TO_PHYSICAL: Record<number, number> = Object.fromEntries(
+  Object.entries(PI3_PHYSICAL_TO_BCM)
+    .filter(([, bcm]) => bcm >= 0)
+    .map(([physical, bcm]) => [bcm, Number(physical)])
+);
+
 /** All known board component IDs in the simulator */
-export const BOARD_COMPONENT_IDS = ['arduino-uno', 'arduino-nano', 'arduino-mega', 'nano-rp2040'];
+export const BOARD_COMPONENT_IDS = [
+  'arduino-uno', 'arduino-nano', 'arduino-mega', 'nano-rp2040', 'raspberry-pi-3',
+];
 
 /**
  * Check whether a componentId represents a board (not an external component).
  */
 export function isBoardComponent(componentId: string): boolean {
-  return BOARD_COMPONENT_IDS.includes(componentId);
+  return BOARD_COMPONENT_IDS.some((id) => componentId === id || componentId.startsWith(id));
 }
 
 /**
@@ -106,6 +163,14 @@ export function boardPinToNumber(boardId: string, pinName: string): number | nul
 
   if (boardId === 'nano-rp2040') {
     return NANO_RP2040_PIN_MAP[pinName] ?? null;
+  }
+
+  // Raspberry Pi 3B — pinName is the physical pin number ("1" … "40")
+  // We return the BCM GPIO number, or -1 for power/GND pins.
+  if (boardId === 'raspberry-pi-3' || boardId.startsWith('raspberry-pi-3')) {
+    const physical = parseInt(pinName, 10);
+    if (!isNaN(physical)) return PI3_PHYSICAL_TO_BCM[physical] ?? null;
+    return null;
   }
 
   return null;

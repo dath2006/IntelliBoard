@@ -1,29 +1,27 @@
-import { useSimulatorStore, BOARD_LABELS } from '../../store/useSimulatorStore';
-import type { BoardType } from '../../store/useSimulatorStore';
+import { useSimulatorStore } from '../../store/useSimulatorStore';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { ArduinoUno } from '../components-wokwi/ArduinoUno';
-import { ArduinoNano } from '../components-wokwi/ArduinoNano';
-import { ArduinoMega } from '../components-wokwi/ArduinoMega';
-import { NanoRP2040 } from '../components-wokwi/NanoRP2040';
 import { ComponentPickerModal } from '../ComponentPickerModal';
 import { ComponentPropertyDialog } from './ComponentPropertyDialog';
 import { DynamicComponent, createComponentFromMetadata } from '../DynamicComponent';
 import { ComponentRegistry } from '../../services/ComponentRegistry';
 import { PinSelector } from './PinSelector';
 import { WireLayer } from './WireLayer';
-import { PinOverlay } from './PinOverlay';
+import { BoardOnCanvas } from './BoardOnCanvas';
+import { BoardPickerModal } from './BoardPickerModal';
 import { PartSimulationRegistry } from '../../simulation/parts';
 import { isBoardComponent, boardPinToNumber } from '../../utils/boardPinMapping';
 import type { ComponentMetadata } from '../../types/component-metadata';
+import type { BoardKind } from '../../types/board';
 import { useOscilloscopeStore } from '../../store/useOscilloscopeStore';
+import { useEditorStore } from '../../store/useEditorStore';
 import './SimulatorCanvas.css';
 
 export const SimulatorCanvas = () => {
   const {
-    boardType,
-    setBoardType,
-    boardPosition,
+    boards,
+    activeBoardId,
     setBoardPosition,
+    addBoard,
     components,
     running,
     pinManager,
@@ -34,9 +32,11 @@ export const SimulatorCanvas = () => {
     updateComponent,
     serialMonitorOpen,
     toggleSerialMonitor,
-    connectRemoteSimulator,
-    disconnectRemoteSimulator,
   } = useSimulatorStore();
+
+  // Legacy derived values for components that still use them
+  const boardType = useSimulatorStore((s) => s.boardType);
+  const boardPosition = useSimulatorStore((s) => s.boardPosition);
 
   // Wire management from store
   const startWireCreation = useSimulatorStore((s) => s.startWireCreation);
@@ -49,6 +49,9 @@ export const SimulatorCanvas = () => {
   // Oscilloscope
   const oscilloscopeOpen = useOscilloscopeStore((s) => s.open);
   const toggleOscilloscope = useOscilloscopeStore((s) => s.toggleOscilloscope);
+
+  // Board picker modal
+  const [showBoardPicker, setShowBoardPicker] = useState(false);
 
   // Component picker modal
   const [showComponentPicker, setShowComponentPicker] = useState(false);
@@ -126,20 +129,16 @@ export const SimulatorCanvas = () => {
     initSimulator();
   }, [initSimulator]);
 
-  // Connect to Remote Simulator (QEMU) if a Raspberry Pi exists and simulation is running
+  // Auto-start/stop Pi bridges when simulation state changes
+  const startBoard = useSimulatorStore((s) => s.startBoard);
+  const stopBoard = useSimulatorStore((s) => s.stopBoard);
   useEffect(() => {
-    const hasPi = components.some(c => c.metadataId === 'raspberry-pi-3');
-    if (running && hasPi) {
-       // Using a random client ID or static one for local development
-       connectRemoteSimulator('local-velxio-client');
-    } else {
-       disconnectRemoteSimulator();
-    }
-    
-    return () => {
-       if (!running) disconnectRemoteSimulator();
-    };
-  }, [running, components, connectRemoteSimulator, disconnectRemoteSimulator]);
+    const piBoards = boards.filter((b) => b.boardKind === 'raspberry-pi-3');
+    piBoards.forEach((b) => {
+      if (running && !b.running) startBoard(b.id);
+      else if (!running && b.running) stopBoard(b.id);
+    });
+  }, [running, boards, startBoard, stopBoard]);
 
   // Attach wheel listener as non-passive so preventDefault() works
   useEffect(() => {
@@ -289,13 +288,20 @@ export const SimulatorCanvas = () => {
       } else if (touchDraggedComponentIdRef.current) {
         // ── Single finger component/board drag ──
         const world = toWorld(touch.clientX, touch.clientY);
-        if (touchDraggedComponentIdRef.current === '__board__') {
+        const touchId = touchDraggedComponentIdRef.current;
+        if (touchId && touchId.startsWith('__board__:')) {
+          const boardId = touchId.slice('__board__:'.length);
+          setBoardPosition({
+            x: world.x - touchDragOffsetRef.current.x,
+            y: world.y - touchDragOffsetRef.current.y,
+          }, boardId);
+        } else if (touchId === '__board__') {
           setBoardPosition({
             x: world.x - touchDragOffsetRef.current.x,
             y: world.y - touchDragOffsetRef.current.y,
           });
         } else {
-          updateComponent(touchDraggedComponentIdRef.current, {
+          updateComponent(touchDraggedComponentIdRef.current!, {
             x: world.x - touchDragOffsetRef.current.x,
             y: world.y - touchDragOffsetRef.current.y,
           } as any);
@@ -537,14 +543,15 @@ export const SimulatorCanvas = () => {
       return;
     }
 
-    // Handle component dragging
+    // Handle component/board dragging
     if (draggedComponentId) {
       const world = toWorld(e.clientX, e.clientY);
-      if (draggedComponentId === '__board__') {
-        setBoardPosition({
-          x: world.x - dragOffset.x,
-          y: world.y - dragOffset.y,
-        });
+      if (draggedComponentId.startsWith('__board__:')) {
+        const boardId = draggedComponentId.slice('__board__:'.length);
+        setBoardPosition({ x: world.x - dragOffset.x, y: world.y - dragOffset.y }, boardId);
+      } else if (draggedComponentId === '__board__') {
+        // legacy fallback
+        setBoardPosition({ x: world.x - dragOffset.x, y: world.y - dragOffset.y });
       } else {
         updateComponent(draggedComponentId, {
           x: world.x - dragOffset.x,
@@ -776,16 +783,16 @@ export const SimulatorCanvas = () => {
             {/* Status LED */}
             <span className={`status-dot ${running ? 'running' : 'stopped'}`} title={running ? 'Running' : 'Stopped'} />
 
-            {/* Board selector */}
+            {/* Active board selector (multi-board) */}
             <select
               className="board-selector"
-              value={boardType}
-              onChange={(e) => setBoardType(e.target.value as BoardType)}
+              value={activeBoardId ?? ''}
+              onChange={(e) => useSimulatorStore.getState().setActiveBoardId(e.target.value)}
               disabled={running}
-              title="Select board"
+              title="Active board"
             >
-              {(Object.entries(BOARD_LABELS) as [BoardType, string][]).map(([type, label]) => (
-                <option key={type} value={type}>{label}</option>
+              {boards.map((b) => (
+                <option key={b.id} value={b.id}>{b.id}</option>
               ))}
             </select>
 
@@ -851,6 +858,22 @@ export const SimulatorCanvas = () => {
               </svg>
               Add
             </button>
+
+            {/* Add Board */}
+            <button
+              className="add-component-btn"
+              onClick={() => setShowBoardPicker(true)}
+              title="Add Board"
+              disabled={running}
+              style={{ marginLeft: 2 }}
+            >
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="2" y="5" width="20" height="14" rx="2" />
+                <line x1="12" y1="9" x2="12" y2="15" />
+                <line x1="9" y1="12" x2="15" y2="12" />
+              </svg>
+              Board
+            </button>
           </div>
         </div>
         <div
@@ -872,68 +895,21 @@ export const SimulatorCanvas = () => {
             {/* Wire Layer - Renders below all components */}
             <WireLayer />
 
-            {/* Board visual — switches based on selected board type */}
-            {boardType === 'arduino-uno' ? (
-              <ArduinoUno
-                x={boardPosition.x}
-                y={boardPosition.y}
+            {/* All boards on canvas */}
+            {boards.map((board) => (
+              <BoardOnCanvas
+                key={board.id}
+                board={board}
+                running={running}
                 led13={Boolean(components.find((c) => c.id === 'led-builtin')?.properties.state)}
-              />
-            ) : boardType === 'arduino-nano' ? (
-              <ArduinoNano
-                x={boardPosition.x}
-                y={boardPosition.y}
-                led13={Boolean(components.find((c) => c.id === 'led-builtin')?.properties.state)}
-              />
-            ) : boardType === 'arduino-mega' ? (
-              <ArduinoMega
-                x={boardPosition.x}
-                y={boardPosition.y}
-                led13={Boolean(components.find((c) => c.id === 'led-builtin')?.properties.state)}
-              />
-            ) : (
-              <NanoRP2040
-                x={boardPosition.x}
-                y={boardPosition.y}
-                ledBuiltIn={Boolean(components.find((c) => c.id === 'led-builtin')?.properties.state)}
-              />
-            )}
-
-            {/* Board interaction overlay for dragging */}
-            {!running && (
-              <div
-                data-board-overlay="true"
-                style={{
-                  position: 'absolute',
-                  left: boardPosition.x,
-                  top: boardPosition.y,
-                  width: boardType === 'arduino-uno' ? 360 : boardType === 'arduino-nano' ? 175 : boardType === 'arduino-mega' ? 530 : 280,
-                  height: boardType === 'arduino-uno' ? 250 : boardType === 'arduino-nano' ? 70 : boardType === 'arduino-mega' ? 195 : 180,
-                  cursor: 'move',
-                  zIndex: 1,
-                }}
                 onMouseDown={(e) => {
-                  e.stopPropagation();
                   const world = toWorld(e.clientX, e.clientY);
-                  setDraggedComponentId('__board__');
-                  setDragOffset({
-                    x: world.x - boardPosition.x,
-                    y: world.y - boardPosition.y,
-                  });
+                  setDraggedComponentId(`__board__:${board.id}`);
+                  setDragOffset({ x: world.x - board.x, y: world.y - board.y });
                 }}
+                onPinClick={handlePinClick}
               />
-            )}
-
-            {/* Board pin overlay */}
-            <PinOverlay
-              componentId={boardType === 'arduino-uno' ? 'arduino-uno' : boardType === 'arduino-nano' ? 'arduino-nano' : boardType === 'arduino-mega' ? 'arduino-mega' : 'nano-rp2040'}
-              componentX={boardPosition.x}
-              componentY={boardPosition.y}
-              onPinClick={handlePinClick}
-              showPins={true}
-              wrapperOffsetX={0}
-              wrapperOffsetY={0}
-            />
+            ))}
 
             {/* Components using wokwi-elements */}
             <div className="components-area">{registryLoaded && components.map(renderComponent)}</div>
@@ -988,6 +964,20 @@ export const SimulatorCanvas = () => {
         isOpen={showComponentPicker}
         onClose={() => setShowComponentPicker(false)}
         onSelectComponent={handleSelectComponent}
+      />
+
+      {/* Board Picker Modal */}
+      <BoardPickerModal
+        isOpen={showBoardPicker}
+        onClose={() => setShowBoardPicker(false)}
+        onSelectBoard={(kind: BoardKind) => {
+          const sameKind = boards.filter((b) => b.boardKind === kind);
+          const newBoardId = sameKind.length === 0 ? kind : `${kind}-${sameKind.length + 1}`;
+          const x = boardPosition.x + boards.length * 60 + 420;
+          const y = boardPosition.y + boards.length * 30;
+          addBoard(kind, x, y);
+          useEditorStore.getState().createFileGroup(`group-${newBoardId}`);
+        }}
       />
     </div>
   );
