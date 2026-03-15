@@ -131,7 +131,7 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
   const handleRun = () => {
     if (activeBoardId) {
       const board = boards.find((b) => b.id === activeBoardId);
-      const isQemuBoard = board?.boardKind === 'raspberry-pi-3' || board?.boardKind === 'esp32' || board?.boardKind === 'esp32-s3' || board?.boardKind === 'esp32-c3';
+      const isQemuBoard = board?.boardKind === 'raspberry-pi-3' || board?.boardKind === 'esp32' || board?.boardKind === 'esp32-s3';
       if (isQemuBoard || board?.compiledProgram) {
         startBoard(activeBoardId);
         setMessage(null);
@@ -213,7 +213,7 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
     const boardsList = useSimulatorStore.getState().boards;
     for (const board of boardsList) {
       const isQemu = board.boardKind === 'raspberry-pi-3' ||
-        board.boardKind === 'esp32' || board.boardKind === 'esp32-s3' || board.boardKind === 'esp32-c3';
+        board.boardKind === 'esp32' || board.boardKind === 'esp32-s3';
       if (!board.running && (isQemu || board.compiledProgram)) {
         startBoard(board.id);
       }
@@ -306,7 +306,7 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
           {/* Run */}
           <button
             onClick={handleRun}
-            disabled={running || (!['raspberry-pi-3','esp32','esp32-s3','esp32-c3'].includes(activeBoard?.boardKind ?? '') && !compiledHex && !activeBoard?.compiledProgram)}
+            disabled={running || (!['raspberry-pi-3','esp32','esp32-s3'].includes(activeBoard?.boardKind ?? '') && !compiledHex && !activeBoard?.compiledProgram)}
             className="tb-btn tb-btn-run"
             title="Run"
           >

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { AVRSimulator } from '../simulation/AVRSimulator';
 import { RP2040Simulator } from '../simulation/RP2040Simulator';
 import { RiscVSimulator } from '../simulation/RiscVSimulator';
+import { Esp32C3Simulator } from '../simulation/Esp32C3Simulator';
 import { PinManager } from '../simulation/PinManager';
 import { VirtualDS1307, VirtualTempSensor, I2CMemoryDevice } from '../simulation/I2CBusManager';
 import type { RP2040I2CDevice } from '../simulation/RP2040Simulator';
@@ -35,7 +36,7 @@ export const DEFAULT_BOARD_POSITION = { x: 50, y: 50 };
 export const ARDUINO_POSITION = DEFAULT_BOARD_POSITION;
 
 // ── Runtime Maps (outside Zustand — not serialisable) ─────────────────────
-const simulatorMap = new Map<string, AVRSimulator | RP2040Simulator | RiscVSimulator>();
+const simulatorMap = new Map<string, AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator>();
 const pinManagerMap = new Map<string, PinManager>();
 const bridgeMap = new Map<string, RaspberryPi3Bridge>();
 const esp32BridgeMap = new Map<string, Esp32Bridge>();
@@ -45,14 +46,23 @@ export const getBoardPinManager = (id: string) => pinManagerMap.get(id);
 export const getBoardBridge = (id: string) => bridgeMap.get(id);
 export const getEsp32Bridge = (id: string) => esp32BridgeMap.get(id);
 
+// Xtensa-based ESP32 boards — still use QEMU bridge (backend)
 const ESP32_KINDS = new Set<BoardKind>([
   'esp32', 'esp32-devkit-c-v4', 'esp32-cam', 'wemos-lolin32-lite',
   'esp32-s3', 'xiao-esp32-s3', 'arduino-nano-esp32',
+]);
+
+// RISC-V ESP32 boards — use the browser-side Esp32C3Simulator (no backend needed)
+const ESP32_RISCV_KINDS = new Set<BoardKind>([
   'esp32-c3', 'xiao-esp32-c3', 'aitewinrobot-esp32c3-supermini',
 ]);
 
 function isEsp32Kind(kind: BoardKind): boolean {
   return ESP32_KINDS.has(kind);
+}
+
+function isRiscVEsp32Kind(kind: BoardKind): boolean {
+  return ESP32_RISCV_KINDS.has(kind);
 }
 
 // ── Component type ────────────────────────────────────────────────────────
@@ -86,7 +96,7 @@ interface SimulatorState {
   /** @deprecated use boards[x].x/y */
   boardPosition: { x: number; y: number };
   /** @deprecated use getBoardSimulator(activeBoardId) */
-  simulator: AVRSimulator | RP2040Simulator | RiscVSimulator | null;
+  simulator: AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator | null;
   /** @deprecated use getBoardPinManager(activeBoardId) */
   pinManager: PinManager;
   running: boolean;
@@ -159,8 +169,8 @@ function createSimulator(
   onSerial: (ch: string) => void,
   onBaud: (baud: number) => void,
   onPinTime: (pin: number, state: boolean, t: number) => void,
-): AVRSimulator | RP2040Simulator | RiscVSimulator {
-  let sim: AVRSimulator | RP2040Simulator | RiscVSimulator;
+): AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator {
+  let sim: AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator;
   if (boardKind === 'arduino-mega') {
     sim = new AVRSimulator(pm, 'mega');
   } else if (boardKind === 'attiny85') {
@@ -169,6 +179,9 @@ function createSimulator(
     sim = new RiscVSimulator(pm);
   } else if (boardKind === 'raspberry-pi-pico' || boardKind === 'pi-pico-w') {
     sim = new RP2040Simulator(pm);
+  } else if (isRiscVEsp32Kind(boardKind)) {
+    // ESP32-C3 / XIAO-C3 / C3 SuperMini — browser-side RV32IMC emulator
+    sim = new Esp32C3Simulator(pm);
   } else {
     // arduino-uno, arduino-nano
     sim = new AVRSimulator(pm, 'uno');
@@ -418,9 +431,20 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       if (!board) return;
 
       if (isEsp32Kind(board.boardKind)) {
-        // For ESP32: program is base64-encoded .bin — send to QEMU via bridge
+        // Xtensa ESP32 boards: program is base64-encoded .bin — send to QEMU via bridge
         const esp32Bridge = getEsp32Bridge(boardId);
         if (esp32Bridge) esp32Bridge.loadFirmware(program);
+      } else if (isRiscVEsp32Kind(board.boardKind)) {
+        // RISC-V ESP32-C3 boards: parse merged flash image and load into browser emulator
+        const sim = getBoardSimulator(boardId);
+        if (sim instanceof Esp32C3Simulator) {
+          try {
+            sim.loadFlashImage(program);
+          } catch (err) {
+            console.error(`[Esp32C3Simulator] loadFlashImage failed for ${boardId}:`, err);
+            return;
+          }
+        }
       } else {
         const sim = getBoardSimulator(boardId);
         if (sim && board.boardKind !== 'raspberry-pi-3') {

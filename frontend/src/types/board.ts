@@ -12,9 +12,9 @@ export type BoardKind =
   | 'esp32-s3'                    // Xtensa LX7, QEMU backend
   | 'xiao-esp32-s3'               // Seeed XIAO ESP32-S3, QEMU (esp32-s3)
   | 'arduino-nano-esp32'          // Arduino Nano ESP32 (S3), QEMU (esp32-s3)
-  | 'esp32-c3'                    // RISC-V, QEMU backend
-  | 'xiao-esp32-c3'               // Seeed XIAO ESP32-C3, QEMU (esp32-c3)
-  | 'aitewinrobot-esp32c3-supermini' // ESP32-C3 SuperMini, QEMU (esp32-c3)
+  | 'esp32-c3'                    // RISC-V RV32IMC, browser emulation (Esp32C3Simulator)
+  | 'xiao-esp32-c3'               // Seeed XIAO ESP32-C3, browser emulation (Esp32C3Simulator)
+  | 'aitewinrobot-esp32c3-supermini' // ESP32-C3 SuperMini, browser emulation (Esp32C3Simulator)
   | 'attiny85'                    // AVR ATtiny85, browser emulation (avr8js)
   | 'riscv-generic';              // RV32I generic MCU (CH32V003 target), browser emulation
 

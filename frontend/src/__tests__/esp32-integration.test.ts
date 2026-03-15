@@ -293,14 +293,12 @@ describe('Esp32Bridge — WebSocket protocol', () => {
     s3Bridge.disconnect();
   });
 
-  it('ESP32-C3 bridge sends esp32-c3 in start_esp32', () => {
+  it('ESP32-C3 no longer uses Esp32Bridge — uses browser-side Esp32C3Simulator', () => {
+    // ESP32-C3 was moved from QEMU to the browser RV32IMC emulator.
+    // Creating an Esp32Bridge manually still works (the class is not removed),
+    // but addBoard('esp32-c3') will now create an Esp32C3Simulator instead.
     const c3Bridge = new Esp32Bridge('test-esp32-c3', 'esp32-c3');
-    c3Bridge.connect();
-    const c3Ws = (c3Bridge as any).socket as MockWebSocket;
-    c3Ws.open();
-    const msg = JSON.parse(c3Ws.sent[0]);
-    expect(msg.data.board).toBe('esp32-c3');
-    c3Bridge.disconnect();
+    expect(c3Bridge.boardKind).toBe('esp32-c3'); // bridge still instantiatable
   });
 });
 
@@ -330,10 +328,12 @@ describe('useSimulatorStore — ESP32 boards', () => {
     expect(getEsp32Bridge(id)?.boardKind).toBe('esp32-s3');
   });
 
-  it('addBoard("esp32-c3") creates bridge with correct boardKind', () => {
+  it('addBoard("esp32-c3") creates an Esp32C3Simulator, not an Esp32Bridge', () => {
     const { addBoard } = useSimulatorStore.getState();
     const id = addBoard('esp32-c3', 300, 100);
-    expect(getEsp32Bridge(id)?.boardKind).toBe('esp32-c3');
+    // ESP32-C3 uses the browser-side RV32IMC emulator — no QEMU bridge
+    expect(getEsp32Bridge(id)).toBeUndefined();
+    expect(getBoardSimulator(id)).toBeDefined();
   });
 
   it('addBoard creates a file group with sketch.ino (not script.py)', () => {
