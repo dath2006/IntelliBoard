@@ -93,10 +93,7 @@
 }
 
 .osc-picker-dropdown {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 200;
+  /* position/left/bottom/z-index set via inline style (portal) */
   background: #252526;
   border: 1px solid #555;
   border-radius: 4px;
@@ -105,7 +102,64 @@
   grid-template-columns: repeat(4, 1fr);
   gap: 3px;
   min-width: 200px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.6);
+}
+
+/* Multi-board picker layout */
+.osc-picker-multiboard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  min-width: 260px;
+  max-height: 320px;
+  overflow: hidden;
+}
+
+.osc-picker-board-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #3a3a3a;
+  padding-bottom: 6px;
+}
+
+.osc-picker-board-tab {
+  background: #2d2d2d;
+  border: 1px solid #444;
+  color: #999;
+  padding: 2px 8px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-family: inherit;
+  transition: background 0.1s, color 0.1s;
+}
+
+.osc-picker-board-tab:hover {
+  background: #383838;
+  color: #ccc;
+}
+
+.osc-picker-board-tab.active {
+  background: #0e3a5a;
+  border-color: #007acc;
+  color: #4fc3f7;
+}
+
+.osc-picker-board-label {
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.osc-picker-pins {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 3px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .osc-pin-btn {
@@ -160,7 +214,7 @@
 }
 
 .osc-channel-label {
-  width: 56px;
+  width: 72px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
@@ -169,7 +223,16 @@
   padding: 4px 6px;
   background: #141414;
   border-right: 1px solid #222;
-  gap: 4px;
+  gap: 2px;
+}
+
+.osc-channel-board {
+  font-size: 9px;
+  color: #666;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  white-space: nowrap;
+  max-width: 100%;
 }
 
 .osc-channel-name {
