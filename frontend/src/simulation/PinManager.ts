@@ -73,8 +73,6 @@ export class PinManager {
         if (callbacks) {
           callbacks.forEach(cb => cb(arduinoPin, newState));
         }
-
-        console.log(`Pin ${arduinoPin} (${portName}${bit}): ${oldState ? 'HIGH' : 'LOW'} → ${newState ? 'HIGH' : 'LOW'}`);
       }
     }
   }

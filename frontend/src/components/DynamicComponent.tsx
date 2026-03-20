@@ -197,7 +197,8 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
     if (logic && logic.attachEvents && simulator) {
       // Helper to find Arduino pin connected to a component pin
       const getArduinoPin = (componentPinName: string): number | null => {
-        const wires = useSimulatorStore.getState().wires.filter(
+        const state = useSimulatorStore.getState();
+        const wires = state.wires.filter(
           w => (w.start.componentId === id && w.start.pinName === componentPinName) ||
             (w.end.componentId === id && w.end.pinName === componentPinName)
         );
@@ -207,7 +208,11 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
           const boardEndpoint = isBoardComponent(w.start.componentId) ? w.start :
             isBoardComponent(w.end.componentId) ? w.end : null;
           if (boardEndpoint) {
-            const pin = boardPinToNumber(boardEndpoint.componentId, boardEndpoint.pinName);
+            // Use the board's actual kind for pin mapping (instance ID may differ from kind,
+            // e.g. board ID 'arduino-uno' after switching to 'raspberry-pi-pico')
+            const boardKind = state.boards.find((b) => b.id === boardEndpoint.componentId)?.boardKind
+              ?? boardEndpoint.componentId;
+            const pin = boardPinToNumber(boardKind, boardEndpoint.pinName);
             if (pin !== null) return pin;
           }
         }

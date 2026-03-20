@@ -42,7 +42,11 @@ export function calculatePinPosition(
   }
 
   // Find the specific pin
-  const pin = pinInfo.find((p: any) => p.name === pinName);
+  let pin = pinInfo.find((p: any) => p.name === pinName);
+  // Fallback: try numbered variant (e.g. GND → GND.1) for pins that have suffix variants
+  if (!pin && !pinName.includes('.')) {
+    pin = pinInfo.find((p: any) => p.name === `${pinName}.1`);
+  }
   if (!pin) {
     console.warn(`[pinPositionCalculator] Pin ${pinName} not found on component ${componentId}`);
     console.warn(`Available pins:`, pinInfo.map((p: any) => p.name));

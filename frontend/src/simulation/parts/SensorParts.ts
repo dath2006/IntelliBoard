@@ -642,12 +642,15 @@ PartSimulationRegistry.register('hc-sr04', {
             //  - Echo duration = distanceCm / 17150 s × 16 000 000 cycles/s
             //    (17150 cm/s = speed of sound, one-way = round-trip/2)
             if (typeof simulator.schedulePinChange === 'function') {
+                const clockHz: number = typeof (simulator as any).getClockHz === 'function'
+                    ? (simulator as any).getClockHz()
+                    : 16_000_000;
                 const now = simulator.getCurrentCycles() as number;
-                const processingCycles = 9600; // ~600 µs sensor overhead
-                const echoCycles = Math.round((distanceCm / 17150) * 16_000_000);
+                const processingCycles = Math.round(600e-6 * clockHz); // 600 µs sensor overhead
+                const echoCycles = Math.round((distanceCm / 17150) * clockHz);
                 simulator.schedulePinChange(echoPin, true,  now + processingCycles);
                 simulator.schedulePinChange(echoPin, false, now + processingCycles + echoCycles);
-                console.log(`[HC-SR04] Scheduled ECHO (${distanceCm} cm, echo=${(echoCycles/16000).toFixed(1)} µs)`);
+                console.log(`[HC-SR04] Scheduled ECHO (${distanceCm} cm, echo=${(echoCycles / (clockHz / 1e6)).toFixed(1)} µs)`);
             } else {
                 // Fallback: best-effort async (works with delay()-based sketches, not pulseIn)
                 const echoMs = Math.max(1, distanceCm / 17.15);

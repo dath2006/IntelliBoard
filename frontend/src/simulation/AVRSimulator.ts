@@ -309,6 +309,11 @@ export class AVRSimulator {
     return this.adc;
   }
 
+  /** Returns the CPU clock frequency in Hz (16 MHz for AVR). */
+  getClockHz(): number {
+    return 16_000_000;
+  }
+
   /**
    * Returns the current CPU cycle count.
    * Used by timing-sensitive peripherals to schedule future pin changes.

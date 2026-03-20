@@ -454,34 +454,41 @@ export const SimulatorCanvas = () => {
 
     // Helper to add subscription
     const subscribeComponentToPin = (component: any, pin: number, componentPinName?: string) => {
+      // Components with attachEvents in PartSimulationRegistry manage their own
+      // visual state (e.g. servo, buzzer). Skip generic digital/PWM updates for them
+      // to avoid flickering from raw PWM pulses being misinterpreted as on/off state.
+      const logic = PartSimulationRegistry.get(component.metadataId);
+      const hasSelfManagedVisuals = !!(logic && logic.attachEvents);
+
       const unsubscribe = pinManager.onPinChange(
         pin,
         (_pin, state) => {
-          // 1. Update React state for standard properties
-          updateComponentState(component.id, state);
+          if (!hasSelfManagedVisuals) {
+            // 1. Update React state for standard properties (LEDs, buttons, etc.)
+            updateComponentState(component.id, state);
+          }
 
           // 2. Delegate to PartSimulationRegistry for custom visual updates
-          const logic = PartSimulationRegistry.get(component.metadataId);
           if (logic && logic.onPinStateChange) {
             const el = document.getElementById(component.id);
             if (el) {
               logic.onPinStateChange(componentPinName || 'A', state, el);
             }
           }
-
-          console.log(`Component ${component.id} on pin ${pin}: ${state ? 'HIGH' : 'LOW'}`);
         }
       );
       unsubscribers.push(unsubscribe);
 
-      // PWM subscription: update LED opacity when the pin receives a LEDC duty cycle.
-      // duty=0 means no PWM / analogWrite(0) — clear the inline style so the
-      // component keeps its default visibility instead of becoming invisible.
-      const pwmUnsub = pinManager.onPwmChange(pin, (_p, duty) => {
-        const el = document.getElementById(component.id);
-        if (el) el.style.opacity = duty > 0 ? String(duty) : '';
-      });
-      unsubscribers.push(pwmUnsub);
+      // PWM subscription: update LED opacity when the pin receives a PWM duty cycle.
+      // Skip for self-managed components (servo, buzzer) — their duty cycle is a
+      // control signal, not a brightness value, so setting opacity would cause flicker.
+      if (!hasSelfManagedVisuals) {
+        const pwmUnsub = pinManager.onPwmChange(pin, (_p, duty) => {
+          const el = document.getElementById(component.id);
+          if (el) el.style.opacity = duty > 0 ? String(duty) : '';
+        });
+        unsubscribers.push(pwmUnsub);
+      }
     };
 
     components.forEach((component) => {

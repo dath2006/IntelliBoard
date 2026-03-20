@@ -184,23 +184,29 @@ PartSimulationRegistry.register('photoresistor-sensor', {
  */
 PartSimulationRegistry.register('analog-joystick', {
     attachEvents: (element, avrSimulator, getArduinoPinHelper, componentId) => {
-        const pinX   = getArduinoPinHelper('VRX') ?? getArduinoPinHelper('XOUT');
-        const pinY   = getArduinoPinHelper('VRY') ?? getArduinoPinHelper('YOUT');
-        const pinSW  = getArduinoPinHelper('SW');
+        // wokwi-analog-joystick uses VERT/HORZ/SEL pin names
+        const pinX  = getArduinoPinHelper('VERT') ?? getArduinoPinHelper('VRX') ?? getArduinoPinHelper('XOUT');
+        const pinY  = getArduinoPinHelper('HORZ') ?? getArduinoPinHelper('VRY') ?? getArduinoPinHelper('YOUT');
+        const pinSW = getArduinoPinHelper('SEL')  ?? getArduinoPinHelper('SW');
         const el = element as any;
 
-        // Center position is mid-range (~2.5V)
-        if (pinX !== null) setAdcVoltage(avrSimulator, pinX, 2.5);
-        if (pinY !== null) setAdcVoltage(avrSimulator, pinY, 2.5);
+        // RP2040 uses 3.3V reference; AVR uses 5V
+        const vcc = avrSimulator instanceof RP2040Simulator ? 3.3 : 5.0;
+        const centerV = vcc / 2;
+
+        // Initialize to center position and button not pressed
+        if (pinX !== null) setAdcVoltage(avrSimulator, pinX, centerV);
+        if (pinY !== null) setAdcVoltage(avrSimulator, pinY, centerV);
+        if (pinSW !== null) avrSimulator.setPinState(pinSW, true); // HIGH = not pressed
 
         const onMove = () => {
             // xValue / yValue are 0-1023
             if (pinX !== null) {
-                const vx = ((el.xValue ?? 512) / 1023.0) * 5.0;
+                const vx = ((el.xValue ?? 512) / 1023.0) * vcc;
                 setAdcVoltage(avrSimulator, pinX, vx);
             }
             if (pinY !== null) {
-                const vy = ((el.yValue ?? 512) / 1023.0) * 5.0;
+                const vy = ((el.yValue ?? 512) / 1023.0) * vcc;
                 setAdcVoltage(avrSimulator, pinY, vy);
             }
         };
@@ -219,13 +225,13 @@ PartSimulationRegistry.register('analog-joystick', {
         element.addEventListener('button-press', onPress);
         element.addEventListener('button-release', onRelease);
 
-        // SensorControlPanel: xAxis/yAxis -512..512 → voltage 0–5V (center = 2.5V)
+        // SensorControlPanel: xAxis/yAxis -512..512 → voltage 0–VCC (center = VCC/2)
         registerSensorUpdate(componentId, (values) => {
             if ('xAxis' in values && pinX !== null) {
-                setAdcVoltage(avrSimulator, pinX, ((values.xAxis as number + 512) / 1023) * 5.0);
+                setAdcVoltage(avrSimulator, pinX, ((values.xAxis as number + 512) / 1023) * vcc);
             }
             if ('yAxis' in values && pinY !== null) {
-                setAdcVoltage(avrSimulator, pinY, ((values.yAxis as number + 512) / 1023) * 5.0);
+                setAdcVoltage(avrSimulator, pinY, ((values.yAxis as number + 512) / 1023) * vcc);
             }
         });
 
@@ -242,34 +248,80 @@ PartSimulationRegistry.register('analog-joystick', {
 // ─── Servo ───────────────────────────────────────────────────────────────────
 
 /**
- * Servo motor — reads OCR1A and ICR1 to calculate pulse width and angle.
+ * Servo motor — measures actual PWM pulse width from pin state changes.
  *
  * Standard RC servo protocol:
  *   - 50 Hz signal (20 ms period)
- *   - Pulse width 1 ms → 0°, 1.5 ms → 90°, 2 ms → 180°
+ *   - Pulse width 544 µs → 0°, 1472 µs → 90°, 2400 µs → 180°
+ *   (Arduino Servo.h uses 544–2400 µs, NOT the generic 1000–2000 µs range)
  *
- * With Timer1, prescaler=8, F_CPU=16MHz:
- *   - ICR1 = 20000 for 50Hz
- *   - OCR1A = 1000 → 0°, 1500 → 90°, 2000 → 180°
+ * Approach: subscribe to the servo's PWM pin state changes, record the CPU
+ * cycle count at the rising edge, then compute pulse width on the falling edge.
+ * avr8js re-schedules Timer1 every 8 CPU cycles (prescaler=8), so each HIGH
+ * and LOW transition fires in a separate count() call with a distinct cpu.cycles
+ * value → the measurement is cycle-accurate.
  *
- * We poll these registers every animation frame via a requestAnimationFrame loop.
+ * Fallback: if no wire is connected (pinSIG === null), poll OCR1A/ICR1 registers
+ * via requestAnimationFrame (less accurate but still functional).
  */
 PartSimulationRegistry.register('servo', {
     attachEvents: (element, avrSimulator, getArduinoPinHelper) => {
         const pinSIG = getArduinoPinHelper('PWM') ?? getArduinoPinHelper('SIG') ?? getArduinoPinHelper('1');
         const el = element as any;
 
-        // OCR1A low byte = 0x88, OCR1A high byte = 0x89
+        // Arduino Servo.h actual pulse range (544µs = 0°, 2400µs = 180°)
+        const MIN_PULSE_US = 544;
+        const MAX_PULSE_US = 2400;
+        const CPU_HZ = 16_000_000;
+
+        // ── Primary: cycle-accurate pulse width measurement ────────────────
+        if (pinSIG !== null) {
+            const pinManager = (avrSimulator as any).pinManager as import('../PinManager').PinManager | undefined;
+            if (pinManager) {
+                let riseTime = -1; // cpu.cycles at last rising edge
+
+                const unsubscribe = pinManager.onPinChange(pinSIG, (_pin, state) => {
+                    const cpu = (avrSimulator as any).cpu;
+                    if (!cpu) return;
+
+                    if (state) {
+                        // Rising edge — record cycle count
+                        riseTime = cpu.cycles;
+                    } else if (riseTime >= 0) {
+                        // Falling edge — compute pulse width in µs
+                        const pulseCycles = cpu.cycles - riseTime;
+                        const pulseUs = (pulseCycles / CPU_HZ) * 1_000_000;
+                        riseTime = -1;
+
+                        // Only update if pulse is in valid RC servo range
+                        if (pulseUs >= MIN_PULSE_US && pulseUs <= MAX_PULSE_US) {
+                            const angle = Math.round(
+                                ((pulseUs - MIN_PULSE_US) / (MAX_PULSE_US - MIN_PULSE_US)) * 180
+                            );
+                            el.angle = angle;
+                        }
+                    }
+                });
+
+                return () => { unsubscribe(); };
+            }
+        }
+
+        // ── Fallback: poll OCR1A/ICR1 registers when no wire is connected ──
+        // OCR1A low byte = 0x88, high byte = 0x89
         // ICR1L = 0x86, ICR1H = 0x87
         const OCR1AL = 0x88;
         const OCR1AH = 0x89;
         const ICR1L  = 0x86;
         const ICR1H  = 0x87;
+        const SERVO_PERIOD_US = 20000;
 
         let rafId: number | null = null;
         let lastOcr1a = -1;
 
         const poll = () => {
+            if (!avrSimulator.isRunning()) { rafId = requestAnimationFrame(poll); return; }
+
             const cpu = (avrSimulator as any).cpu;
             if (!cpu) { rafId = requestAnimationFrame(poll); return; }
 
@@ -278,37 +330,17 @@ PartSimulationRegistry.register('servo', {
                 lastOcr1a = ocr1a;
                 const icr1 = cpu.data[ICR1L] | (cpu.data[ICR1H] << 8);
 
-                // Calculate pulse width in microseconds
-                // prescaler 8, F_CPU 16MHz → 1 tick = 0.5µs
-                // pulse_us = ocr1a * 0.5
-                // But also handle prescaler 64 (1 tick = 4µs) and default ICR1 detection
                 let pulseUs: number;
                 if (icr1 > 0) {
-                    // Proportional to ICR1 period (assume 20ms period)
-                    pulseUs = 1000 + (ocr1a / icr1) * 1000;
+                    pulseUs = (ocr1a / icr1) * SERVO_PERIOD_US;
                 } else {
-                    // Fallback: prescaler 8
+                    // prescaler 8, 16MHz → 0.5µs per tick
                     pulseUs = ocr1a * 0.5;
                 }
 
-                // Clamp to 1000-2000µs and map to 0-180°
-                const clamped = Math.max(1000, Math.min(2000, pulseUs));
-                const angle = Math.round(((clamped - 1000) / 1000) * 180);
+                const clamped = Math.max(MIN_PULSE_US, Math.min(MAX_PULSE_US, pulseUs));
+                const angle = Math.round(((clamped - MIN_PULSE_US) / (MAX_PULSE_US - MIN_PULSE_US)) * 180);
                 el.angle = angle;
-            }
-
-            // Also support PWM duty cycle approach via PinManager
-            if (pinSIG !== null) {
-                const pinManager = (avrSimulator as any).pinManager;
-                // Only override angle if cpu-based approach doesn't work
-                // (ICR1 = 0 means Timer1 not configured as servo)
-                const icr1 = cpu.data[ICR1L] | (cpu.data[ICR1H] << 8);
-                if (icr1 === 0 && pinManager) {
-                    const dc = pinManager.getPwmValue(pinSIG);
-                    if (dc > 0) {
-                        el.angle = Math.round(dc * 180);
-                    }
-                }
             }
 
             rafId = requestAnimationFrame(poll);

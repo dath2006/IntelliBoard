@@ -166,6 +166,8 @@ export function isBoardComponent(componentId: string): boolean {
  */
 export function boardPinToNumber(boardId: string, pinName: string): number | null {
   if (boardId === 'arduino-uno' || boardId === 'arduino-nano') {
+    // Power / GND pins — not real GPIOs, skip silently
+    if (/^(GND|VCC|VIN|IOREF|AREF|RESET|3\.3V|3V3|5V|3V)/.test(pinName)) return -1;
     // Try numeric (covers '0' through '13', also legacy examples using just numbers)
     const num = parseInt(pinName, 10);
     if (!isNaN(num) && num >= 0 && num <= 21) return num;
@@ -190,6 +192,11 @@ export function boardPinToNumber(boardId: string, pinName: string): number | nul
   }
 
   if (boardId === 'nano-rp2040' || boardId === 'raspberry-pi-pico') {
+    // Power / GND pins — return -1 so callers skip silently
+    if (pinName.startsWith('GND') || pinName.startsWith('3.3V') || pinName.startsWith('3V3')
+        || pinName.startsWith('5V') || pinName.startsWith('VBUS') || pinName.startsWith('VSYS')) {
+      return -1;
+    }
     // Try D-prefix map first (D2 → GPIO25 = LED_BUILTIN, etc.)
     const mapped = NANO_RP2040_PIN_MAP[pinName];
     if (mapped !== undefined) return mapped;

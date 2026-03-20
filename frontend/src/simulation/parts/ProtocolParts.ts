@@ -415,31 +415,41 @@ function scheduleDHT22Response(simulator: any, pin: number, element: HTMLElement
   const now = simulator.getCurrentCycles() as number;
 
   // Timing constants at 16 MHz (cycles per µs = 16)
+  // DHT22 starts pulling the line LOW ~20 µs after MCU releases it HIGH.
+  // The Adafruit DHT library v1.4.7 calls expectPulse(LOW) at ~55 µs (pullTime default),
+  // so the preamble LOW must already be active by then. Starting at 20 µs (320 cycles)
+  // guarantees the pin IS LOW when the library checks.
+  const RESPONSE_START = 320; // 20 µs — DHT22 response start
   const LOW80  = 1280; // 80 µs LOW preamble
   const HIGH80 = 1280; // 80 µs HIGH preamble
   const LOW50  =  800; // 50 µs LOW marker before each bit
   const HIGH0  =  416; // 26 µs HIGH → bit '0'
   const HIGH1  = 1120; // 70 µs HIGH → bit '1'
 
-  let t = now;
+  let t = now + RESPONSE_START;
 
-  // Preamble: 80 µs LOW then 80 µs HIGH
-  t += LOW80;  simulator.schedulePinChange(pin, false, t);
-  t += HIGH80; simulator.schedulePinChange(pin, true,  t);
+  // Preamble: 80 µs LOW
+  simulator.schedulePinChange(pin, false, t);
+  t += LOW80;
+  // Preamble: 80 µs HIGH
+  simulator.schedulePinChange(pin, true, t);
+  t += HIGH80;
 
-  // 40 data bits, MSB first
+  // 40 data bits, MSB first — schedule LOW then advance, schedule HIGH then advance
   for (const byte of payload) {
     for (let b = 7; b >= 0; b--) {
       const bit = (byte >> b) & 1;
-      t += LOW50;          simulator.schedulePinChange(pin, false, t);
+      simulator.schedulePinChange(pin, false, t);
+      t += LOW50;
+      simulator.schedulePinChange(pin, true, t);
       t += bit ? HIGH1 : HIGH0;
-                           simulator.schedulePinChange(pin, true,  t);
     }
   }
 
-  // Release line HIGH (it already is, but explicit for clarity)
-  t += LOW50; simulator.schedulePinChange(pin, false, t);
-  t += HIGH0; simulator.schedulePinChange(pin, true,  t);
+  // Final release
+  simulator.schedulePinChange(pin, false, t);
+  t += LOW50;
+  simulator.schedulePinChange(pin, true, t);
 }
 
 PartSimulationRegistry.register('dht22', {
@@ -449,10 +459,26 @@ PartSimulationRegistry.register('dht22', {
     if (pin === null) return () => {};
 
     let wasLow = false;
+    // Prevent DHT22's own scheduled pin changes from re-triggering the response.
+    // After the MCU releases DATA HIGH and we begin responding, we ignore all
+    // pin-change callbacks until the full waveform has been emitted.
+    // DHT22 response is ~5 ms; at 16 MHz that is ~80 000 cycles. We gate for
+    // 200 000 cycles (~12.5 ms) to give plenty of headroom.
+    const RESPONSE_GATE_CYCLES = 200_000;
+    let responseEndCycle = 0;
+
+    const getCycles = (): number =>
+      typeof (simulator as any).getCurrentCycles === 'function'
+        ? ((simulator as any).getCurrentCycles() as number)
+        : -1;
 
     const unsub = (simulator as any).pinManager.onPinChange(
       pin,
       (_: number, state: boolean) => {
+        // While DHT22 is driving the line, ignore our own scheduled changes.
+        const now = getCycles();
+        if (now >= 0 && now < responseEndCycle) return;
+
         if (!state) {
           // MCU drove DATA LOW — start signal detected
           wasLow = true;
@@ -461,6 +487,8 @@ PartSimulationRegistry.register('dht22', {
         if (wasLow) {
           // MCU released DATA HIGH — begin DHT22 response
           wasLow = false;
+          const cur = getCycles();
+          responseEndCycle = cur >= 0 ? cur + RESPONSE_GATE_CYCLES : 0;
           scheduleDHT22Response(simulator, pin, element);
         }
       },

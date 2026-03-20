@@ -49,6 +49,8 @@ export class RP2040Simulator {
   private speed = 1.0;
   private gpioUnsubscribers: Array<() => void> = [];
   private flashCopy: Uint8Array | null = null;
+  private totalCycles = 0;
+  private scheduledPinChanges: Array<{ cycle: number; pin: number; state: boolean }> = [];
 
   /** Serial output callback — fires for each byte the Pico sends on UART0 */
   public onSerialData: ((char: string) => void) | null = null;
@@ -269,7 +271,10 @@ export class RP2040Simulator {
               const jump: number = clock.nanosToNextAlarm;
               if (jump <= 0) break; // no pending alarms
               clock.tick(jump);
-              cyclesDone += Math.ceil(jump / CYCLE_NANOS);
+              const jumped = Math.ceil(jump / CYCLE_NANOS);
+              cyclesDone += jumped;
+              this.totalCycles += jumped;
+              this.flushScheduledPinChanges();
             } else {
               break;
             }
@@ -277,6 +282,8 @@ export class RP2040Simulator {
             const cycles: number = core.executeInstruction();
             if (clock) clock.tick(cycles * CYCLE_NANOS);
             cyclesDone += cycles;
+            this.totalCycles += cycles;
+            this.flushScheduledPinChanges();
           }
         }
 
@@ -308,6 +315,8 @@ export class RP2040Simulator {
 
   reset(): void {
     this.stop();
+    this.totalCycles = 0;
+    this.scheduledPinChanges = [];
     if (this.rp2040 && this.flashCopy) {
       this.initMCU(this.flashCopy);
       // Re-register any previously added I2C devices
@@ -326,6 +335,34 @@ export class RP2040Simulator {
 
   getSpeed(): number {
     return this.speed;
+  }
+
+  /** Returns the CPU clock frequency in Hz. */
+  getClockHz(): number {
+    return F_CPU;
+  }
+
+  /** Returns total CPU cycles executed since last reset/load. */
+  getCurrentCycles(): number {
+    return this.totalCycles;
+  }
+
+  /**
+   * Schedule a GPIO pin state change at a specific future cycle count.
+   * Enables cycle-accurate protocol simulation (e.g. HC-SR04 echo timing).
+   */
+  schedulePinChange(pin: number, state: boolean, atCycle: number): void {
+    let i = this.scheduledPinChanges.length;
+    while (i > 0 && this.scheduledPinChanges[i - 1].cycle > atCycle) i--;
+    this.scheduledPinChanges.splice(i, 0, { cycle: atCycle, pin, state });
+  }
+
+  private flushScheduledPinChanges(): void {
+    if (this.scheduledPinChanges.length === 0) return;
+    while (this.scheduledPinChanges.length > 0 && this.scheduledPinChanges[0].cycle <= this.totalCycles) {
+      const { pin, state } = this.scheduledPinChanges.shift()!;
+      this.setPinState(pin, state);
+    }
   }
 
   /**
