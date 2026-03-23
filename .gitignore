@@ -94,3 +94,6 @@ test/esp32-emulator/**/*.elf
 test/esp32-emulator/**/*.map
 test/esp32-emulator/out_*/
 .claude/settings.json
+
+# Google Cloud service account credentials
+velxio-ba3355a41944.json

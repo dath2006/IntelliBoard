@@ -2,8 +2,15 @@ import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { login, initiateGoogleLogin } from '../services/authService';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSEO } from '../utils/useSEO';
 
 export const LoginPage: React.FC = () => {
+  useSEO({
+    title: 'Sign In — Velxio',
+    description: 'Sign in to your Velxio account to save projects and access your Arduino simulations.',
+    url: 'https://velxio.dev/login',
+    noindex: true,
+  });
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const setUser = useAuthStore((s) => s.setUser);

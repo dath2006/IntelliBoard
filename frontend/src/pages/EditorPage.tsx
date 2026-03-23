@@ -112,8 +112,8 @@ export const EditorPage: React.FC = () => {
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerWidth, setExplorerWidth] = useState(EXPLORER_DEFAULT);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches);
-  // Default to 'circuit' on mobile — the visual simulation is the primary content
-  const [mobileView, setMobileView] = useState<'code' | 'circuit'>('circuit');
+  // Default to 'code' on mobile — show the editor so users can write/view code
+  const [mobileView, setMobileView] = useState<'code' | 'circuit'>('code');
   const user = useAuthStore((s) => s.user);
 
   const handleSaveClick = useCallback(() => {
@@ -232,6 +232,34 @@ export const EditorPage: React.FC = () => {
   return (
     <div className="app">
       <AppHeader />
+
+      {/* ── Mobile tab bar (top, above panels) ── */}
+      {isMobile && (
+        <nav className="mobile-tab-bar">
+          <button
+            className={`mobile-tab-btn${mobileView === 'code' ? ' mobile-tab-btn--active' : ''}`}
+            onClick={() => setMobileView('code')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="16 18 22 12 16 6" />
+              <polyline points="8 6 2 12 8 18" />
+            </svg>
+            <span>&lt;/&gt; Code</span>
+          </button>
+          <button
+            className={`mobile-tab-btn${mobileView === 'circuit' ? ' mobile-tab-btn--active' : ''}`}
+            onClick={() => setMobileView('circuit')}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="7" width="20" height="14" rx="2" />
+              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+              <line x1="12" y1="12" x2="12" y2="16" />
+              <line x1="10" y1="14" x2="14" y2="14" />
+            </svg>
+            <span>Circuit</span>
+          </button>
+        </nav>
+      )}
 
       <div className="app-container" ref={containerRef}>
         {/* ── Editor side ── */}
@@ -358,34 +386,6 @@ export const EditorPage: React.FC = () => {
           )}
         </div>
       </div>
-
-      {/* ── Mobile tab bar ── */}
-      {isMobile && (
-        <nav className="mobile-tab-bar">
-          <button
-            className={`mobile-tab-btn${mobileView === 'code' ? ' mobile-tab-btn--active' : ''}`}
-            onClick={() => setMobileView('code')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
-            </svg>
-            <span>Code</span>
-          </button>
-          <button
-            className={`mobile-tab-btn${mobileView === 'circuit' ? ' mobile-tab-btn--active' : ''}`}
-            onClick={() => setMobileView('circuit')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="14" rx="2" />
-              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-              <line x1="12" y1="12" x2="12" y2="16" />
-              <line x1="10" y1="14" x2="14" y2="14" />
-            </svg>
-            <span>Circuit</span>
-          </button>
-        </nav>
-      )}
 
       {saveModalOpen && <SaveProjectModal onClose={() => setSaveModalOpen(false)} />}
       {loginPromptOpen && <LoginPromptModal onClose={() => setLoginPromptOpen(false)} />}

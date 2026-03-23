@@ -4,9 +4,16 @@ import { getProjectById } from '../services/projectService';
 import { useEditorStore } from '../store/useEditorStore';
 import { useSimulatorStore } from '../store/useSimulatorStore';
 import { useProjectStore } from '../store/useProjectStore';
+import { useSEO } from '../utils/useSEO';
 import { EditorPage } from './EditorPage';
 
 export const ProjectByIdPage: React.FC = () => {
+  useSEO({
+    title: 'Project — Velxio Arduino Emulator',
+    description: 'View and simulate this Arduino project on Velxio — free, open-source multi-board emulator.',
+    url: 'https://velxio.dev/editor',
+    noindex: true,
+  });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const loadFiles = useEditorStore((s) => s.loadFiles);

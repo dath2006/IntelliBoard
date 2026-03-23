@@ -3,10 +3,18 @@ import { Link, useParams } from 'react-router-dom';
 import { getUserProjects, type ProjectResponse } from '../services/projectService';
 import { useAuthStore } from '../store/useAuthStore';
 import { AppHeader } from '../components/layout/AppHeader';
+import { useSEO } from '../utils/useSEO';
 import './UserProfilePage.css';
 
 export const UserProfilePage: React.FC = () => {
   const { username } = useParams<{ username: string }>();
+
+  useSEO({
+    title: `${username ?? 'User'} — Velxio Profile`,
+    description: `View Arduino and ESP32 projects by ${username ?? 'this user'} on Velxio.`,
+    url: `https://velxio.dev/${username ?? ''}`,
+    noindex: true,
+  });
   const user = useAuthStore((s) => s.user);
   const [projects, setProjects] = useState<ProjectResponse[]>([]);
   const [loading, setLoading] = useState(true);

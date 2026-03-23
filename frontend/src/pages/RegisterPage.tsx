@@ -3,8 +3,15 @@ import { Link, useNavigate } from 'react-router-dom';
 import { register, initiateGoogleLogin } from '../services/authService';
 import { useAuthStore } from '../store/useAuthStore';
 import { RESERVED_USERNAMES } from '../utils/reservedUsernames';
+import { useSEO } from '../utils/useSEO';
 
 export const RegisterPage: React.FC = () => {
+  useSEO({
+    title: 'Create Account — Velxio',
+    description: 'Create a free Velxio account to save your Arduino projects and share simulations.',
+    url: 'https://velxio.dev/register',
+    noindex: true,
+  });
   const navigate = useNavigate();
   const setUser = useAuthStore((s) => s.setUser);
   const [username, setUsername] = useState('');

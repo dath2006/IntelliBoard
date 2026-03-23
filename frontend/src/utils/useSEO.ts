@@ -7,6 +7,8 @@ export interface SEOMeta {
   ogImage?: string;
   /** Module-level constant: injected once on mount, removed on unmount. */
   jsonLd?: object | object[];
+  /** If true, sets robots meta to "noindex, nofollow" to prevent indexing. */
+  noindex?: boolean;
 }
 
 function qs(selector: string): HTMLMetaElement | null {
@@ -21,12 +23,13 @@ function qs(selector: string): HTMLMetaElement | null {
  * once on mount and removed on unmount. Pass a module-level constant to avoid
  * unnecessary re-injection.
  */
-export function useSEO({ title, description, url, ogImage, jsonLd }: SEOMeta) {
+export function useSEO({ title, description, url, ogImage, jsonLd, noindex }: SEOMeta) {
   const scriptRef = useRef<HTMLScriptElement | null>(null);
 
   useEffect(() => {
     const origTitle = document.title;
     const descEl      = qs('meta[name="description"]');
+    const robotsEl    = qs('meta[name="robots"]');
     const ogTitleEl   = qs('meta[property="og:title"]');
     const ogDescEl    = qs('meta[property="og:description"]');
     const ogUrlEl     = qs('meta[property="og:url"]');
@@ -39,6 +42,7 @@ export function useSEO({ title, description, url, ogImage, jsonLd }: SEOMeta) {
     const set = (el: HTMLMetaElement | null, v: string) => el?.setAttribute('content', v);
 
     const origDesc      = get(descEl);
+    const origRobots    = get(robotsEl);
     const origOgTitle   = get(ogTitleEl);
     const origOgDesc    = get(ogDescEl);
     const origOgUrl     = get(ogUrlEl);
@@ -61,6 +65,9 @@ export function useSEO({ title, description, url, ogImage, jsonLd }: SEOMeta) {
     // Apply
     document.title = title;
     set(descEl, description);
+    if (noindex) {
+      set(robotsEl, 'noindex, nofollow');
+    }
     set(ogTitleEl, title);
     set(ogDescEl, description);
     set(ogUrlEl, url);
@@ -82,6 +89,7 @@ export function useSEO({ title, description, url, ogImage, jsonLd }: SEOMeta) {
     return () => {
       document.title = origTitle;
       set(descEl, origDesc);
+      if (noindex) set(robotsEl, origRobots);
       set(ogTitleEl, origOgTitle);
       set(ogDescEl, origOgDesc);
       set(ogUrlEl, origOgUrl);
@@ -99,5 +107,5 @@ export function useSEO({ title, description, url, ogImage, jsonLd }: SEOMeta) {
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, description, url, ogImage]);
+  }, [title, description, url, ogImage, noindex]);
 }

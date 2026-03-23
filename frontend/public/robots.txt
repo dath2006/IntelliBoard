@@ -1,5 +1,16 @@
 User-agent: *
 Allow: /
 
+# Auth pages — no useful content for search engines
+Disallow: /login
+Disallow: /register
+
+# Dynamic user/project pages — noindex is also set via meta tag
+Disallow: /project/
+Disallow: /admin
+
+# Prevent crawling of API endpoints
+Disallow: /api/
+
 # Sitemap
 Sitemap: https://velxio.dev/sitemap.xml

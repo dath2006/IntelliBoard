@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
+import { useSEO } from '../utils/useSEO';
 import {
   getAdminSetupStatus,
   createFirstAdmin,
@@ -517,6 +518,13 @@ function AdminDashboard() {
 type AdminPageState = 'loading' | 'setup' | 'not-admin' | 'dashboard';
 
 export const AdminPage: React.FC = () => {
+  useSEO({
+    title: 'Admin — Velxio',
+    description: 'Velxio administration panel.',
+    url: 'https://velxio.dev/admin',
+    noindex: true,
+  });
+
   const user = useAuthStore((s) => s.user);
   const [pageState, setPageState] = useState<AdminPageState>('loading');
 
