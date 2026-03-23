@@ -479,6 +479,72 @@ export const Velxio2Page: React.FC = () => {
           </div>
         </section>
 
+        {/* ── Open-source libraries ── */}
+        <section className="seo-section">
+          <h2>Built on open-source</h2>
+          <p className="lead">
+            Velxio is powered by these open-source projects. Without them, none of this would be possible.
+          </p>
+          <div className="v2-repos">
+            <a href="https://github.com/wokwi/avr8js" target="_blank" rel="noopener noreferrer" className="v2-repo-card">
+              <IcoGitHub />
+              <div>
+                <h3>avr8js</h3>
+                <p>AVR8 CPU emulator in JavaScript — powers Arduino Uno, Nano, Mega simulation</p>
+              </div>
+            </a>
+            <a href="https://github.com/wokwi/rp2040js" target="_blank" rel="noopener noreferrer" className="v2-repo-card">
+              <IcoGitHub />
+              <div>
+                <h3>rp2040js</h3>
+                <p>RP2040 emulator — powers Raspberry Pi Pico and Pico W simulation</p>
+              </div>
+            </a>
+            <a href="https://github.com/wokwi/wokwi-elements" target="_blank" rel="noopener noreferrer" className="v2-repo-card">
+              <IcoGitHub />
+              <div>
+                <h3>wokwi-elements</h3>
+                <p>Web Components for electronic parts — LEDs, buttons, sensors, displays, and more</p>
+              </div>
+            </a>
+            <a href="https://github.com/wokwi/wokwi-boards" target="_blank" rel="noopener noreferrer" className="v2-repo-card">
+              <IcoGitHub />
+              <div>
+                <h3>wokwi-boards</h3>
+                <p>SVG board definitions for Arduino, ESP32, Raspberry Pi Pico, and other boards</p>
+              </div>
+            </a>
+            <a href="https://github.com/lcgamboa/qemu" target="_blank" rel="noopener noreferrer" className="v2-repo-card">
+              <IcoGitHub />
+              <div>
+                <h3>QEMU (lcgamboa fork)</h3>
+                <p>QEMU fork with ESP32 Xtensa LX6/LX7 emulation support</p>
+              </div>
+            </a>
+            <a href="https://github.com/espressif/qemu" target="_blank" rel="noopener noreferrer" className="v2-repo-card">
+              <IcoGitHub />
+              <div>
+                <h3>QEMU (Espressif)</h3>
+                <p>Official Espressif QEMU fork for ESP32 development and testing</p>
+              </div>
+            </a>
+            <a href="https://github.com/wokwi/wokwi-features" target="_blank" rel="noopener noreferrer" className="v2-repo-card">
+              <IcoGitHub />
+              <div>
+                <h3>wokwi-features</h3>
+                <p>Feature tracking and component specifications for the Wokwi ecosystem</p>
+              </div>
+            </a>
+            <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className="v2-repo-card v2-repo-card--primary">
+              <IcoGitHub />
+              <div>
+                <h3>Velxio</h3>
+                <p>This project — free, open-source multi-board embedded simulator</p>
+              </div>
+            </a>
+          </div>
+        </section>
+
         {/* ── Bottom CTA ── */}
         <div className="seo-bottom">
           <h2>Try Velxio 2.0 now</h2>

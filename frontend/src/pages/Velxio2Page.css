@@ -233,6 +233,64 @@
   background: #484848;
 }
 
+/* ── Repository cards ────────────────────────────────── */
+.v2-repos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+}
+
+.v2-repo-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #121214;
+  border: 1px solid #1c1c1e;
+  border-radius: 10px;
+  padding: 1rem 1.15rem;
+  text-decoration: none;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.v2-repo-card:hover {
+  border-color: #333;
+  transform: translateY(-1px);
+}
+
+.v2-repo-card > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: #8b949e;
+  fill: #8b949e;
+}
+
+.v2-repo-card h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #e6edf3;
+  margin: 0 0 3px;
+}
+
+.v2-repo-card p {
+  font-size: 0.78rem;
+  color: #8b949e;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.v2-repo-card--primary {
+  border-color: rgba(0, 122, 204, 0.3);
+  background: rgba(0, 122, 204, 0.06);
+}
+
+.v2-repo-card--primary:hover {
+  border-color: #007acc;
+}
+
+.v2-repo-card--primary h3 {
+  color: #007acc;
+}
+
 /* ── Bottom community ────────────────────────────────── */
 .v2-bottom-community {
   display: flex;
