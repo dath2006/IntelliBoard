@@ -67,20 +67,12 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
   const [installModalOpen, setInstallModalOpen] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
-  const [overflowCollapsed, setOverflowCollapsed] = useState(false);
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
+  const [missingLibHint, setMissingLibHint] = useState(false);
 
-  // Collapse secondary buttons when toolbar is too narrow
-  useEffect(() => {
-    const el = toolbarRef.current;
-    if (!el) return;
-    const ro = new ResizeObserver(([entry]) => {
-      setOverflowCollapsed(entry.contentRect.width < 500);
-    });
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  // (ResizeObserver removed — Library Manager is always visible now,
+  // only import/export live in the overflow menu)
 
   // Close overflow dropdown on outside click
   useEffect(() => {
@@ -143,8 +135,14 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
           compileBoardProgram(activeBoardId, program);
         }
         setMessage({ type: 'success', text: 'Compiled successfully' });
+        setMissingLibHint(false);
       } else {
-        setMessage({ type: 'error', text: result.error || result.stderr || 'Compile failed' });
+        const errText = result.error || result.stderr || 'Compile failed';
+        setMessage({ type: 'error', text: errText });
+        // Detect missing library errors — common patterns:
+        // "No such file or directory" for #include, "fatal error: XXX.h"
+        const looksLikeMissingLib = /No such file or directory|fatal error:.*\.h|library not found/i.test(errText);
+        setMissingLibHint(looksLikeMissingLib);
       }
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : 'Compile failed';
@@ -428,104 +426,61 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
             onChange={handleImportFile}
           />
 
-          {/* Secondary buttons — hidden when toolbar is narrow */}
-          {!overflowCollapsed && (
-            <>
-              {/* Import Wokwi zip */}
-              <button
-                onClick={() => importInputRef.current?.click()}
-                className="tb-btn tb-btn-lib"
-                title="Import Wokwi zip"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              </button>
+          {/* Library Manager — always visible with label */}
+          <button
+            onClick={() => setLibManagerOpen(true)}
+            className="tb-btn-libraries"
+            title="Search and install Arduino libraries"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
+              <path d="m3.3 7 8.7 5 8.7-5" />
+              <path d="M12 22V12" />
+            </svg>
+            <span className="tb-libraries-label">Libraries</span>
+          </button>
 
-              {/* Export Wokwi zip */}
-              <button
-                onClick={handleExport}
-                className="tb-btn tb-btn-lib"
-                title="Export as Wokwi zip"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </button>
+          {/* Import / Export — overflow menu */}
+          <div className="tb-overflow-wrap" ref={overflowMenuRef}>
+            <button
+              onClick={() => setOverflowOpen((v) => !v)}
+              className={`tb-btn tb-btn-overflow${overflowOpen ? ' tb-btn-overflow-active' : ''}`}
+              title="Import / Export"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                <circle cx="5"  cy="12" r="2" />
+                <circle cx="12" cy="12" r="2" />
+                <circle cx="19" cy="12" r="2" />
+              </svg>
+            </button>
 
-              {/* Libraries */}
-              <button
-                onClick={() => setLibManagerOpen(true)}
-                className="tb-btn tb-btn-lib"
-                title="Library Manager"
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                  <path d="m3.3 7 8.7 5 8.7-5" />
-                  <path d="M12 22V12" />
-                </svg>
-              </button>
-            </>
-          )}
-
-          {/* Overflow (…) button — shown when toolbar is narrow */}
-          {overflowCollapsed && (
-            <div className="tb-overflow-wrap" ref={overflowMenuRef}>
-              <button
-                onClick={() => setOverflowOpen((v) => !v)}
-                className={`tb-btn tb-btn-overflow${overflowOpen ? ' tb-btn-overflow-active' : ''}`}
-                title="More actions"
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                  <circle cx="5"  cy="12" r="2" />
-                  <circle cx="12" cy="12" r="2" />
-                  <circle cx="19" cy="12" r="2" />
-                </svg>
-              </button>
-
-              {overflowOpen && (
-                <div className="tb-overflow-menu">
-                  <button
-                    className="tb-overflow-item"
-                    onClick={() => { importInputRef.current?.click(); setOverflowOpen(false); }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                    Import Wokwi zip
-                  </button>
-                  <button
-                    className="tb-overflow-item"
-                    onClick={() => { handleExport(); setOverflowOpen(false); }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="17 8 12 3 7 8" />
-                      <line x1="12" y1="3" x2="12" y2="15" />
-                    </svg>
-                    Export as Wokwi zip
-                  </button>
-                  <button
-                    className="tb-overflow-item"
-                    onClick={() => { setLibManagerOpen(true); setOverflowOpen(false); }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-                      <path d="m3.3 7 8.7 5 8.7-5" />
-                      <path d="M12 22V12" />
-                    </svg>
-                    Library Manager
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+            {overflowOpen && (
+              <div className="tb-overflow-menu">
+                <button
+                  className="tb-overflow-item"
+                  onClick={() => { importInputRef.current?.click(); setOverflowOpen(false); }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Import zip
+                </button>
+                <button
+                  className="tb-overflow-item"
+                  onClick={() => { handleExport(); setOverflowOpen(false); }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  Export zip
+                </button>
+              </div>
+            )}
+          </div>
 
           <div className="tb-divider" />
 
@@ -547,6 +502,24 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
       {/* Error detail bar */}
       {message?.type === 'error' && message.text.length > 40 && !consoleOpen && (
         <div className="toolbar-error-detail">{message.text}</div>
+      )}
+
+      {/* Missing library hint */}
+      {missingLibHint && (
+        <div className="tb-lib-hint">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="10" />
+            <line x1="12" y1="8" x2="12" y2="12" />
+            <line x1="12" y1="16" x2="12.01" y2="16" />
+          </svg>
+          <span>Missing library? Install it from the</span>
+          <button className="tb-lib-hint-btn" onClick={() => { setLibManagerOpen(true); setMissingLibHint(false); }}>
+            Library Manager
+          </button>
+          <button className="tb-lib-hint-close" onClick={() => setMissingLibHint(false)} title="Dismiss">
+            &times;
+          </button>
+        </div>
       )}
 
       <LibraryManagerModal isOpen={libManagerOpen} onClose={() => setLibManagerOpen(false)} />
