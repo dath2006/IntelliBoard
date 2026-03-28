@@ -739,6 +739,7 @@ export const LandingPage: React.FC = () => {
           <Link to="/docs">Docs</Link>
           <Link to="/examples">Examples</Link>
           <Link to="/editor">Editor</Link>
+          <Link to="/about">About</Link>
         </div>
         <p className="footer-copy">
           MIT License · Powered by <a href="https://github.com/wokwi/avr8js" target="_blank" rel="noopener noreferrer">avr8js</a> &amp; <a href="https://github.com/wokwi/wokwi-elements" target="_blank" rel="noopener noreferrer">wokwi-elements</a>

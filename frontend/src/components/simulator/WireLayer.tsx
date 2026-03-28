@@ -3,6 +3,8 @@ import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { WireRenderer } from './WireRenderer';
 import { WireInProgressRenderer } from './WireInProgressRenderer';
 
+const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
 export interface SegmentHandle {
   segIndex: number;
   axis: 'horizontal' | 'vertical';
@@ -18,6 +20,8 @@ interface WireLayerProps {
   segmentHandles: SegmentHandle[];
   /** Called when user starts dragging a handle (passes segIndex) */
   onHandleMouseDown: (e: React.MouseEvent, segIndex: number) => void;
+  /** Called when user starts dragging a handle via touch (passes segIndex) */
+  onHandleTouchStart?: (e: React.TouchEvent, segIndex: number) => void;
 }
 
 export const WireLayer: React.FC<WireLayerProps> = ({
@@ -25,6 +29,7 @@ export const WireLayer: React.FC<WireLayerProps> = ({
   segmentDragPreview,
   segmentHandles,
   onHandleMouseDown,
+  onHandleTouchStart,
 }) => {
   const wires = useSimulatorStore((s) => s.wires);
   const wireInProgress = useSimulatorStore((s) => s.wireInProgress);
@@ -64,12 +69,13 @@ export const WireLayer: React.FC<WireLayerProps> = ({
           key={handle.segIndex}
           cx={handle.mx}
           cy={handle.my}
-          r={7}
+          r={isTouchDevice ? 14 : 7}
           fill="white"
           stroke="#007acc"
           strokeWidth={2}
-          style={{ pointerEvents: 'all', cursor: handle.axis === 'horizontal' ? 'ns-resize' : 'ew-resize' }}
+          style={{ pointerEvents: 'all', cursor: handle.axis === 'horizontal' ? 'ns-resize' : 'ew-resize', touchAction: 'none' }}
           onMouseDown={(e) => onHandleMouseDown(e, handle.segIndex)}
+          onTouchStart={(e) => onHandleTouchStart?.(e, handle.segIndex)}
         />
       ))}
 

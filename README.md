@@ -440,6 +440,12 @@ For commercial licensing inquiries: [davidmonterocrespo24@gmail.com](mailto:davi
 
 See [LICENSE](LICENSE) and [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for full terms.
 
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=davidmonterocrespo24/velxio&type=Date)](https://star-history.com/#davidmonterocrespo24/velxio&Date)
+
+---
+
 ## References
 
 - [Wokwi](https://wokwi.com) — Inspiration

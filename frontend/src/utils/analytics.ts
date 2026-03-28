@@ -5,9 +5,10 @@
  * Each function maps to an event that should be marked as a Key Event in GA4.
  */
 
-declare function gtag(command: 'event', eventName: string, eventParams?: Record<string, unknown>): void;
+type GtagFn = (command: 'event', eventName: string, eventParams?: Record<string, unknown>) => void;
 
 function fireEvent(eventName: string, params: Record<string, string | number | boolean>): void {
+  const gtag = (window as unknown as { gtag?: GtagFn }).gtag;
   if (typeof gtag === 'function') {
     gtag('event', eventName, params);
   }

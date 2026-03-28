@@ -23,6 +23,9 @@ import {
   renderedToWaypoints,
   renderedPointsToPath,
 } from '../../utils/wireHitDetection';
+
+/** Detect touch-capable device once */
+const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 import type { ComponentMetadata } from '../../types/component-metadata';
 import type { BoardKind } from '../../types/board';
 import { BOARD_KIND_LABELS } from '../../types/board';
@@ -396,6 +399,18 @@ export const SimulatorCanvas = () => {
       if (e.touches.length !== 1) return;
       const touch = e.touches[0];
 
+      // ── Segment drag (wire editing) via touch ──
+      if (segmentDragRef.current) {
+        const world = toWorld(touch.clientX, touch.clientY);
+        const sd = segmentDragRef.current;
+        sd.isDragging = true;
+        const newValue = sd.axis === 'horizontal' ? world.y : world.x;
+        const newPts = moveSegment(sd.renderedPts, sd.segIndex, sd.axis, newValue);
+        const overridePath = renderedPointsToPath(newPts);
+        setSegmentDragPreview({ wireId: sd.wireId, overridePath });
+        return;
+      }
+
       // ── Wire preview: update position as finger moves ──
       if (wireInProgressRef.current && !isPanningRef.current && !touchDraggedComponentIdRef.current) {
         const world = toWorld(touch.clientX, touch.clientY);
@@ -464,6 +479,24 @@ export const SimulatorCanvas = () => {
 
       if (e.touches.length > 0) return; // Still fingers on screen
 
+      // ── Finish segment drag (wire editing) via touch ──
+      if (segmentDragRef.current) {
+        const sd = segmentDragRef.current;
+        if (sd.isDragging) {
+          segmentDragJustCommittedRef.current = true;
+          const changed = e.changedTouches[0];
+          if (changed) {
+            const world = toWorld(changed.clientX, changed.clientY);
+            const newValue = sd.axis === 'horizontal' ? world.y : world.x;
+            const newPts = moveSegment(sd.renderedPts, sd.segIndex, sd.axis, newValue);
+            updateWire(sd.wireId, { waypoints: renderedToWaypoints(newPts) });
+          }
+        }
+        segmentDragRef.current = null;
+        setSegmentDragPreview(null);
+        return;
+      }
+
       // ── Finish panning ──
       let wasPanning = false;
       if (isPanningRef.current) {
@@ -480,7 +513,7 @@ export const SimulatorCanvas = () => {
       const dx = changed.clientX - touchClickStartPosRef.current.x;
       const dy = changed.clientY - touchClickStartPosRef.current.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
-      const isShortTap = dist < 10 && elapsed < 400;
+      const isShortTap = dist < 20 && elapsed < 400;
 
       // If we actually panned (moved significantly), don't process as tap
       if (wasPanning && !isShortTap) return;
@@ -530,7 +563,8 @@ export const SimulatorCanvas = () => {
       if (isShortTap) {
         const now = Date.now();
         const world = toWorld(changed.clientX, changed.clientY);
-        const threshold = 8 / zoomRef.current;
+        const baseThreshold = isTouchDevice ? 20 : 8;
+        const threshold = baseThreshold / zoomRef.current;
         const wire = findWireNearPoint(wiresRef.current, world.x, world.y, threshold);
 
         // Double-tap → delete wire
@@ -961,6 +995,28 @@ export const SimulatorCanvas = () => {
     [selectedWireId],
   );
 
+  // Handle touchstart on a segment handle circle (mobile wire editing)
+  const handleHandleTouchStart = useCallback(
+    (e: React.TouchEvent, segIndex: number) => {
+      e.stopPropagation();
+      if (!selectedWireId) return;
+      const wire = wiresRef.current.find((w) => w.id === selectedWireId);
+      if (!wire) return;
+      const segments = getRenderedSegments(wire);
+      const seg = segments[segIndex];
+      if (!seg) return;
+      const expandedPts = getRenderedPoints(wire);
+      segmentDragRef.current = {
+        wireId: wire.id,
+        segIndex,
+        axis: seg.axis,
+        renderedPts: expandedPts,
+        isDragging: false,
+      };
+    },
+    [selectedWireId],
+  );
+
   // Zoom centered on cursor
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
@@ -1135,6 +1191,7 @@ export const SimulatorCanvas = () => {
             componentY={component.y}
             onPinClick={handlePinClick}
             showPins={showPinsForComponent}
+            zoom={zoom}
           />
         )}
       </React.Fragment>
@@ -1325,6 +1382,7 @@ export const SimulatorCanvas = () => {
               segmentDragPreview={segmentDragPreview}
               segmentHandles={segmentHandles}
               onHandleMouseDown={handleHandleMouseDown}
+              onHandleTouchStart={handleHandleTouchStart}
             />
 
             {/* All boards on canvas */}
@@ -1343,6 +1401,7 @@ export const SimulatorCanvas = () => {
                   setDragOffset({ x: world.x - board.x, y: world.y - board.y });
                 }}
                 onPinClick={handlePinClick}
+                zoom={zoom}
               />
             ))}
 

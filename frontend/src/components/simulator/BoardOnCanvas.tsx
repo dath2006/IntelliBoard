@@ -40,6 +40,7 @@ interface BoardOnCanvasProps {
   isActive?: boolean;
   onMouseDown: (e: React.MouseEvent) => void;
   onPinClick: (componentId: string, pinName: string, x: number, y: number) => void;
+  zoom?: number;
 }
 
 export const BoardOnCanvas = ({
@@ -49,6 +50,7 @@ export const BoardOnCanvas = ({
   isActive = false,
   onMouseDown,
   onPinClick,
+  zoom = 1,
 }: BoardOnCanvasProps) => {
   const { id, boardKind, x, y } = board;
   const size = BOARD_SIZE[boardKind] ?? { w: 300, h: 200 };
@@ -156,6 +158,7 @@ export const BoardOnCanvas = ({
         showPins={true}
         wrapperOffsetX={0}
         wrapperOffsetY={0}
+        zoom={zoom}
       />
     </>
   );

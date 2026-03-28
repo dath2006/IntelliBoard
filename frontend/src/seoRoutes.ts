@@ -191,6 +191,18 @@ export const SEO_ROUTES: SeoRoute[] = [
     },
   },
 
+  // ── About
+  {
+    path: '/about',
+    priority: 0.7,
+    changefreq: 'monthly',
+    seoMeta: {
+      title: 'About Velxio — Open Source Embedded Emulator by David Montero Crespo',
+      description: 'Learn about Velxio, the free open-source multi-board embedded emulator, and its creator David Montero Crespo — Application Architect at IBM, programming and robotics enthusiast.',
+      url: `${DOMAIN}/about`,
+    },
+  },
+
   // ── Auth / admin (noindex)
   { path: '/login',    noindex: true },
   { path: '/register', noindex: true },

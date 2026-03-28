@@ -20,6 +20,7 @@ import { Esp32C3SimulatorPage } from './pages/Esp32C3SimulatorPage';
 import { RaspberryPiPicoSimulatorPage } from './pages/RaspberryPiPicoSimulatorPage';
 import { RaspberryPiSimulatorPage } from './pages/RaspberryPiSimulatorPage';
 import { Velxio2Page } from './pages/Velxio2Page';
+import { AboutPage } from './pages/AboutPage';
 import { useAuthStore } from './store/useAuthStore';
 import './App.css';
 
@@ -52,6 +53,7 @@ function App() {
         <Route path="/raspberry-pi-pico-simulator" element={<RaspberryPiPicoSimulatorPage />} />
         <Route path="/raspberry-pi-simulator" element={<RaspberryPiSimulatorPage />} />
         <Route path="/v2" element={<Velxio2Page />} />
+        <Route path="/about" element={<AboutPage />} />
         {/* Canonical project URL by ID */}
         <Route path="/project/:id" element={<ProjectByIdPage />} />
         {/* Legacy slug route — redirects to /project/:id */}
