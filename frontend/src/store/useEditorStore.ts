@@ -89,6 +89,10 @@ interface EditorState {
   setTheme: (theme: 'vs-dark' | 'light') => void;
   setFontSize: (size: number) => void;
 
+  // Dirty flag — tracks whether code changed since last compilation
+  codeChangedSinceLastCompile: boolean;
+  markCompiled: () => void;
+
   // Legacy compat — sets content of the active file
   setCode: (code: string) => void;
 }
@@ -107,6 +111,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeGroupId: DEFAULT_GROUP_ID,
   activeGroupFileId: { [DEFAULT_GROUP_ID]: MAIN_ID },
   openGroupFileIds: { [DEFAULT_GROUP_ID]: [MAIN_ID] },
+
+  codeChangedSinceLastCompile: true,
+  markCompiled: () => set({ codeChangedSinceLastCompile: false }),
 
   // ── File operations (legacy API — operate on active group) ──────────────
 
@@ -178,6 +185,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         files: s.files.map(mapper),
         fileGroups: { ...s.fileGroups, [groupId]: (s.fileGroups[groupId] ?? []).map(mapper) },
+        codeChangedSinceLastCompile: true,
       };
     });
   },

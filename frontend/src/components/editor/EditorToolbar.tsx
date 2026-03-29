@@ -44,7 +44,7 @@ const BOARD_PILL_COLOR: Record<BoardKind, string> = {
 };
 
 export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compileLogs, setCompileLogs }: EditorToolbarProps) => {
-  const { files } = useEditorStore();
+  const { files, codeChangedSinceLastCompile, markCompiled } = useEditorStore();
   const {
     boards,
     activeBoardId,
@@ -137,6 +137,7 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
           compileBoardProgram(activeBoardId, program);
         }
         setMessage({ type: 'success', text: 'Compiled successfully' });
+        markCompiled();
         setMissingLibHint(false);
       } else {
         const errText = result.error || result.stderr || 'Compile failed';
@@ -155,24 +156,62 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
     }
   };
 
-  const handleRun = () => {
+  // Track whether we should auto-run after compilation completes
+  const autoRunAfterCompile = useRef(false);
+
+  const handleRun = async () => {
     if (activeBoardId) {
       const board = boards.find((b) => b.id === activeBoardId);
       const isQemuBoard = board?.boardKind === 'raspberry-pi-3' || board?.boardKind === 'esp32' || board?.boardKind === 'esp32-s3';
-      if (isQemuBoard || board?.compiledProgram) {
+
+      // QEMU boards don't need compilation
+      if (isQemuBoard) {
         trackRunSimulation(board?.boardKind);
         startBoard(activeBoardId);
         setMessage(null);
         return;
       }
+
+      // Auto-compile if no program or code changed since last compile
+      if (!board?.compiledProgram || codeChangedSinceLastCompile) {
+        autoRunAfterCompile.current = true;
+        await handleCompile();
+        // After compile, check if it succeeded and run
+        const updatedBoard = useSimulatorStore.getState().boards.find((b) => b.id === activeBoardId);
+        if (autoRunAfterCompile.current && updatedBoard?.compiledProgram) {
+          autoRunAfterCompile.current = false;
+          trackRunSimulation(updatedBoard.boardKind);
+          startBoard(activeBoardId);
+          setMessage(null);
+        } else {
+          autoRunAfterCompile.current = false;
+        }
+        return;
+      }
+
+      trackRunSimulation(board?.boardKind);
+      startBoard(activeBoardId);
+      setMessage(null);
+      return;
     }
-    // legacy fallback
-    if (compiledHex) {
+
+    // Legacy fallback
+    if (!compiledHex || codeChangedSinceLastCompile) {
+      autoRunAfterCompile.current = true;
+      await handleCompile();
+      const hex = useSimulatorStore.getState().compiledHex;
+      if (autoRunAfterCompile.current && hex) {
+        autoRunAfterCompile.current = false;
+        trackRunSimulation();
+        startSimulation();
+        setMessage(null);
+      } else {
+        autoRunAfterCompile.current = false;
+      }
+    } else {
       trackRunSimulation();
       startSimulation();
       setMessage(null);
-    } else {
-      setMessage({ type: 'error', text: 'Compile first' });
     }
   };
 
@@ -337,9 +376,9 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
           {/* Run */}
           <button
             onClick={handleRun}
-            disabled={running || (!['raspberry-pi-3','esp32','esp32-s3'].includes(activeBoard?.boardKind ?? '') && !compiledHex && !activeBoard?.compiledProgram)}
+            disabled={running || compiling}
             className="tb-btn tb-btn-run"
-            title="Run"
+            title="Run (auto-compiles if needed)"
           >
             <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
               <polygon points="5,3 19,12 5,21" />
