@@ -24,6 +24,29 @@ WORKDIR /qemu-lcgamboa
 RUN bash build_libqemu-esp32.sh
 
 
+# ---- Stage 0.5: ESP-IDF toolchain for ESP32 compilation ----
+FROM ubuntu:22.04 AS espidf-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git wget flex bison gperf python3 python3-pip python3-venv \
+    cmake ninja-build ccache libffi-dev libssl-dev \
+    libusb-1.0-0 ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install ESP-IDF 4.4.7 (matches Arduino ESP32 core 2.0.17 / lcgamboa QEMU ROM)
+RUN git clone -b v4.4.7 --recursive --depth=1 --shallow-submodules \
+    https://github.com/espressif/esp-idf.git /opt/esp-idf
+
+WORKDIR /opt/esp-idf
+
+# Install toolchains for esp32 (Xtensa) and esp32c3 (RISC-V) only
+RUN ./install.sh esp32,esp32c3
+
+# Clean up large unnecessary files to reduce image size
+RUN rm -rf .git docs examples \
+    && find /root/.espressif -name '*.tar.*' -delete 2>/dev/null || true
+
+
 # ---- Stage 1: Build frontend and wokwi-libs ----
 FROM node:20 AS frontend-builder
 
@@ -78,9 +101,9 @@ RUN curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/inst
     | BINDIR=/usr/local/bin sh
 
 # Only install arduino-cli binary here. Core installation (arduino:avr,
-# rp2040:rp2040, esp32:esp32) is done at first boot by entrypoint.sh
-# and persisted in the mounted /root/.arduino15 volume.
-# This keeps the image small (~500MB vs ~2.5GB) and builds fast.
+# rp2040:rp2040) is done at first boot by entrypoint.sh and persisted
+# in the mounted /root/.arduino15 volume.
+# ESP32 compilation uses ESP-IDF instead of arduino-cli.
 
 WORKDIR /app
 
@@ -123,6 +146,14 @@ COPY --from=qemu-builder /qemu-lcgamboa/pc-bios/esp32c3-rom.bin /app/lib/
 # QEMU_RISCV32_LIB  → RISC-V library (ESP32-C3 and variants)
 ENV QEMU_ESP32_LIB=/app/lib/libqemu-xtensa.so
 ENV QEMU_RISCV32_LIB=/app/lib/libqemu-riscv32.so
+
+# ── ESP-IDF toolchain for ESP32 compilation ──────────────────────────────────
+# Copied from espidf-builder stage: IDF framework + cross-compiler toolchains
+COPY --from=espidf-builder /opt/esp-idf /opt/esp-idf
+COPY --from=espidf-builder /root/.espressif /root/.espressif
+
+ENV IDF_PATH=/opt/esp-idf
+ENV IDF_TOOLS_PATH=/root/.espressif
 
 EXPOSE 80
 

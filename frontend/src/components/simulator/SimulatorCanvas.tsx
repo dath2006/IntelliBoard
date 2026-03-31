@@ -33,6 +33,13 @@ import { useOscilloscopeStore } from '../../store/useOscilloscopeStore';
 import { trackSelectBoard, trackAddComponent, trackCreateWire, trackToggleSerialMonitor } from '../../utils/analytics';
 import './SimulatorCanvas.css';
 
+/** Check if a board kind is an ESP32-family board. */
+function isEsp32Kind(kind: BoardKind): boolean {
+  return kind.startsWith('esp32') || kind === 'xiao-esp32-s3' || kind === 'xiao-esp32-c3'
+    || kind === 'arduino-nano-esp32' || kind === 'aitewinrobot-esp32c3-supermini'
+    || kind === 'esp32-cam' || kind === 'wemos-lolin32-lite' || kind === 'esp32-devkit-c-v4';
+}
+
 export const SimulatorCanvas = () => {
   const {
     boards,
@@ -50,6 +57,9 @@ export const SimulatorCanvas = () => {
     serialMonitorOpen,
     toggleSerialMonitor,
   } = useSimulatorStore();
+
+  // Active board (for WiFi/BLE status display)
+  const activeBoard = boards.find((b) => b.id === activeBoardId) ?? null;
 
   // Legacy derived values for components that still use them
   const boardType = useSimulatorStore((s) => s.boardType);
@@ -1253,6 +1263,45 @@ export const SimulatorCanvas = () => {
               </svg>
               Serial
             </button>
+
+            {/* WiFi status indicator (ESP32 boards only) */}
+            {activeBoard && isEsp32Kind(activeBoard.boardKind) && activeBoard.wifiStatus && (
+              <span
+                className={`canvas-wifi-badge canvas-wifi-${activeBoard.wifiStatus.status}`}
+                title={
+                  activeBoard.wifiStatus.status === 'got_ip'
+                    ? `WiFi: ${activeBoard.wifiStatus.ssid ?? 'Velxio-GUEST'} — IP: ${activeBoard.wifiStatus.ip}`
+                    : activeBoard.wifiStatus.status === 'connected'
+                    ? `WiFi: ${activeBoard.wifiStatus.ssid ?? 'Velxio-GUEST'} — Connecting...`
+                    : activeBoard.wifiStatus.status === 'initializing'
+                    ? 'WiFi: Initializing...'
+                    : 'WiFi: Disconnected'
+                }
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                  <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                  <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                  <circle cx="12" cy="20" r="1" />
+                </svg>
+              </span>
+            )}
+
+            {/* BLE status indicator (ESP32 boards only) */}
+            {activeBoard && isEsp32Kind(activeBoard.boardKind) && activeBoard.bleStatus && (
+              <span
+                className={`canvas-ble-badge canvas-ble-${activeBoard.bleStatus.status}`}
+                title={
+                  activeBoard.bleStatus.status === 'advertising'
+                    ? 'BLE: Advertising'
+                    : 'BLE: Initialized'
+                }
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5" />
+                </svg>
+              </span>
+            )}
 
             {/* Oscilloscope toggle */}
             <button

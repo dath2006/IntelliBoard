@@ -12,6 +12,8 @@ services:
     environment:
       - DATABASE_URL=sqlite+aiosqlite:////app/data/velxio.db
       - DATA_DIR=/app/data
+      - IDF_PATH=/opt/esp-idf
+      - IDF_TOOLS_PATH=/root/.espressif
     volumes:
       - ./data:/app/data
       - arduino-libs:/root/.arduino15

@@ -60,10 +60,15 @@ function getTabSessionId(): string {
 
 export interface Ws2812Pixel { r: number; g: number; b: number }
 export interface LedcUpdate  { channel: number; duty: number; duty_pct: number; gpio?: number }
+export interface WifiStatus  { status: string; ssid?: string; ip?: string }
+export interface BleStatus   { status: string }
 
 export class Esp32Bridge {
   readonly boardId: string;
   readonly boardKind: BoardKind;
+
+  /** Set to true before connect() to enable WiFi NIC in QEMU. */
+  wifiEnabled = false;
 
   // Callbacks wired up by useSimulatorStore
   onSerialData:    ((char: string, uart?: number) => void) | null = null;
@@ -78,6 +83,8 @@ export class Esp32Bridge {
   onError:         ((msg: string) => void) | null = null;
   onSystemEvent:   ((event: string, data: Record<string, unknown>) => void) | null = null;
   onCrash:         ((data: Record<string, unknown>) => void) | null = null;
+  onWifiStatus:    ((status: WifiStatus) => void) | null = null;
+  onBleStatus:     ((status: BleStatus) => void) | null = null;
 
   private socket: WebSocket | null = null;
   private _connected = false;
@@ -115,6 +122,7 @@ export class Esp32Bridge {
           board: toQemuBoardType(this.boardKind),
           ...(this._pendingFirmware ? { firmware_b64: this._pendingFirmware } : {}),
           sensors: this._pendingSensors,
+          wifi_enabled: this.wifiEnabled,
         },
       });
     };
@@ -179,6 +187,18 @@ export class Esp32Bridge {
             this.onCrash?.(msg.data);
           }
           this.onSystemEvent?.(evt, msg.data);
+          break;
+        }
+        case 'wifi_status': {
+          const wifiStatus = msg.data as unknown as WifiStatus;
+          console.log(`[Esp32Bridge:${this.boardId}] wifi_status: ${wifiStatus.status} ssid=${wifiStatus.ssid ?? ''} ip=${wifiStatus.ip ?? ''}`);
+          this.onWifiStatus?.(wifiStatus);
+          break;
+        }
+        case 'ble_status': {
+          const bleStatus = msg.data as unknown as BleStatus;
+          console.log(`[Esp32Bridge:${this.boardId}] ble_status: ${bleStatus.status}`);
+          this.onBleStatus?.(bleStatus);
           break;
         }
         case 'error':

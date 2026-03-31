@@ -4190,6 +4190,491 @@ void loop() {
       { id: 'c3sv-pwm', start: { componentId: 'esp32-c3', pinName: '10'    }, end: { componentId: 'c3-sv1', pinName: 'PWM' }, color: '#ff8800' },
     ],
   },
+
+  // ── ESP32-C3 WiFi & Bluetooth Examples ─────────────────────────────────────
+
+  {
+    id: 'esp32c3-wifi-scan',
+    title: 'ESP32-C3 WiFi Scan',
+    description: 'Scan for available WiFi networks on the ESP32-C3 (RISC-V). The emulated ESP32-C3 will find the "Velxio-GUEST" access point.',
+    category: 'communication',
+    difficulty: 'beginner',
+    boardType: 'esp32-c3',
+    boardFilter: 'esp32-c3',
+    code: `#include <WiFi.h>
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32-C3 WiFi Scanner");
+  Serial.println("=====================");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+
+  Serial.println("Scanning for networks...");
+  int n = WiFi.scanNetworks();
+  if (n == 0) {
+    Serial.println("No networks found");
+  } else {
+    Serial.printf("Found %d networks:\\n", n);
+    for (int i = 0; i < n; i++) {
+      Serial.printf("  %d: %-20s  %d dBm  %s\\n",
+        i + 1,
+        WiFi.SSID(i).c_str(),
+        WiFi.RSSI(i),
+        WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "Open" : "Encrypted");
+    }
+  }
+  Serial.println("\\nDone! Scan again in 10 seconds...");
+}
+
+void loop() {
+  delay(10000);
+  setup();  // re-scan
+}
+`,
+    components: [],
+    wires: [],
+  },
+
+  {
+    id: 'esp32c3-wifi-connect',
+    title: 'ESP32-C3 WiFi Connect',
+    description: 'Connect the ESP32-C3 to the virtual "Velxio-GUEST" WiFi network and print the assigned IP address. Uses channel 6 for faster connection.',
+    category: 'communication',
+    difficulty: 'beginner',
+    boardType: 'esp32-c3',
+    boardFilter: 'esp32-c3',
+    code: `#include <WiFi.h>
+
+const char* ssid = "Velxio-GUEST";
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32-C3 WiFi Connection Demo");
+  Serial.println("=============================");
+  Serial.printf("Connecting to %s", ssid);
+
+  WiFi.begin(ssid, "", 6);  // channel 6, no password
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println(" Connected!");
+  Serial.printf("IP Address: %s\\n", WiFi.localIP().toString().c_str());
+  Serial.printf("MAC Address: %s\\n", WiFi.macAddress().c_str());
+  Serial.printf("Signal Strength (RSSI): %d dBm\\n", WiFi.RSSI());
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("WiFi still connected - IP: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("WiFi disconnected! Reconnecting...");
+    WiFi.begin(ssid, "", 6);
+  }
+  delay(5000);
+}
+`,
+    components: [],
+    wires: [],
+  },
+
+  {
+    id: 'esp32c3-http-server',
+    title: 'ESP32-C3 HTTP Server',
+    description: 'Run a simple web server on the ESP32-C3. After connecting to WiFi, the server responds with an HTML page. Access it via the IoT Gateway link.',
+    category: 'communication',
+    difficulty: 'intermediate',
+    boardType: 'esp32-c3',
+    boardFilter: 'esp32-c3',
+    code: `#include <WiFi.h>
+#include <WebServer.h>
+
+const char* ssid = "Velxio-GUEST";
+WebServer server(80);
+
+int requestCount = 0;
+
+void handleRoot() {
+  requestCount++;
+  String html = "<!DOCTYPE html><html><head>";
+  html += "<meta charset='utf-8'>";
+  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+  html += "<title>ESP32-C3 Web Server</title>";
+  html += "<style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:0 20px;";
+  html += "background:#1a1a2e;color:#e0e0e0}h1{color:#00d4ff}";
+  html += ".card{background:#16213e;padding:20px;border-radius:10px;margin:10px 0}";
+  html += ".stat{color:#00d4ff;font-size:1.2em}</style></head><body>";
+  html += "<h1>Hello from ESP32-C3!</h1>";
+  html += "<div class='card'><p>This page is served by an ESP32-C3 (RISC-V) running in the Velxio simulator.</p>";
+  html += "<p>Requests served: <span class='stat'>" + String(requestCount) + "</span></p>";
+  html += "<p>Uptime: <span class='stat'>" + String(millis() / 1000) + "s</span></p>";
+  html += "<p>Free heap: <span class='stat'>" + String(ESP.getFreeHeap()) + " bytes</span></p>";
+  html += "</div></body></html>";
+  server.send(200, "text/html", html);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32-C3 HTTP Server");
+
+  WiFi.begin(ssid, "", 6);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" Connected!");
+
+  server.on("/", handleRoot);
+  server.on("/api/hello", []() {
+    server.send(200, "application/json", "{\\"message\\":\\"Hello from ESP32-C3!\\"}");
+  });
+  server.begin();
+
+  Serial.printf("Server started at: http://%s/\\n", WiFi.localIP().toString().c_str());
+  Serial.println("Open the IoT Gateway link to access it from your browser.");
+}
+
+void loop() {
+  server.handleClient();
+}
+`,
+    components: [],
+    wires: [],
+  },
+
+  {
+    id: 'esp32c3-ble-advertise',
+    title: 'ESP32-C3 BLE Advertise',
+    description: 'Initialize BLE 5.0 and start advertising on the ESP32-C3. Note: The ESP32-C3 only supports BLE (no Classic Bluetooth). BLE initialization is detected but actual communication is not emulated.',
+    category: 'communication',
+    difficulty: 'intermediate',
+    boardType: 'esp32-c3',
+    boardFilter: 'esp32-c3',
+    code: `#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+BLEServer* pServer = nullptr;
+BLECharacteristic* pCharacteristic = nullptr;
+bool deviceConnected = false;
+int counter = 0;
+
+class MyServerCallbacks: public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) {
+    deviceConnected = true;
+    Serial.println("BLE client connected!");
+  }
+  void onDisconnect(BLEServer* pServer) {
+    deviceConnected = false;
+    Serial.println("BLE client disconnected");
+    pServer->startAdvertising();
+  }
+};
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32-C3 BLE Advertise Demo");
+  Serial.println("===========================");
+  Serial.println("Note: ESP32-C3 supports BLE 5.0 only (no Classic BT).");
+  Serial.println("BLE init is detected but communication is not emulated.");
+  Serial.println();
+
+  BLEDevice::init("Velxio-ESP32C3");
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+    CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ |
+    BLECharacteristic::PROPERTY_WRITE |
+    BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pCharacteristic->addDescriptor(new BLE2902());
+  pCharacteristic->setValue("Hello from Velxio C3!");
+
+  pService->start();
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->start();
+
+  Serial.println("BLE advertising started!");
+  Serial.println("Device name: Velxio-ESP32C3");
+  Serial.printf("Service UUID: %s\\n", SERVICE_UUID);
+}
+
+void loop() {
+  if (deviceConnected) {
+    counter++;
+    String value = "Count: " + String(counter);
+    pCharacteristic->setValue(value.c_str());
+    pCharacteristic->notify();
+    Serial.printf("Notified: %s\\n", value.c_str());
+  }
+  delay(2000);
+}
+`,
+    components: [],
+    wires: [],
+  },
+
+  // ── ESP32 WiFi & Bluetooth Examples ───────────────────────────────────────
+
+  {
+    id: 'esp32-wifi-scan',
+    title: 'ESP32 WiFi Scan',
+    description: 'Scan for available WiFi networks and display them in Serial Monitor. The emulated ESP32 will find the "Velxio-GUEST" access point.',
+    category: 'communication',
+    difficulty: 'beginner',
+    boardType: 'esp32',
+    boardFilter: 'esp32',
+    code: `#include <WiFi.h>
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32 WiFi Scanner");
+  Serial.println("==================");
+
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+
+  Serial.println("Scanning for networks...");
+  int n = WiFi.scanNetworks();
+  if (n == 0) {
+    Serial.println("No networks found");
+  } else {
+    Serial.printf("Found %d networks:\\n", n);
+    for (int i = 0; i < n; i++) {
+      Serial.printf("  %d: %-20s  %d dBm  %s\\n",
+        i + 1,
+        WiFi.SSID(i).c_str(),
+        WiFi.RSSI(i),
+        WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "Open" : "Encrypted");
+    }
+  }
+  Serial.println("\\nDone! Scan again in 10 seconds...");
+}
+
+void loop() {
+  delay(10000);
+  setup();  // re-scan
+}
+`,
+    components: [],
+    wires: [],
+  },
+
+  {
+    id: 'esp32-wifi-connect',
+    title: 'ESP32 WiFi Connect',
+    description: 'Connect to the virtual "Velxio-GUEST" WiFi network and print the assigned IP address. Uses channel 6 for faster connection.',
+    category: 'communication',
+    difficulty: 'beginner',
+    boardType: 'esp32',
+    boardFilter: 'esp32',
+    code: `#include <WiFi.h>
+
+const char* ssid = "Velxio-GUEST";
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32 WiFi Connection Demo");
+  Serial.println("==========================");
+  Serial.printf("Connecting to %s", ssid);
+
+  WiFi.begin(ssid, "", 6);  // channel 6, no password
+
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println(" Connected!");
+  Serial.printf("IP Address: %s\\n", WiFi.localIP().toString().c_str());
+  Serial.printf("MAC Address: %s\\n", WiFi.macAddress().c_str());
+  Serial.printf("Signal Strength (RSSI): %d dBm\\n", WiFi.RSSI());
+}
+
+void loop() {
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println("WiFi still connected - IP: " + WiFi.localIP().toString());
+  } else {
+    Serial.println("WiFi disconnected! Reconnecting...");
+    WiFi.begin(ssid, "", 6);
+  }
+  delay(5000);
+}
+`,
+    components: [],
+    wires: [],
+  },
+
+  {
+    id: 'esp32-http-server',
+    title: 'ESP32 HTTP Server',
+    description: 'Run a simple web server on the ESP32. After connecting to WiFi, the server responds with an HTML page. Access it via the IoT Gateway link.',
+    category: 'communication',
+    difficulty: 'intermediate',
+    boardType: 'esp32',
+    boardFilter: 'esp32',
+    code: `#include <WiFi.h>
+#include <WebServer.h>
+
+const char* ssid = "Velxio-GUEST";
+WebServer server(80);
+
+int requestCount = 0;
+
+void handleRoot() {
+  requestCount++;
+  String html = "<!DOCTYPE html><html><head>";
+  html += "<meta charset='utf-8'>";
+  html += "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+  html += "<title>ESP32 Web Server</title>";
+  html += "<style>body{font-family:sans-serif;max-width:600px;margin:40px auto;padding:0 20px;";
+  html += "background:#1a1a2e;color:#e0e0e0}h1{color:#00d4ff}";
+  html += ".card{background:#16213e;padding:20px;border-radius:10px;margin:10px 0}";
+  html += ".stat{color:#00d4ff;font-size:1.2em}</style></head><body>";
+  html += "<h1>Hello from ESP32!</h1>";
+  html += "<div class='card'><p>This page is served by an ESP32 running in the Velxio simulator.</p>";
+  html += "<p>Requests served: <span class='stat'>" + String(requestCount) + "</span></p>";
+  html += "<p>Uptime: <span class='stat'>" + String(millis() / 1000) + "s</span></p>";
+  html += "<p>Free heap: <span class='stat'>" + String(ESP.getFreeHeap()) + " bytes</span></p>";
+  html += "</div></body></html>";
+  server.send(200, "text/html", html);
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32 HTTP Server");
+
+  WiFi.begin(ssid, "", 6);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println(" Connected!");
+
+  server.on("/", handleRoot);
+  server.on("/api/hello", []() {
+    server.send(200, "application/json", "{\\"message\\":\\"Hello from ESP32!\\"}");
+  });
+  server.begin();
+
+  Serial.printf("Server started at: http://%s/\\n", WiFi.localIP().toString().c_str());
+  Serial.println("Open the IoT Gateway link to access it from your browser.");
+}
+
+void loop() {
+  server.handleClient();
+}
+`,
+    components: [],
+    wires: [],
+  },
+
+  {
+    id: 'esp32-ble-advertise',
+    title: 'ESP32 BLE Advertise',
+    description: 'Initialize BLE and start advertising. Note: BLE initialization is detected but actual BLE communication is not emulated in the current simulator.',
+    category: 'communication',
+    difficulty: 'intermediate',
+    boardType: 'esp32',
+    boardFilter: 'esp32',
+    code: `#include <BLEDevice.h>
+#include <BLEServer.h>
+#include <BLEUtils.h>
+#include <BLE2902.h>
+
+#define SERVICE_UUID        "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
+
+BLEServer* pServer = nullptr;
+BLECharacteristic* pCharacteristic = nullptr;
+bool deviceConnected = false;
+int counter = 0;
+
+class MyServerCallbacks: public BLEServerCallbacks {
+  void onConnect(BLEServer* pServer) {
+    deviceConnected = true;
+    Serial.println("BLE client connected!");
+  }
+  void onDisconnect(BLEServer* pServer) {
+    deviceConnected = false;
+    Serial.println("BLE client disconnected");
+    // Restart advertising
+    pServer->startAdvertising();
+  }
+};
+
+void setup() {
+  Serial.begin(115200);
+  delay(1000);
+  Serial.println("ESP32 BLE Advertise Demo");
+  Serial.println("========================");
+  Serial.println("Note: BLE init is detected but communication");
+  Serial.println("is not emulated in the simulator.");
+  Serial.println();
+
+  BLEDevice::init("Velxio-ESP32");
+  pServer = BLEDevice::createServer();
+  pServer->setCallbacks(new MyServerCallbacks());
+
+  BLEService *pService = pServer->createService(SERVICE_UUID);
+  pCharacteristic = pService->createCharacteristic(
+    CHARACTERISTIC_UUID,
+    BLECharacteristic::PROPERTY_READ |
+    BLECharacteristic::PROPERTY_WRITE |
+    BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pCharacteristic->addDescriptor(new BLE2902());
+  pCharacteristic->setValue("Hello from Velxio!");
+
+  pService->start();
+  BLEAdvertising *pAdvertising = BLEDevice::getAdvertising();
+  pAdvertising->addServiceUUID(SERVICE_UUID);
+  pAdvertising->setScanResponse(true);
+  pAdvertising->start();
+
+  Serial.println("BLE advertising started!");
+  Serial.println("Device name: Velxio-ESP32");
+  Serial.printf("Service UUID: %s\\n", SERVICE_UUID);
+}
+
+void loop() {
+  if (deviceConnected) {
+    counter++;
+    String value = "Count: " + String(counter);
+    pCharacteristic->setValue(value.c_str());
+    pCharacteristic->notify();
+    Serial.printf("Notified: %s\\n", value.c_str());
+  }
+  delay(2000);
+}
+`,
+    components: [],
+    wires: [],
+  },
 ];
 
 // Get examples by category

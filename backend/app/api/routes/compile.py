@@ -1,6 +1,11 @@
+import logging
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.services.arduino_cli import ArduinoCLIService
+from app.services.espidf_compiler import espidf_compiler
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 arduino_cli = ArduinoCLIService()
@@ -49,6 +54,21 @@ async def compile_sketch(request: CompileRequest):
         )
 
     try:
+        # ESP32 targets: use ESP-IDF compiler for QEMU-compatible output
+        if request.board_fqbn.startswith("esp32:") and espidf_compiler.available:
+            logger.info(f"[compile] Using ESP-IDF for {request.board_fqbn}")
+            result = await espidf_compiler.compile(files, request.board_fqbn)
+            return CompileResponse(
+                success=result["success"],
+                hex_content=result.get("hex_content"),
+                binary_content=result.get("binary_content"),
+                binary_type=result.get("binary_type"),
+                stdout=result.get("stdout", ""),
+                stderr=result.get("stderr", ""),
+                error=result.get("error"),
+            )
+
+        # AVR, RP2040, and ESP32 fallback: use arduino-cli
         core_status = await arduino_cli.ensure_core_for_board(request.board_fqbn)
         core_log = core_status.get("log", "")
 

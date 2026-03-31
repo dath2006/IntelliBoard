@@ -174,10 +174,12 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
         _log(f'Bad config JSON: {exc}')
         os._exit(1)
 
-    lib_path       = cfg['lib_path']
-    firmware_b64   = cfg['firmware_b64']
-    machine        = cfg.get('machine', 'esp32-picsimlab')
-    initial_sensors = cfg.get('sensors', [])
+    lib_path          = cfg['lib_path']
+    firmware_b64      = cfg['firmware_b64']
+    machine           = cfg.get('machine', 'esp32-picsimlab')
+    initial_sensors   = cfg.get('sensors', [])
+    wifi_enabled      = cfg.get('wifi_enabled', False)
+    wifi_hostfwd_port = cfg.get('wifi_hostfwd_port', 0)
 
     # Adjust GPIO pinmap based on chip: ESP32-C3 has only 22 GPIOs
     if 'c3' in machine:
@@ -213,6 +215,20 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
         b'-L', rom_dir,
         b'-drive', f'file={firmware_path},if=mtd,format=raw'.encode(),
     ]
+
+    # ── ESP32-C3 requires deterministic instruction counting for stable boot
+    if 'c3' in machine:
+        args_list.extend([b'-icount', b'3'])
+
+    # ── WiFi NIC (slirp user-mode networking) ──────────────────────────────
+    if wifi_enabled:
+        nic_model = 'esp32c3_wifi' if 'c3' in machine else 'esp32_wifi'
+        nic_arg = f'user,model={nic_model},net=192.168.4.0/24'
+        if wifi_hostfwd_port:
+            nic_arg += f',hostfwd=tcp::{wifi_hostfwd_port}-192.168.4.15:80'
+        args_list.extend([b'-nic', nic_arg.encode()])
+        _log(f'WiFi enabled: -nic {nic_arg}')
+
     argc = len(args_list)
     argv = (ctypes.c_char_p * argc)(*args_list)
 

@@ -17,6 +17,16 @@ export type BoardKind =
   | 'aitewinrobot-esp32c3-supermini' // ESP32-C3 SuperMini, browser emulation (Esp32C3Simulator)
   | 'attiny85';                   // AVR ATtiny85, browser emulation (avr8js)
 
+export interface WifiStatus {
+  status: string;       // 'initializing' | 'connected' | 'got_ip' | 'disconnected'
+  ssid?: string;
+  ip?: string;
+}
+
+export interface BleStatus {
+  status: string;       // 'initialized' | 'advertising'
+}
+
 export interface BoardInstance {
   id: string;                   // unique in canvas, e.g. 'arduino-uno', 'raspberry-pi-3'
   boardKind: BoardKind;
@@ -28,6 +38,8 @@ export interface BoardInstance {
   serialBaudRate: number;
   serialMonitorOpen: boolean;
   activeFileGroupId: string;
+  wifiStatus?: WifiStatus;
+  bleStatus?: BleStatus;
 }
 
 export const BOARD_KIND_LABELS: Record<BoardKind, string> = {

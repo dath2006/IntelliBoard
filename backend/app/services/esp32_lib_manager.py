@@ -123,6 +123,8 @@ class _WorkerInstance:
     threads:    list[threading.Thread]
     loop:       asyncio.AbstractEventLoop
     running:    bool = True
+    wifi_enabled: bool = False
+    wifi_hostfwd_port: int = 0
 
 
 # ── Manager ───────────────────────────────────────────────────────────────────
@@ -155,6 +157,11 @@ class EspLibManager:
 
     # ── Public API ────────────────────────────────────────────────────────────
 
+    def get_instance(self, client_id: str) -> _WorkerInstance | None:
+        """Return the worker instance for a client, or None."""
+        with self._instances_lock:
+            return self._instances.get(client_id)
+
     async def start_instance(
         self,
         client_id:    str,
@@ -162,6 +169,8 @@ class EspLibManager:
         callback:     EventCallback,
         firmware_b64: str | None = None,
         sensors:      list | None = None,
+        wifi_enabled: bool = False,
+        wifi_hostfwd_port: int = 0,
     ) -> None:
         # Stop any existing instance for this client_id first
         if client_id in self._instances:
@@ -175,10 +184,12 @@ class EspLibManager:
         machine  = _MACHINE.get(board_type, 'esp32-picsimlab')
         lib_path = LIB_RISCV_PATH if board_type in _RISCV_BOARDS else LIB_PATH
         config   = json.dumps({
-            'lib_path':     lib_path,
-            'firmware_b64': firmware_b64,
-            'machine':      machine,
-            'sensors':      sensors or [],
+            'lib_path':          lib_path,
+            'firmware_b64':      firmware_b64,
+            'machine':           machine,
+            'sensors':           sensors or [],
+            'wifi_enabled':      wifi_enabled,
+            'wifi_hostfwd_port': wifi_hostfwd_port,
         })
 
         logger.info('Launching esp32_worker for %s (machine=%s, script=%s, python=%s)',
@@ -214,13 +225,15 @@ class EspLibManager:
 
         loop = asyncio.get_running_loop()
         inst = _WorkerInstance(
-            process    = proc,
-            stdin_lock = threading.Lock(),
-            callback   = callback,
-            board_type = board_type,
-            uart_bufs  = {0: _UartBuffer(0), 1: _UartBuffer(1), 2: _UartBuffer(2)},
-            threads    = [],
-            loop       = loop,
+            process           = proc,
+            stdin_lock        = threading.Lock(),
+            callback          = callback,
+            board_type        = board_type,
+            uart_bufs         = {0: _UartBuffer(0), 1: _UartBuffer(1), 2: _UartBuffer(2)},
+            threads           = [],
+            loop              = loop,
+            wifi_enabled      = wifi_enabled,
+            wifi_hostfwd_port = wifi_hostfwd_port,
         )
 
         with self._instances_lock:
@@ -449,6 +462,14 @@ class EspLibManager:
                             self._dispatch(inst, 'serial_output', {
                                 'data': text, 'uart': uart_id,
                             })
+                            # Parse WiFi/BLE status from UART0 output
+                            if uart_id == 0 and inst.wifi_enabled:
+                                from app.services.wifi_status_parser import parse_serial_text
+                                wifi_evts, ble_evts = parse_serial_text(text)
+                                for we in wifi_evts:
+                                    self._dispatch(inst, 'wifi_status', dict(we))
+                                for be in ble_evts:
+                                    self._dispatch(inst, 'ble_status', dict(be))
                 elif etype:
                     self._dispatch(inst, etype, event)
 

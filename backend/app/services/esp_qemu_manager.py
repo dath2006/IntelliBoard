@@ -88,7 +88,9 @@ class EspQemuManager:
 
     def start_instance(self, client_id: str, board_type: str,
                        callback: EventCallback,
-                       firmware_b64: str | None = None) -> None:
+                       firmware_b64: str | None = None,
+                       wifi_enabled: bool = False,
+                       wifi_hostfwd_port: int = 0) -> None:
         if client_id in self._instances:
             logger.warning('start_instance: %s already running', client_id)
             return
@@ -97,14 +99,16 @@ class EspQemuManager:
             return
         inst = EspInstance(client_id, board_type, callback)
         self._instances[client_id] = inst
-        asyncio.create_task(self._boot(inst, firmware_b64))
+        asyncio.create_task(self._boot(inst, firmware_b64, wifi_enabled, wifi_hostfwd_port))
 
     def stop_instance(self, client_id: str) -> None:
         inst = self._instances.pop(client_id, None)
         if inst:
             asyncio.create_task(self._shutdown(inst))
 
-    def load_firmware(self, client_id: str, firmware_b64: str) -> None:
+    def load_firmware(self, client_id: str, firmware_b64: str,
+                      wifi_enabled: bool = False,
+                      wifi_hostfwd_port: int = 0) -> None:
         """Hot-reload firmware into a running instance (stop + restart)."""
         inst = self._instances.get(client_id)
         if not inst:
@@ -116,7 +120,8 @@ class EspQemuManager:
         # Re-start with new firmware after brief delay for cleanup
         async def _restart() -> None:
             await asyncio.sleep(0.5)
-            self.start_instance(client_id, board_type, callback, firmware_b64)
+            self.start_instance(client_id, board_type, callback, firmware_b64,
+                                wifi_enabled, wifi_hostfwd_port)
         asyncio.create_task(_restart())
 
     def set_pin_state(self, client_id: str, pin: int | str, state: int) -> None:
@@ -165,7 +170,8 @@ class EspQemuManager:
 
     # ── Boot sequence ──────────────────────────────────────────────────────────
 
-    async def _boot(self, inst: EspInstance, firmware_b64: str | None) -> None:
+    async def _boot(self, inst: EspInstance, firmware_b64: str | None,
+                    wifi_enabled: bool = False, wifi_hostfwd_port: int = 0) -> None:
         # Write firmware to temp file if provided
         firmware_path: str | None = None
         if firmware_b64:
@@ -200,6 +206,14 @@ class EspQemuManager:
 
         if firmware_path:
             cmd += ['-drive', f'file={firmware_path},if=mtd,format=raw']
+
+        # WiFi NIC (slirp user-mode networking)
+        if wifi_enabled:
+            nic_model = 'esp32c3_wifi' if 'c3' in machine else 'esp32_wifi'
+            nic_arg = f'user,model={nic_model},net=192.168.4.0/24'
+            if wifi_hostfwd_port:
+                nic_arg += f',hostfwd=tcp::{wifi_hostfwd_port}-192.168.4.2:80'
+            cmd += ['-nic', nic_arg]
 
         logger.info('Launching ESP32 QEMU for %s: %s', inst.client_id, ' '.join(cmd))
 
