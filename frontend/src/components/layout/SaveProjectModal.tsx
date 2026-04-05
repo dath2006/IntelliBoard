@@ -12,10 +12,17 @@ interface SaveProjectModalProps {
 
 export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) => {
   const navigate = useNavigate();
-  const files = useEditorStore((s) => s.files);
+  const { boards, activeBoardId, components, wires } = useSimulatorStore();
+  const activeBoard = boards.find((b) => b.id === activeBoardId) ?? boards[0];
+  // Use the active board's file group; fall back to legacy global files
+  const activeFiles = useEditorStore((s) =>
+    (s.fileGroups[activeBoard?.activeFileGroupId ?? '']?.length
+      ? s.fileGroups[activeBoard.activeFileGroupId]
+      : s.files) ?? s.files
+  );
+  const boardKind = activeBoard?.boardKind ?? 'arduino-uno';
   // Legacy: save primary .ino content for the project code field
-  const code = files.find((f) => f.name === 'sketch.ino')?.content ?? files[0]?.content ?? '';
-  const { boardType, components, wires } = useSimulatorStore();
+  const code = activeFiles.find((f) => f.name.endsWith('.ino'))?.content ?? activeFiles[0]?.content ?? '';
   const currentProject = useProjectStore((s) => s.currentProject);
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
 
@@ -44,8 +51,8 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) =
       name: name.trim(),
       description: description.trim() || undefined,
       is_public: isPublic,
-      board_type: boardType,
-      files: files.map((f) => ({ name: f.name, content: f.content })),
+      board_type: boardKind,
+      files: activeFiles.map((f) => ({ name: f.name, content: f.content })),
       code,
       components_json: JSON.stringify(components),
       wires_json: JSON.stringify(wires),
@@ -69,7 +76,13 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) =
       navigate(`/project/${saved.id}`, { replace: true });
       onClose();
     } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Save failed.');
+      if (!err?.response) {
+        setError('Server unreachable. Check your connection and try again.');
+      } else if (err.response.status === 401) {
+        setError('Not authenticated. Please log in and try again.');
+      } else {
+        setError(err.response?.data?.detail || `Save failed (${err.response.status}).`);
+      }
     } finally {
       setSaving(false);
     }
