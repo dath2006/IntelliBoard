@@ -611,6 +611,25 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
     os.dup2(_nul, 0)
     os.close(_nul)
 
+    # Also redirect fd 1 (stdout) to /dev/null so QEMU's -nographic UART mux
+    # doesn't write raw UART bytes onto our JSON event pipe.  Without this:
+    #   1. Raw UART bytes prefix each JSON line, corrupting the protocol.
+    #   2. On a busy host the pipe fills up, causing _on_uart_tx (called
+    #      synchronously from qemu_main_loop) to block inside sys.stdout.flush(),
+    #      which stalls qemu_main_loop() and prevents QEMU_CLOCK_REALTIME timers
+    #      (including Esp32_WLAN_beacon_timer) from firing → WiFi never connects.
+    # Save the real pipe fd and rebind sys.stdout so _emit() keeps working.
+    import io as _io
+    _orig_stdout_fd = os.dup(1)
+    _nul_w = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(_nul_w, 1)
+    os.close(_nul_w)
+    sys.stdout = _io.TextIOWrapper(
+        _io.FileIO(_orig_stdout_fd, mode='w', closefd=True),
+        line_buffering=True,
+        write_through=True,
+    )
+
     qemu_t = threading.Thread(target=_qemu_thread, daemon=True, name=f'qemu-{machine}')
     qemu_t.start()
 

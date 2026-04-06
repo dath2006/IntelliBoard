@@ -34,8 +34,11 @@ _STATIC_IP = '192.168.4.15'
 _GATEWAY_IP = '192.168.4.2'
 _NETMASK = '255.255.255.0'
 
-# SSID the QEMU WiFi AP broadcasts
-_QEMU_WIFI_SSID = 'Velxio-GUEST'
+# SSID the QEMU WiFi AP broadcasts.
+# Must match one of the access_point_info entries in esp32_wifi_ap.c
+# (the lcgamboa QEMU fork). "Espressif" is on channel 5 in that array.
+_QEMU_WIFI_SSID = 'Espressif'
+_QEMU_WIFI_CHANNEL = 5
 
 
 class ESPIDFCompiler:
@@ -109,11 +112,11 @@ class ESPIDFCompiler:
         """
         Normalize WiFi SSID/password/channel in Arduino sketches for QEMU.
 
-        QEMU's WiFi AP broadcasts "Velxio-GUEST" on channel 6 with open auth.
+        QEMU's WiFi AP broadcasts _QEMU_WIFI_SSID on _QEMU_WIFI_CHANNEL with open auth.
         This method rewrites the user's sketch so that:
-          - Any SSID string literal → "Velxio-GUEST"
+          - Any SSID string literal → _QEMU_WIFI_SSID
           - Password → "" (open auth)
-          - Channel → 6
+          - Channel → _QEMU_WIFI_CHANNEL
         The user's editor still shows their original code; only the compiled
         binary is modified.
         """
@@ -121,9 +124,9 @@ class ESPIDFCompiler:
             return code
 
         # 1) Replace SSID variable definitions:
-        #    const char* ssid = "anything" → "Velxio-GUEST"
-        #    char ssid[] = "anything"      → "Velxio-GUEST"
-        #    #define WIFI_SSID "anything"   → "Velxio-GUEST"
+        #    const char* ssid = "anything" → _QEMU_WIFI_SSID
+        #    char ssid[] = "anything"      → _QEMU_WIFI_SSID
+        #    #define WIFI_SSID "anything"   → _QEMU_WIFI_SSID
         code = re.sub(
             r'((?:const\s+)?char\s*\*?\s*ssid\s*\[?\]?\s*=\s*)"[^"]*"',
             rf'\1"{_QEMU_WIFI_SSID}"',
@@ -138,19 +141,19 @@ class ESPIDFCompiler:
         )
 
         # 2) Normalize WiFi.begin() calls:
-        #    WiFi.begin("X")           → WiFi.begin("Velxio-GUEST", "", 6)
-        #    WiFi.begin("X", "pass")   → WiFi.begin("Velxio-GUEST", "", 6)
-        #    WiFi.begin(ssid, pass, N) → WiFi.begin(ssid, "", 6)
-        #    WiFi.begin(ssid)          → WiFi.begin(ssid, "", 6)
+        #    WiFi.begin("X")           → WiFi.begin(_QEMU_WIFI_SSID, "", _QEMU_WIFI_CHANNEL)
+        #    WiFi.begin("X", "pass")   → WiFi.begin(_QEMU_WIFI_SSID, "", _QEMU_WIFI_CHANNEL)
+        #    WiFi.begin(ssid, pass, N) → WiFi.begin(ssid, "", _QEMU_WIFI_CHANNEL)
+        #    WiFi.begin(ssid)          → WiFi.begin(ssid, "", _QEMU_WIFI_CHANNEL)
 
         def _rewrite_wifi_begin(m: re.Match) -> str:
             args = m.group(1)
             parts = [a.strip() for a in args.split(',')]
             ssid_arg = parts[0]
-            # If SSID is a string literal, force to Velxio-GUEST
+            # If SSID is a string literal, force to _QEMU_WIFI_SSID
             if ssid_arg.startswith('"'):
                 ssid_arg = f'"{_QEMU_WIFI_SSID}"'
-            return f'WiFi.begin({ssid_arg}, "", 6)'
+            return f'WiFi.begin({ssid_arg}, "", {_QEMU_WIFI_CHANNEL})'
 
         code = re.sub(
             r'WiFi\.begin\s*\(([^)]+)\)',
@@ -158,7 +161,7 @@ class ESPIDFCompiler:
             code
         )
 
-        logger.info('[espidf] WiFi normalized: SSID→%s, channel→6, open auth', _QEMU_WIFI_SSID)
+        logger.info('[espidf] WiFi normalized: SSID→%s, channel→%d, open auth', _QEMU_WIFI_SSID, _QEMU_WIFI_CHANNEL)
         return code
 
     def _translate_sketch_to_espidf(self, sketch_code: str) -> str:
