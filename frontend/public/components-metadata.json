@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-04-08T16:30:31.167Z",
+  "generatedAt": "2026-04-07T16:08:47.256Z",
   "components": [
     {
       "id": "arduino-mega",
@@ -48,12 +48,7 @@
         "resetPressed": false
       },
       "pinCount": 0,
-      "tags": [
-        "arduino-mega",
-        "arduino mega",
-        "arduino",
-        "mega"
-      ]
+      "tags": ["arduino-mega", "arduino mega", "arduino", "mega"]
     },
     {
       "id": "arduino-nano",
@@ -101,12 +96,7 @@
         "resetPressed": false
       },
       "pinCount": 0,
-      "tags": [
-        "arduino-nano",
-        "arduino nano",
-        "arduino",
-        "nano"
-      ]
+      "tags": ["arduino-nano", "arduino nano", "arduino", "nano"]
     },
     {
       "id": "arduino-uno",
@@ -154,12 +144,7 @@
         "resetPressed": false
       },
       "pinCount": 0,
-      "tags": [
-        "arduino-uno",
-        "arduino uno",
-        "arduino",
-        "uno"
-      ]
+      "tags": ["arduino-uno", "arduino uno", "arduino", "uno"]
     },
     {
       "id": "esp32-devkit-v1",
@@ -186,13 +171,7 @@
         "ledPower": false
       },
       "pinCount": 0,
-      "tags": [
-        "esp32-devkit-v1",
-        "esp32 devkit v1",
-        "esp32",
-        "devkit",
-        "v1"
-      ]
+      "tags": ["esp32-devkit-v1", "esp32 devkit v1", "esp32", "devkit", "v1"]
     },
     {
       "id": "ili9341",
@@ -219,9 +198,7 @@
         "flipVertical": false
       },
       "pinCount": 0,
-      "tags": [
-        "ili9341"
-      ]
+      "tags": ["ili9341"]
     },
     {
       "id": "lcd2004",
@@ -232,9 +209,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "lcd2004"
-      ]
+      "tags": ["lcd2004"]
     },
     {
       "id": "ssd1306",
@@ -254,19 +229,14 @@
           "defaultValue": "i2c",
           "control": "select",
           "description": "Communication protocol",
-          "options": [
-            "i2c",
-            "spi"
-          ]
+          "options": ["i2c", "spi"]
         }
       ],
       "defaultValues": {
         "protocol": "i2c"
       },
       "pinCount": 0,
-      "tags": [
-        "ssd1306"
-      ]
+      "tags": ["ssd1306"]
     },
     {
       "id": "dip-switch-8",
@@ -278,39 +248,15 @@
         {
           "name": "values",
           "type": "string",
-          "defaultValue": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
+          "defaultValue": [0, 0, 0, 0, 0, 0, 0, 0],
           "control": "text"
         }
       ],
       "defaultValues": {
-        "values": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ]
+        "values": [0, 0, 0, 0, 0, 0, 0, 0]
       },
       "pinCount": 0,
-      "tags": [
-        "dip-switch-8",
-        "dip switch 8",
-        "dip",
-        "switch",
-        "8"
-      ]
+      "tags": ["dip-switch-8", "dip switch 8", "dip", "switch", "8"]
     },
     {
       "id": "membrane-keypad",
@@ -378,12 +324,7 @@
         ]
       },
       "pinCount": 15,
-      "tags": [
-        "membrane-keypad",
-        "membrane keypad",
-        "membrane",
-        "keypad"
-      ]
+      "tags": ["membrane-keypad", "membrane keypad", "membrane", "keypad"]
     },
     {
       "id": "potentiometer",
@@ -438,9 +379,7 @@
         "endDegree": 135
       },
       "pinCount": 0,
-      "tags": [
-        "potentiometer"
-      ]
+      "tags": ["potentiometer"]
     },
     {
       "id": "pushbutton",
@@ -481,9 +420,7 @@
         "xray": false
       },
       "pinCount": 0,
-      "tags": [
-        "pushbutton"
-      ]
+      "tags": ["pushbutton"]
     },
     {
       "id": "slide-switch",
@@ -503,12 +440,7 @@
         "value": 0
       },
       "pinCount": 0,
-      "tags": [
-        "slide-switch",
-        "slide switch",
-        "slide",
-        "switch"
-      ]
+      "tags": ["slide-switch", "slide switch", "slide", "switch"]
     },
     {
       "id": "biaxial-stepper",
@@ -577,12 +509,7 @@
         "innerHandShape": "plain"
       },
       "pinCount": 9,
-      "tags": [
-        "biaxial-stepper",
-        "biaxial stepper",
-        "biaxial",
-        "stepper"
-      ]
+      "tags": ["biaxial-stepper", "biaxial stepper", "biaxial", "stepper"]
     },
     {
       "id": "servo",
@@ -617,9 +544,7 @@
         "hornColor": "#ccc"
       },
       "pinCount": 0,
-      "tags": [
-        "servo"
-      ]
+      "tags": ["servo"]
     },
     {
       "id": "7segment",
@@ -673,16 +598,7 @@
         {
           "name": "values",
           "type": "number",
-          "defaultValue": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
+          "defaultValue": [0, 0, 0, 0, 0, 0, 0, 0],
           "control": "range"
         }
       ],
@@ -694,24 +610,10 @@
         "colon": false,
         "colonValue": false,
         "pins": "top",
-        "values": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ]
+        "values": [0, 0, 0, 0, 0, 0, 0, 0]
       },
       "pinCount": 47,
-      "tags": [
-        "7segment",
-        "7 segment",
-        "7",
-        "segment"
-      ]
+      "tags": ["7segment", "7 segment", "7", "segment"]
     },
     {
       "id": "analog-joystick",
@@ -745,12 +647,7 @@
         "pressed": false
       },
       "pinCount": 0,
-      "tags": [
-        "analog-joystick",
-        "analog joystick",
-        "analog",
-        "joystick"
-      ]
+      "tags": ["analog-joystick", "analog joystick", "analog", "joystick"]
     },
     {
       "id": "big-sound-sensor",
@@ -777,13 +674,7 @@
         "led2": false
       },
       "pinCount": 0,
-      "tags": [
-        "big-sound-sensor",
-        "big sound sensor",
-        "big",
-        "sound",
-        "sensor"
-      ]
+      "tags": ["big-sound-sensor", "big sound sensor", "big", "sound", "sensor"]
     },
     {
       "id": "ds1307",
@@ -794,9 +685,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "ds1307"
-      ]
+      "tags": ["ds1307"]
     },
     {
       "id": "flame-sensor",
@@ -823,12 +712,7 @@
         "ledSignal": false
       },
       "pinCount": 0,
-      "tags": [
-        "flame-sensor",
-        "flame sensor",
-        "flame",
-        "sensor"
-      ]
+      "tags": ["flame-sensor", "flame sensor", "flame", "sensor"]
     },
     {
       "id": "gas-sensor",
@@ -855,12 +739,7 @@
         "ledD0": false
       },
       "pinCount": 0,
-      "tags": [
-        "gas-sensor",
-        "gas sensor",
-        "gas",
-        "sensor"
-      ]
+      "tags": ["gas-sensor", "gas sensor", "gas", "sensor"]
     },
     {
       "id": "heart-beat-sensor",
@@ -894,9 +773,7 @@
       ],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "hx711"
-      ]
+      "tags": ["hx711"]
     },
     {
       "id": "ks2e-m-dc5",
@@ -907,12 +784,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "ks2e-m-dc5",
-        "ks2e",
-        "m",
-        "dc5"
-      ]
+      "tags": ["ks2e-m-dc5", "ks2e", "m", "dc5"]
     },
     {
       "id": "ky-040",
@@ -946,12 +818,7 @@
         "pressed": false
       },
       "pinCount": 0,
-      "tags": [
-        "ky-040",
-        "ky040",
-        "ky",
-        "040"
-      ]
+      "tags": ["ky-040", "ky040", "ky", "040"]
     },
     {
       "id": "led-ring",
@@ -992,12 +859,7 @@
         "animation": false
       },
       "pinCount": 5,
-      "tags": [
-        "led-ring",
-        "led ring",
-        "led",
-        "ring"
-      ]
+      "tags": ["led-ring", "led ring", "led", "ring"]
     },
     {
       "id": "microsd-card",
@@ -1008,12 +870,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "microsd-card",
-        "microsd card",
-        "microsd",
-        "card"
-      ]
+      "tags": ["microsd-card", "microsd card", "microsd", "card"]
     },
     {
       "id": "nano-rp2040-connect",
@@ -1122,12 +979,7 @@
         "animation": false
       },
       "pinCount": 5,
-      "tags": [
-        "neopixel-matrix",
-        "neopixel matrix",
-        "neopixel",
-        "matrix"
-      ]
+      "tags": ["neopixel-matrix", "neopixel matrix", "neopixel", "matrix"]
     },
     {
       "id": "pushbutton-6mm",
@@ -1168,12 +1020,7 @@
         "xray": false
       },
       "pinCount": 0,
-      "tags": [
-        "pushbutton-6mm",
-        "pushbutton 6mm",
-        "pushbutton",
-        "6mm"
-      ]
+      "tags": ["pushbutton-6mm", "pushbutton 6mm", "pushbutton", "6mm"]
     },
     {
       "id": "rotary-dialer",
@@ -1184,12 +1031,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "rotary-dialer",
-        "",
-        "rotary",
-        "dialer"
-      ]
+      "tags": ["rotary-dialer", "", "rotary", "dialer"]
     },
     {
       "id": "slide-potentiometer",
@@ -1286,12 +1128,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "tilt-switch",
-        "tilt switch",
-        "tilt",
-        "switch"
-      ]
+      "tags": ["tilt-switch", "tilt switch", "tilt", "switch"]
     },
     {
       "id": "buzzer",
@@ -1312,9 +1149,7 @@
         "hasSignal": false
       },
       "pinCount": 0,
-      "tags": [
-        "buzzer"
-      ]
+      "tags": ["buzzer"]
     },
     {
       "id": "led",
@@ -1378,9 +1213,7 @@
         "flip": false
       },
       "pinCount": 2,
-      "tags": [
-        "led"
-      ]
+      "tags": ["led"]
     },
     {
       "id": "led-bar-graph",
@@ -1404,45 +1237,17 @@
         {
           "name": "values",
           "type": "number",
-          "defaultValue": [
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0,
-            0
-          ],
+          "defaultValue": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
           "control": "range"
         }
       ],
       "defaultValues": {
         "color": "red",
         "offColor": "#444",
-        "values": [
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0,
-          0
-        ]
+        "values": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       },
       "pinCount": 0,
-      "tags": [
-        "led-bar-graph",
-        "led bar graph",
-        "led",
-        "bar",
-        "graph"
-      ]
+      "tags": ["led-bar-graph", "led bar graph", "led", "bar", "graph"]
     },
     {
       "id": "neopixel",
@@ -1476,9 +1281,7 @@
         "b": 0
       },
       "pinCount": 0,
-      "tags": [
-        "neopixel"
-      ]
+      "tags": ["neopixel"]
     },
     {
       "id": "rgb-led",
@@ -1512,12 +1315,7 @@
         "ledBlue": 0
       },
       "pinCount": 0,
-      "tags": [
-        "rgb-led",
-        "rgb led",
-        "rgb",
-        "led"
-      ]
+      "tags": ["rgb-led", "rgb led", "rgb", "led"]
     },
     {
       "id": "franzininho",
@@ -1551,9 +1349,7 @@
         "resetPressed": false
       },
       "pinCount": 0,
-      "tags": [
-        "franzininho"
-      ]
+      "tags": ["franzininho"]
     },
     {
       "id": "ir-receiver",
@@ -1564,12 +1360,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "ir-receiver",
-        "ir receiver",
-        "ir",
-        "receiver"
-      ]
+      "tags": ["ir-receiver", "ir receiver", "ir", "receiver"]
     },
     {
       "id": "ir-remote",
@@ -1580,12 +1371,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "ir-remote",
-        "ir remote",
-        "ir",
-        "remote"
-      ]
+      "tags": ["ir-remote", "ir remote", "ir", "remote"]
     },
     {
       "id": "resistor",
@@ -1605,9 +1391,7 @@
         "value": "1000"
       },
       "pinCount": 0,
-      "tags": [
-        "resistor"
-      ]
+      "tags": ["resistor"]
     },
     {
       "id": "dht22",
@@ -1618,9 +1402,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "dht22"
-      ]
+      "tags": ["dht22"]
     },
     {
       "id": "hc-sr04",
@@ -1631,11 +1413,7 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": [
-        "hc-sr04",
-        "hc",
-        "sr04"
-      ]
+      "tags": ["hc-sr04", "hc", "sr04"]
     },
     {
       "id": "mpu6050",
@@ -1655,9 +1433,7 @@
         "led1": false
       },
       "pinCount": 0,
-      "tags": [
-        "mpu6050"
-      ]
+      "tags": ["mpu6050"]
     },
     {
       "id": "ntc-temperature-sensor",

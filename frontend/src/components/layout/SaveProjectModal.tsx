@@ -58,15 +58,19 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) =
       wires_json: JSON.stringify(wires),
     };
 
+    const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    const isValidUpdate = isUpdate && currentProject && UUID_RE.test(currentProject.id);
+
     try {
       let saved;
-      if (isUpdate && currentProject) {
-        saved = await updateProject(currentProject.id, payload);
+      if (isValidUpdate) {
+        saved = await updateProject(currentProject!.id, payload);
         trackSaveProject();
       } else {
         saved = await createProject(payload);
         trackCreateProject();
       }
+
       setCurrentProject({
         id: saved.id,
         slug: saved.slug,

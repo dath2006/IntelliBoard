@@ -76,12 +76,14 @@ class MPU6050Slave:
             self.first_byte = True
             # picsimlab does not fire WRITE callbacks for write-then-read
             # transactions (endTransmission(false) + requestFrom).
-            # Adafruit_I2CDevice::begin() fires TWO START+READ sequences
+            # Adafruit_MPU6050::begin() fires THREE START+READ sequences
             # before any data reads:
-            #   1. detected() → requestFrom fallback → START+READ(WHO_AM_I)
-            #   2. chip_id_register.read() → START+READ(WHO_AM_I)
-            # Only after both have returned 0x68 do we switch to data mode.
-            if self._who_am_i_count >= 2:
+            #   1. Wire.begin(sda, scl) bus-init probe → START+READ(WHO_AM_I)
+            #   2. _wire->begin() inside i2c_dev->begin() → START+READ(WHO_AM_I)
+            #   3. chip_id_register.read() → START+READ(WHO_AM_I)  ← must still return 0x68
+            # Only after all three have returned 0x68 do we switch to data mode
+            # (so subsequent reset() + getEvent() READs get accel/gyro bytes).
+            if self._who_am_i_count >= 3:
                 self.reg_ptr = 0x3B   # sensor data block
             else:
                 self.reg_ptr = 0x75   # WHO_AM_I register

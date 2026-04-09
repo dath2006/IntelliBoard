@@ -19,6 +19,7 @@ export const ProjectByIdPage: React.FC = () => {
   const loadFiles = useEditorStore((s) => s.loadFiles);
   const { setComponents, setWires, setBoardType } = useSimulatorStore();
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
+  const clearCurrentProject = useProjectStore((s) => s.clearCurrentProject);
   const currentProject = useProjectStore((s) => s.currentProject);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
@@ -56,6 +57,7 @@ export const ProjectByIdPage: React.FC = () => {
         if (s === 404) setError('Project not found.');
         else if (s === 403) setError('This project is private.');
         else setError('Failed to load project.');
+        clearCurrentProject();
       });
   }, [id]);
 
