@@ -4675,6 +4675,128 @@ void loop() {
     components: [],
     wires: [],
   },
+
+  // ── ESP32 BMP280 Weather Station ─────────────────────────────────────────────
+  {
+    id: 'esp32-bmp280',
+    title: 'ESP32: BMP280 Weather Station',
+    description: 'Read temperature and pressure from a BMP280 barometric sensor over I2C (SDA=D21, SCL=D22).',
+    libraries: ['Adafruit BMP280 Library', 'Adafruit Unified Sensor'],
+    category: 'sensors',
+    difficulty: 'intermediate',
+    boardType: 'esp32',
+    boardFilter: 'esp32',
+    code: `// ESP32 — BMP280 Barometric Pressure & Temperature (I2C)
+// Requires: Adafruit BMP280 Library, Adafruit Unified Sensor
+// Wiring: SDA → D21  |  SCL → D22  |  VCC → 3V3  |  GND → GND
+
+#include <Wire.h>
+#include <Adafruit_BMP280.h>
+
+Adafruit_BMP280 bmp;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(21, 22);
+  if (!bmp.begin(0x76)) {
+    Serial.println("BMP280 not found! Check wiring.");
+    while (true) delay(10);
+  }
+  bmp.setSampling(Adafruit_BMP280::MODE_NORMAL,
+                  Adafruit_BMP280::SAMPLING_X2,
+                  Adafruit_BMP280::SAMPLING_X16,
+                  Adafruit_BMP280::FILTER_X16,
+                  Adafruit_BMP280::STANDBY_MS_500);
+  Serial.println("BMP280 ready!");
+}
+
+void loop() {
+  float tempC    = bmp.readTemperature();
+  float pressure = bmp.readPressure() / 100.0F; // hPa
+  float altitude = bmp.readAltitude(1013.25);    // m
+
+  Serial.printf("Temp: %.2f C  Pressure: %.2f hPa  Altitude: %.1f m\\n",
+                tempC, pressure, altitude);
+  delay(2000);
+}`,
+    components: [
+      { type: 'wokwi-bmp280', id: 'e32-bmp1', x: 420, y: 150, properties: { temperature: '25', pressure: '1013.25' } },
+    ],
+    wires: [
+      { id: 'e32b-vcc', start: { componentId: 'esp32', pinName: '3V3' }, end: { componentId: 'e32-bmp1', pinName: 'VCC' }, color: '#ff4444' },
+      { id: 'e32b-gnd', start: { componentId: 'esp32', pinName: 'GND' }, end: { componentId: 'e32-bmp1', pinName: 'GND' }, color: '#000000' },
+      { id: 'e32b-sda', start: { componentId: 'esp32', pinName: '21'  }, end: { componentId: 'e32-bmp1', pinName: 'SDA' }, color: '#22aaff' },
+      { id: 'e32b-scl', start: { componentId: 'esp32', pinName: '22'  }, end: { componentId: 'e32-bmp1', pinName: 'SCL' }, color: '#ff8800' },
+    ],
+  },
+
+  // ── ESP32 SSD1306 OLED Display ────────────────────────────────────────────────
+  {
+    id: 'esp32-oled',
+    title: 'ESP32: SSD1306 OLED Display',
+    description: 'Display text and graphics on a 128×64 SSD1306 OLED over I2C (SDA=D21, SCL=D22).',
+    libraries: ['Adafruit SSD1306', 'Adafruit GFX Library'],
+    category: 'displays',
+    difficulty: 'intermediate',
+    boardType: 'esp32',
+    boardFilter: 'esp32',
+    code: `// ESP32 — SSD1306 OLED Display (I2C 128×64)
+// Requires: Adafruit SSD1306, Adafruit GFX Library
+// Wiring: SDA → D21  |  SCL → D22  |  VCC → 3V3  |  GND → GND
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+int counter = 0;
+
+void setup() {
+  Serial.begin(115200);
+  Wire.begin(21, 22);
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("SSD1306 not found!");
+    while (true) delay(10);
+  }
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Hello");
+  display.println("Velxio!");
+  display.display();
+  Serial.println("OLED ready!");
+}
+
+void loop() {
+  counter++;
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Hello");
+  display.println("Velxio!");
+  display.setTextSize(1);
+  display.setCursor(0, 48);
+  display.printf("Count: %d", counter);
+  display.display();
+  Serial.printf("Frame: %d\\n", counter);
+  delay(1000);
+}`,
+    components: [
+      { type: 'wokwi-ssd1306', id: 'e32-oled1', x: 420, y: 130, properties: {} },
+    ],
+    wires: [
+      { id: 'e32o-vcc', start: { componentId: 'esp32', pinName: '3V3' }, end: { componentId: 'e32-oled1', pinName: 'VCC' }, color: '#ff4444' },
+      { id: 'e32o-gnd', start: { componentId: 'esp32', pinName: 'GND' }, end: { componentId: 'e32-oled1', pinName: 'GND' }, color: '#000000' },
+      { id: 'e32o-sda', start: { componentId: 'esp32', pinName: '21'  }, end: { componentId: 'e32-oled1', pinName: 'SDA' }, color: '#22aaff' },
+      { id: 'e32o-scl', start: { componentId: 'esp32', pinName: '22'  }, end: { componentId: 'e32-oled1', pinName: 'SCL' }, color: '#ff8800' },
+    ],
+  },
 ];
 
 // Get examples by category

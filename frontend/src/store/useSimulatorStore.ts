@@ -7,7 +7,8 @@ import { PinManager } from '../simulation/PinManager';
 import { VirtualDS1307, VirtualTempSensor, I2CMemoryDevice } from '../simulation/I2CBusManager';
 import type { RP2040I2CDevice } from '../simulation/RP2040Simulator';
 import type { Wire, WireInProgress, WireEndpoint } from '../types/wire';
-import type { BoardKind, BoardInstance } from '../types/board';
+import type { BoardKind, BoardInstance, LanguageMode } from '../types/board';
+import { BOARD_SUPPORTS_MICROPYTHON } from '../types/board';
 import { calculatePinPosition } from '../utils/pinPositionCalculator';
 import { useOscilloscopeStore } from './useOscilloscopeStore';
 import { RaspberryPi3Bridge } from '../simulation/RaspberryPi3Bridge';
@@ -28,6 +29,26 @@ const SENSOR_COMPONENT_MAP: Record<string, {
 }> = {
   'dht22': { sensorType: 'dht22', dataPinName: 'SDA', propertyKeys: ['temperature', 'humidity'] },
   'hc-sr04': { sensorType: 'hc-sr04', dataPinName: 'TRIG', propertyKeys: ['distance'], extraPins: { echo_pin: 'ECHO' } },
+};
+
+// ── I2C sensor pre-registration ───────────────────────────────────────────────
+// I2C sensors use virtual pins (200 + i2c_addr) instead of real GPIO pins.
+// They are identified by I2C address and do not need wire-resolution.
+// `addrProp` is the component property that overrides the default address.
+const I2C_SENSOR_MAP: Record<string, {
+  sensorType: string;
+  defaultAddr: number;
+  addrProp?: string;       // property key that holds the I2C address (e.g. 'address')
+  addrIsBool?: boolean;    // true when addrProp is a boolean flag (e.g. AD0 → 0x68/0x69)
+  addrBoolHigh?: number;   // address when the boolean flag is truthy
+  propertyKeys?: string[]; // additional sensor values to forward (e.g. temperature, pressure)
+}> = {
+  'mpu6050': { sensorType: 'mpu6050', defaultAddr: 0x68, addrProp: 'ad0', addrIsBool: true, addrBoolHigh: 0x69 },
+  'bmp280':  { sensorType: 'bmp280',  defaultAddr: 0x76, addrProp: 'address', propertyKeys: ['temperature', 'pressure'] },
+  'ds1307':  { sensorType: 'ds1307',  defaultAddr: 0x68 },
+  'ds3231':  { sensorType: 'ds3231',  defaultAddr: 0x68, propertyKeys: ['temperature'] },
+  'ssd1306': { sensorType: 'ssd1306', defaultAddr: 0x3C },
+  'pcf8574': { sensorType: 'pcf8574', defaultAddr: 0x27, addrProp: 'i2cAddress' },
 };
 
 // ── Legacy type aliases (keep external consumers working) ──────────────────
@@ -110,6 +131,23 @@ class Esp32BridgeShim {
   unregisterSensor(pin: number): void {
     this.bridge.sendSensorDetach(pin);
   }
+
+  // ── I2C write-only device relay (SSD1306, PCF8574) ───────────────────────
+  private _i2cTransactionListeners = new Map<number, (data: number[]) => void>();
+
+  addI2CTransactionListener(addr: number, fn: (data: number[]) => void): void {
+    this._i2cTransactionListeners.set(addr, fn);
+    this.bridge.onI2cTransaction = (a: number, data: number[]) => {
+      this._i2cTransactionListeners.get(a)?.(data);
+    };
+  }
+
+  removeI2CTransactionListener(addr: number): void {
+    this._i2cTransactionListeners.delete(addr);
+    if (this._i2cTransactionListeners.size === 0) {
+      this.bridge.onI2cTransaction = null;
+    }
+  }
 }
 
 // ── Shared LEDC update handler (used by addBoard, setBoardType, initSimulator) ─
@@ -181,6 +219,8 @@ interface SimulatorState {
   setBoardPosition: (pos: { x: number; y: number }, boardId?: string) => void;
   setActiveBoardId: (boardId: string) => void;
   compileBoardProgram: (boardId: string, program: string) => void;
+  loadMicroPythonProgram: (boardId: string, files: Array<{ name: string; content: string }>) => Promise<void>;
+  setBoardLanguageMode: (boardId: string, mode: LanguageMode) => void;
   startBoard: (boardId: string) => void;
   stopBoard: (boardId: string) => void;
   resetBoard: (boardId: string) => void;
@@ -298,6 +338,7 @@ const INITIAL_BOARD: BoardInstance = {
   serialBaudRate: 0,
   serialMonitorOpen: false,
   activeFileGroupId: `group-${INITIAL_BOARD_ID}`,
+  languageMode: 'arduino' as LanguageMode,
 };
 
 // ── Store ─────────────────────────────────────────────────────────────────
@@ -469,6 +510,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         serialOutput: '', serialBaudRate: 0,
         serialMonitorOpen: false,
         activeFileGroupId: `group-${id}`,
+        languageMode: 'arduino',
       };
 
       set((s) => ({ boards: [...s.boards, newBoard] }));
@@ -599,6 +641,68 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       });
     },
 
+    loadMicroPythonProgram: async (boardId: string, files: Array<{ name: string; content: string }>) => {
+      const board = get().boards.find((b) => b.id === boardId);
+      if (!board) return;
+      if (!BOARD_SUPPORTS_MICROPYTHON.has(board.boardKind)) return;
+
+      if (isEsp32Kind(board.boardKind)) {
+        // ESP32 path: load MicroPython firmware via QEMU bridge, inject code via raw-paste REPL
+        const { getEsp32Firmware, uint8ArrayToBase64 } = await import('../simulation/Esp32MicroPythonLoader');
+        const esp32Bridge = getEsp32Bridge(boardId);
+        if (!esp32Bridge) return;
+
+        const firmware = await getEsp32Firmware(board.boardKind);
+        const b64 = uint8ArrayToBase64(firmware);
+        esp32Bridge.loadFirmware(b64);
+
+        // Queue code injection for after REPL boots
+        const mainFile = files.find(f => f.name === 'main.py') ?? files[0];
+        if (mainFile) {
+          esp32Bridge.setPendingMicroPythonCode(mainFile.content);
+        }
+      } else {
+        // RP2040 path: load firmware + filesystem in browser
+        const sim = getBoardSimulator(boardId);
+        if (!(sim instanceof RP2040Simulator)) return;
+        await sim.loadMicroPython(files);
+      }
+
+      set((s) => {
+        const boards = s.boards.map((b) =>
+          b.id === boardId ? { ...b, compiledProgram: 'micropython-loaded' } : b
+        );
+        const isActive = s.activeBoardId === boardId;
+        return {
+          boards,
+          ...(isActive ? { compiledHex: 'micropython-loaded', hexEpoch: s.hexEpoch + 1 } : {}),
+        };
+      });
+    },
+
+    setBoardLanguageMode: (boardId: string, mode: LanguageMode) => {
+      const board = get().boards.find((b) => b.id === boardId);
+      if (!board) return;
+
+      // Only allow MicroPython for supported boards
+      if (mode === 'micropython' && !BOARD_SUPPORTS_MICROPYTHON.has(board.boardKind)) return;
+
+      // Stop any running simulation
+      if (board.running) get().stopBoard(boardId);
+
+      // Clear compiled program since language changed
+      set((s) => ({
+        boards: s.boards.map((b) =>
+          b.id === boardId ? { ...b, languageMode: mode, compiledProgram: null } : b
+        ),
+      }));
+
+      // Replace file group with appropriate default files
+      const editorStore = useEditorStore.getState();
+      editorStore.deleteFileGroup(board.activeFileGroupId);
+      editorStore.createFileGroup(board.activeFileGroupId, mode);
+    },
+
     startBoard: (boardId: string) => {
       const board = get().boards.find((b) => b.id === boardId);
       if (!board) return;
@@ -657,6 +761,38 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               break; // only one data pin per sensor
             }
           }
+
+          // Pre-register I2C sensors (virtual pin = 200 + i2c_addr, no wire resolution needed)
+          for (const comp of components) {
+            const i2cDef = I2C_SENSOR_MAP[comp.metadataId];
+            if (!i2cDef) continue;
+            // Resolve I2C address from component property or use default
+            let addr = i2cDef.defaultAddr;
+            if (i2cDef.addrProp) {
+              const rawAddr = comp.properties[i2cDef.addrProp];
+              if (rawAddr !== undefined) {
+                if (i2cDef.addrIsBool) {
+                  // Boolean flag (e.g. AD0 on MPU-6050): truthy → high address
+                  if (rawAddr === true || rawAddr === 'true' || rawAddr === '1') {
+                    addr = i2cDef.addrBoolHigh ?? i2cDef.defaultAddr;
+                  }
+                } else {
+                  const parsed = typeof rawAddr === 'string'
+                    ? (rawAddr.startsWith('0x') ? parseInt(rawAddr, 16) : parseInt(rawAddr, 10))
+                    : Number(rawAddr);
+                  if (!isNaN(parsed)) addr = parsed;
+                }
+              }
+            }
+            const virtualPin = 200 + addr;
+            const props: Record<string, unknown> = { sensor_type: i2cDef.sensorType, pin: virtualPin, addr };
+            for (const key of (i2cDef.propertyKeys ?? [])) {
+              const val = comp.properties[key];
+              if (val !== undefined) props[key] = typeof val === 'string' ? parseFloat(val) : val;
+            }
+            sensors.push(props);
+          }
+
           esp32Bridge.setSensors(sensors);
 
           // Use WiFi flag set by the compiler (most reliable — avoids stale file group issues).
