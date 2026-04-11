@@ -4791,10 +4791,10 @@ void loop() {
       { type: 'wokwi-ssd1306', id: 'e32-oled1', x: 420, y: 130, properties: {} },
     ],
     wires: [
-      { id: 'e32o-vcc', start: { componentId: 'esp32', pinName: '3V3' }, end: { componentId: 'e32-oled1', pinName: 'VCC' }, color: '#ff4444' },
-      { id: 'e32o-gnd', start: { componentId: 'esp32', pinName: 'GND' }, end: { componentId: 'e32-oled1', pinName: 'GND' }, color: '#000000' },
-      { id: 'e32o-sda', start: { componentId: 'esp32', pinName: '21'  }, end: { componentId: 'e32-oled1', pinName: 'SDA' }, color: '#22aaff' },
-      { id: 'e32o-scl', start: { componentId: 'esp32', pinName: '22'  }, end: { componentId: 'e32-oled1', pinName: 'SCL' }, color: '#ff8800' },
+      { id: 'e32o-vcc', start: { componentId: 'esp32', pinName: '3V3' }, end: { componentId: 'e32-oled1', pinName: '3V3'  }, color: '#ff4444' },
+      { id: 'e32o-gnd', start: { componentId: 'esp32', pinName: 'GND' }, end: { componentId: 'e32-oled1', pinName: 'GND'  }, color: '#000000' },
+      { id: 'e32o-sda', start: { componentId: 'esp32', pinName: '21'  }, end: { componentId: 'e32-oled1', pinName: 'DATA' }, color: '#22aaff' },
+      { id: 'e32o-scl', start: { componentId: 'esp32', pinName: '22'  }, end: { componentId: 'e32-oled1', pinName: 'CLK'  }, color: '#ff8800' },
     ],
   },
 ];
