@@ -8,6 +8,11 @@
 
 import { get as idbGet, set as idbSet } from 'idb-keyval';
 import createLittleFS from 'littlefs';
+// ?url tells Vite to return the correct asset URL for the WASM binary
+// (without this, Emscripten fetches 'littlefs.wasm' relative to the bundle
+//  which resolves to the SPA index.html — causing the "expected magic word" error)
+// @ts-ignore — Vite ?url import, no type declaration needed
+import littlefsWasmUrl from 'littlefs/dist/littlefs.wasm?url';
 
 // Flash geometry (matches rp2040js and MicroPython defaults)
 const FLASH_START_ADDRESS = 0x10000000;
@@ -68,8 +73,9 @@ export async function loadUserFiles(
   // Create a backing buffer for the LittleFS filesystem
   const fsBuffer = new Uint8Array(MICROPYTHON_FS_BLOCK_COUNT * MICROPYTHON_FS_BLOCK_SIZE);
 
-  // Initialize the littlefs WASM module
-  const lfs = await createLittleFS({});
+  // Initialize the littlefs WASM module.
+  // locateFile redirects Emscripten's internal fetch to the Vite-resolved asset URL.
+  const lfs = await createLittleFS({ locateFile: () => littlefsWasmUrl });
 
   // Register flash read/write callbacks for the WASM module
   const flashRead = lfs.addFunction(
