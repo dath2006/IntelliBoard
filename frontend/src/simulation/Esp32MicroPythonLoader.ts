@@ -117,6 +117,38 @@ export async function getEsp32Firmware(
   return firmware;
 }
 
+/**
+ * Build a QEMU-compatible flash image from a MicroPython firmware binary.
+ *
+ * Flash layout rules (same as esptool.py flashing offsets):
+ *   ESP32 (LX6)  — firmware starts at 0x1000 (ROM bootloader reads 2nd-stage from there)
+ *   ESP32-S3     — combined image starts at 0x0
+ *   ESP32-C3     — combined image starts at 0x0
+ *
+ * The returned image is padded with 0xFF to the nearest valid QEMU flash size
+ * (2, 4, 8, or 16 MB). QEMU esp32-picsimlab rejects any other size.
+ */
+export function padToFlashSize(firmware: Uint8Array, boardKind?: BoardKind): Uint8Array {
+  const variant = boardKind ? toFirmwareVariant(boardKind) : 'esp32';
+  // ESP32 (LX6): 2nd-stage bootloader header must sit at flash offset 0x1000.
+  // Placing the .bin at 0x0 puts arbitrary bytes at 0x1000, triggering
+  // "invalid header" loops from the ROM bootloader.
+  const flashOffset = variant === 'esp32' ? 0x1000 : 0x0;
+
+  // ESP32 (LX6) MicroPython builds are compiled with CONFIG_ESPTOOLPY_FLASHSIZE_4MB
+  // so the firmware header declares 4 MB. Using a smaller image makes the SPI
+  // flash driver fail ("Detected size smaller than binary image header").
+  const MIN_BYTES = variant === 'esp32' ? 4 * 1024 * 1024 : 2 * 1024 * 1024;
+  const VALID_BYTES = [2, 4, 8, 16].map(mb => mb * 1024 * 1024);
+  const target = VALID_BYTES.find(size => size >= Math.max(firmware.length + flashOffset, MIN_BYTES));
+  if (!target) {
+    throw new Error(`MicroPython firmware too large for QEMU: ${firmware.length} bytes (max 16 MB)`);
+  }
+  const padded = new Uint8Array(target).fill(0xFF);
+  padded.set(firmware, flashOffset);
+  return padded;
+}
+
 /** Convert Uint8Array to base64 string */
 export function uint8ArrayToBase64(bytes: Uint8Array): string {
   let binary = '';

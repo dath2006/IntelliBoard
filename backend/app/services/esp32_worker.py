@@ -220,6 +220,36 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
         os._exit(1)
     lib.qemu_picsimlab_get_internals.restype = ctypes.c_void_p
 
+    # qemu_picsimlab_uart_receive() injects a UART-RX interrupt into the guest CPU.
+    # QEMU asserts qemu_mutex_iothread_locked() at that point, so the caller MUST
+    # hold the IO-thread lock.  Acquire it before every uart_receive call and
+    # release immediately after.  The functions are exported as:
+    #   qemu_mutex_lock_iothread_impl(const char *file, int line)
+    #   qemu_mutex_unlock_iothread()
+    try:
+        _lock_iothread   = lib.qemu_mutex_lock_iothread_impl
+        _lock_iothread.restype  = None
+        _lock_iothread.argtypes = [ctypes.c_char_p, ctypes.c_int]
+        _unlock_iothread = lib.qemu_mutex_unlock_iothread
+        _unlock_iothread.restype  = None
+        _unlock_iothread.argtypes = []
+    except AttributeError:
+        _lock_iothread   = None
+        _unlock_iothread = None
+
+    # qemu_system_shutdown_request() schedules a clean shutdown from inside
+    # the QEMU main-loop thread (which owns the AIO context).  Calling
+    # qemu_cleanup() directly from a Python thread (the command loop) triggers
+    # the "blk_exp_close_all_type: in_aio_context_home_thread" assertion
+    # because the block device teardown happens on the wrong thread.
+    # SHUTDOWN_CAUSE_HOST_SIGNAL = 3 (matches the constant in qapi/run-state.json)
+    try:
+        _shutdown_request = lib.qemu_system_shutdown_request
+        _shutdown_request.restype  = None
+        _shutdown_request.argtypes = [ctypes.c_int]
+    except AttributeError:
+        _shutdown_request = None
+
     # ── 3. Write firmware to a temp file ──────────────────────────────────────
     try:
         fw_bytes = base64.b64decode(firmware_b64)
@@ -883,7 +913,17 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
         elif c == 'uart_send':
             data = base64.b64decode(cmd['data'])
             buf  = (ctypes.c_uint8 * len(data))(*data)
-            lib.qemu_picsimlab_uart_receive(int(cmd.get('uart', 0)), buf, len(data))
+            # Must hold the QEMU IO-thread lock: uart_receive injects a UART-RX
+            # interrupt into the guest CPU and QEMU asserts the lock is held.
+            if _lock_iothread:
+                _lock_iothread(b'esp32_worker.py', 0)
+            try:
+                lib.qemu_picsimlab_uart_receive(
+                    int(cmd.get('uart', 0)), buf, len(data)
+                )
+            finally:
+                if _unlock_iothread:
+                    _unlock_iothread()
 
         elif c == 'set_i2c_response':
             _i2c_responses[int(cmd['addr'])] = int(cmd['response']) & 0xFF
@@ -968,12 +1008,17 @@ def main() -> None:  # noqa: C901  (complexity OK for inline worker)
 
         elif c == 'stop':
             _stopped.set()
-            # Signal QEMU to shut down. The assertion that fires on Windows
-            # ("Bail out!") is non-fatal — glib just logs it and continues.
-            try:
-                lib.qemu_cleanup()
-            except Exception:
-                pass
+            # Request a clean shutdown via the QEMU main-loop thread.
+            # qemu_system_shutdown_request() is safe to call from any thread:
+            # it posts an event to the main loop which then tears down block
+            # devices in the correct AIO context, avoiding the
+            # "blk_exp_close_all_type: in_aio_context_home_thread" assertion
+            # that fires when qemu_cleanup() is called directly from here.
+            if _shutdown_request:
+                try:
+                    _shutdown_request(3)   # SHUTDOWN_CAUSE_HOST_SIGNAL = 3
+                except Exception:
+                    pass
             qemu_t.join(timeout=5.0)
             # Clean up temp firmware file
             if firmware_path:

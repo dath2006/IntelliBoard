@@ -93,9 +93,14 @@ export class Esp32Bridge {
   private _pendingFirmware: string | null = null;
   private _pendingSensors: Array<Record<string, unknown>> = [];
 
-  // MicroPython raw-paste REPL injection
+  // MicroPython REPL injection — 4-stage state machine
+  //   idle → banner_seen → prompt_seen → raw_repl_entered → done
+  // Each stage waits for a specific string in the serial buffer before
+  // proceeding.  This avoids the race where code is sent before raw REPL
+  // mode is confirmed and ends up echoed by the normal REPL.
   private _pendingMicroPythonCode: string | null = null;
   private _serialBuffer = '';
+  private _replState: 'idle' | 'banner_seen' | 'prompt_seen' | 'raw_repl_entered' = 'idle';
   micropythonMode = false;
 
   constructor(boardId: string, boardKind: BoardKind) {
@@ -153,17 +158,46 @@ export class Esp32Bridge {
           if (this.onSerialData) {
             for (const ch of text) this.onSerialData(ch, uart);
           }
-          // Detect MicroPython REPL prompt and inject pending code
-          if (this._pendingMicroPythonCode) {
+          // MicroPython REPL injection — 4-stage state machine.
+          // Each stage waits for a confirmed string in the serial buffer before
+          // advancing, so we never send code before raw REPL mode is verified.
+          if (this._pendingMicroPythonCode || this._replState !== 'idle') {
             this._serialBuffer += text;
-            if (this._serialBuffer.includes('>>>')) {
-              this._injectCodeViaRawPaste(this._pendingMicroPythonCode);
+
+            // Stage 1: banner "Type help()" → poke UART with \r to flush ">>> "
+            // The >>> prompt has no \n so the backend UART buffer holds it until
+            // we send a byte that causes another write.
+            if (this._replState === 'idle' && this._serialBuffer.includes('Type "help()"')) {
+              this._replState = 'banner_seen';
+              console.log('[Esp32Bridge] Stage 1: banner seen → poking UART with \\r');
+              setTimeout(() => {
+                this._send({ type: 'esp32_serial_input', data: { bytes: [0x0D] } });
+              }, 800);
+            }
+
+            // Stage 2: ">>>" → send Ctrl+A to enter raw REPL
+            if (this._replState === 'banner_seen' && this._serialBuffer.includes('>>>')) {
+              this._replState = 'prompt_seen';
+              this._serialBuffer = '';
+              console.log('[Esp32Bridge] Stage 2: >>> seen → sending Ctrl+A');
+              setTimeout(() => {
+                this._send({ type: 'esp32_serial_input', data: { bytes: [0x01] } });
+              }, 200);
+            }
+
+            // Stage 3: "raw REPL" confirmation → now safe to send code
+            if (this._replState === 'prompt_seen' && this._serialBuffer.includes('raw REPL')) {
+              this._replState = 'raw_repl_entered';
+              const code = this._pendingMicroPythonCode!;
               this._pendingMicroPythonCode = null;
               this._serialBuffer = '';
+              console.log('[Esp32Bridge] Stage 3: raw REPL confirmed → sending code');
+              setTimeout(() => this._sendCodeInRawRepl(code), 200);
             }
-            // Prevent buffer from growing indefinitely
-            if (this._serialBuffer.length > 4096) {
-              this._serialBuffer = this._serialBuffer.slice(-512);
+
+            // Keep buffer from growing unboundedly
+            if (this._serialBuffer.length > 8192) {
+              this._serialBuffer = this._serialBuffer.slice(-1024);
             }
           }
           break;
@@ -364,6 +398,7 @@ export class Esp32Bridge {
   setPendingMicroPythonCode(code: string): void {
     this._pendingMicroPythonCode = code;
     this._serialBuffer = '';
+    this._replState = 'idle';
     this.micropythonMode = true;
   }
 
@@ -373,50 +408,73 @@ export class Esp32Bridge {
   }
 
   /**
-   * Inject code via MicroPython raw-paste REPL protocol:
-   *   \x01 (Ctrl+A) → enter raw REPL
-   *   \x05 (Ctrl+E) → enter raw-paste mode
-   *   <code bytes>
-   *   \x04 (Ctrl+D) → execute
+   * Send code bytes to QEMU UART, then Ctrl+D to execute.
+   * Called ONLY after "raw REPL; CTRL-B to exit" has been confirmed in the
+   * serial buffer (stage 3), so we are guaranteed to be in raw REPL mode.
    */
-  private _injectCodeViaRawPaste(code: string): void {
-    console.log(`[Esp32Bridge:${this.boardId}] Injecting MicroPython code (${code.length} bytes) via raw-paste REPL`);
+  /**
+   * Sanitize MicroPython source code before sending to the raw REPL.
+   *
+   * MicroPython v1.20 on ESP32 uses a byte-oriented tokenizer that doesn't
+   * handle non-ASCII bytes in source code.  Multi-byte UTF-8 sequences
+   * (e.g. Spanish accents: á=\xC3\xA1, ú=\xC3\xBA) in comments confuse the
+   * tokenizer and produce SyntaxError at the wrong line.
+   *
+   * Safe to strip non-ASCII only from comments because:
+   *  - String literals with non-ASCII would already fail on MicroPython's
+   *    default build (no wide-unicode support on ESP32).
+   *  - Identifiers must be ASCII.
+   */
+  private static _sanitizeForRepl(code: string): string {
+    // 1. Strip UTF-8 BOM if present
+    let s = code.startsWith('\uFEFF') ? code.slice(1) : code;
+    // 2. Normalize line endings to LF
+    s = s.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    // 3. Replace non-ASCII in line-comments with '?' so the line is preserved
+    s = s.replace(/^([ \t]*#.*)$/gm, (line) =>
+      line.replace(/[^\x00-\x7F]/g, '?')
+    );
+    // 4. Replace non-ASCII in inline comments (after code on the same line)
+    s = s.replace(/([ \t]+#.*)$/gm, (comment) =>
+      comment.replace(/[^\x00-\x7F]/g, '?')
+    );
+    return s;
+  }
 
-    // Small delay to let the REPL fully initialize after printing >>>
-    setTimeout(() => {
-      // Step 1: Enter raw REPL (Ctrl+A)
-      this.sendSerialBytes([0x01]);
+  private _sendCodeInRawRepl(code: string): void {
+    const sanitized = Esp32Bridge._sanitizeForRepl(code);
+    console.log(`[Esp32Bridge:${this.boardId}] Sending ${sanitized.length} bytes to raw REPL + Ctrl+D`);
+    if (sanitized !== code) {
+      console.log(`[Esp32Bridge:${this.boardId}] Code was sanitized (non-ASCII in comments stripped)`);
+    }
+    const codeBytes = Array.from(new TextEncoder().encode(sanitized));
+    console.log(`[Esp32Bridge:${this.boardId}] Sending ${codeBytes.length} bytes in chunks to raw REPL`);
 
-      setTimeout(() => {
-        // Step 2: Enter raw-paste mode (Ctrl+E)
-        this.sendSerialBytes([0x05]);
+    // The ESP32 UART RX FIFO is 128 bytes in hardware (and in QEMU's emulation).
+    // Sending >128 bytes in one qemu_picsimlab_uart_receive() call overflows the
+    // FIFO — the extra bytes are silently dropped, corrupting the injected code
+    // (e.g. "time.sleep" becomes "ti" causing NameError).
+    // Use ≤64-byte chunks with a 150 ms gap so QEMU drains the FIFO between sends.
+    const CHUNK_SIZE = 64;
+    const CHUNK_DELAY_MS = 150;
+    let offset = 0;
 
+    const sendChunk = () => {
+      if (offset >= codeBytes.length) {
+        // All bytes delivered — wait for QEMU to finish processing the last chunk
         setTimeout(() => {
-          // Step 3: Send code bytes in chunks (avoid overwhelming the serial)
-          const encoder = new TextEncoder();
-          const codeBytes = encoder.encode(code);
-          const CHUNK_SIZE = 256;
-
-          let offset = 0;
-          const sendChunk = () => {
-            if (offset >= codeBytes.length) {
-              // Step 4: Execute (Ctrl+D)
-              setTimeout(() => {
-                this.sendSerialBytes([0x04]);
-                console.log(`[Esp32Bridge:${this.boardId}] MicroPython code injection complete`);
-              }, 50);
-              return;
-            }
-            const end = Math.min(offset + CHUNK_SIZE, codeBytes.length);
-            const chunk = Array.from(codeBytes.slice(offset, end));
-            this.sendSerialBytes(chunk);
-            offset = end;
-            setTimeout(sendChunk, 10);
-          };
-          sendChunk();
-        }, 100);
-      }, 100);
-    }, 500);
+          this.sendSerialBytes([0x04]);   // Ctrl+D → compile & execute
+          this._replState = 'idle';
+          console.log(`[Esp32Bridge:${this.boardId}] Ctrl+D sent — code executing`);
+        }, 300);
+        return;
+      }
+      const chunk = codeBytes.slice(offset, offset + CHUNK_SIZE);
+      this.sendSerialBytes(chunk);
+      offset += CHUNK_SIZE;
+      setTimeout(sendChunk, CHUNK_DELAY_MS);
+    };
+    sendChunk();
   }
 
   private _send(payload: unknown): void {

@@ -190,28 +190,35 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
     if (activeBoardId) {
       const board = boards.find((b) => b.id === activeBoardId);
 
-      // MicroPython mode: auto-load firmware + files, then start
+      // MicroPython mode: stop any running session first, then reload firmware + start
       if (board?.languageMode === 'micropython') {
         trackRunSimulation(board.boardKind);
-        if (!board.compiledProgram) {
-          // Need to load MicroPython first
-          setCompiling(true);
-          setMessage(null);
-          addLog({ timestamp: new Date(), type: 'info', message: 'MicroPython: loading firmware and user files...' });
-          try {
-            const groupFiles = useEditorStore.getState().getGroupFiles(board.activeFileGroupId);
-            const pyFiles = groupFiles.map((f) => ({ name: f.name, content: f.content }));
-            await loadMicroPythonProgram(activeBoardId, pyFiles);
-            addLog({ timestamp: new Date(), type: 'success', message: 'MicroPython firmware loaded' });
-          } catch (err) {
-            const errMsg = err instanceof Error ? err.message : 'Failed to load MicroPython';
-            addLog({ timestamp: new Date(), type: 'error', message: errMsg });
-            setMessage({ type: 'error', text: errMsg });
-            setCompiling(false);
-            return;
-          }
-          setCompiling(false);
+
+        // Always stop the current session so the new run gets a clean QEMU boot.
+        // This also prevents the double start_esp32 that occurs when the bridge
+        // is already connected and startBoard() is called again.
+        if (board.running) {
+          stopBoard(activeBoardId);
+          // Give the WebSocket a moment to close cleanly before reconnecting.
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
+
+        setCompiling(true);
+        setMessage(null);
+        addLog({ timestamp: new Date(), type: 'info', message: 'MicroPython: loading firmware and user files...' });
+        try {
+          const groupFiles = useEditorStore.getState().getGroupFiles(board.activeFileGroupId);
+          const pyFiles = groupFiles.map((f) => ({ name: f.name, content: f.content }));
+          await loadMicroPythonProgram(activeBoardId, pyFiles);
+          addLog({ timestamp: new Date(), type: 'success', message: 'MicroPython firmware loaded' });
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : 'Failed to load MicroPython';
+          addLog({ timestamp: new Date(), type: 'error', message: errMsg });
+          setMessage({ type: 'error', text: errMsg });
+          setCompiling(false);
+          return;
+        }
+        setCompiling(false);
         startBoard(activeBoardId);
         setMessage(null);
         return;
