@@ -2,8 +2,9 @@
 
 > **Scope**: This document covers the full debugging journey and all fixes applied to make
 > I2C sensor simulation work correctly in the lcgamboa QEMU ESP32 emulation layer used by Velxio.
-> Specifically, it documents the work to make `Adafruit_MPU6050::begin()` return `true` so that
-> the serial monitor shows real sensor data instead of "MPU6050 not found!".
+> Specifically, it documents the work to make `Adafruit_MPU6050::begin()` and `Adafruit_BMP280::begin()`
+> return `true` so that the serial monitor shows real sensor data instead of "MPU6050 not found!" /
+> "BMP280 not found! Check wiring.".
 > Target audience: future maintainers who need to understand *why* the I2C slave code is the way it is.
 
 ---
@@ -18,9 +19,10 @@
 6. [How write-then-read works in QEMU](#6-how-write-then-read-works-in-qemu)
 7. [Final implementation of MPU6050Slave](#7-final-implementation-of-mpu6050slave)
 8. [Other slaves fixed (BMP280, DS1307, DS3231)](#8-other-slaves-fixed)
-9. [Test suite](#9-test-suite)
-10. [Debugging infrastructure added and later removed](#10-debugging-infrastructure)
-11. [End-to-end verification](#11-end-to-end-verification)
+9. [Root cause 4 — BMP280 wrong chip ID (0x60 vs 0x58)](#9-root-cause-4--bmp280-wrong-chip-id)
+10. [Test suite](#10-test-suite)
+11. [Debugging infrastructure added and later removed](#11-debugging-infrastructure)
+12. [End-to-end verification](#12-end-to-end-verification)
 
 ---
 
@@ -45,7 +47,7 @@ When firmware calls `Wire.beginTransmission(addr)` / `Wire.write(reg)` / `Wire.e
 
 ## 2. Root Cause 1 — Wrong I2C Event Constants
 
-### What was wrong
+### What was wrong — event constants
 
 The original constants in `esp32_i2c_slaves.py` were:
 
@@ -108,7 +110,7 @@ I2C_READ       = 0x06   # firmware requesting a byte; return value = the byte
 
 ## 3. Root Cause 2 — Wrong ACK Return Value Convention
 
-### What was wrong
+### What was wrong — ACK convention
 
 All slave `handle_event` methods returned `1` for "device present / ACK" and `0` for "not present".
 This is the **opposite** of what QEMU expects.
@@ -159,6 +161,7 @@ these were band-aids on the wrong root cause.
 ### Why they are no longer needed
 
 Once root causes 1 & 2 were fixed:
+
 - WRITE events fire correctly for every `Wire.write(reg)` call.
 - `reg_ptr` is set by the WRITE phase and preserved into the READ phase via RSTART.
 - No heuristics are needed. The code is simple and correct.
@@ -298,14 +301,71 @@ updated to use the correct constants and `return 0` for ACK.
 
 | Class | Address | Notable registers |
 |---|---|---|
-| `BMP280Slave` | 0x76 / 0x77 | `0xD0` = chip ID (`0x60`), calibration regs, temperature/pressure raw data |
+| `BMP280Slave` | 0x76 / 0x77 | `0xD0` = chip ID (`0x58`), calibration regs, temperature/pressure raw data |
 | `DS1307Slave` | 0x68 | Timekeeping registers (seconds, minutes, hours, day, date, month, year) |
 | `DS3231Slave` | 0x68 | Same layout as DS1307 plus temperature registers |
 | `I2CWriteSink` | configurable | Accepts any WRITE silently (for LCD, OLED, etc.) |
 
 ---
 
-## 9. Test Suite
+## 9. Root Cause 4 — BMP280 Wrong Chip ID
+
+### What was wrong — BMP280 chip ID
+
+`BMP280Slave._init_calibration()` initialised register `0xD0` (chip ID) to `0x60`:
+
+```python
+self.regs[0xD0] = 0x60  # chip_id BMP280   ← WRONG
+```
+
+`0x60` is the chip ID of the **BME280** (the humidity-capable sibling). The real BMP280
+production silicon returns **`0x58`**.
+
+### Why it mattered
+
+`Adafruit_BMP280::begin()` calls `Adafruit_I2CDevice::begin()`, which probes the I2C bus,
+then reads register `0xD0` and compares it against the compile-time constant:
+
+```cpp
+#define BMP280_CHIPID (0x58)
+// inside begin():
+if (chip_id != BMP280_CHIPID && chip_id != BME280_CHIPID) return false;
+```
+
+With the slave returning `0x60`, the library matched the `BME280_CHIPID` branch — which only
+works if `Adafruit_BME280` is used, not `Adafruit_BMP280`. In practice the example sketch uses
+`Adafruit_BMP280`, so `begin()` returned `false` and the serial monitor printed:
+
+```
+BMP280 not found! Check wiring.
+```
+
+### Fix — chip ID 0x60 → 0x58
+
+Changed `esp32_i2c_slaves.py` and `I2CBusManager.ts` (AVR/RP2040 path):
+
+```python
+# esp32_i2c_slaves.py
+self.regs[0xD0] = 0x58  # chip_id BMP280 (production silicon; BME280 uses 0x60)
+```
+
+```typescript
+// frontend/src/simulation/I2CBusManager.ts
+r[0xD0] = 0x58;  // chip_id BMP280 (production silicon; BME280 uses 0x60)
+```
+
+The frontend unit test in `virtual-i2c-devices.test.ts` was updated accordingly:
+
+```typescript
+// Before
+expect(dev.readByte()).toBe(0x60);
+// After
+expect(dev.readByte()).toBe(0x58);
+```
+
+---
+
+## 10. Test Suite
 
 File: `backend/test_esp32_i2c_slaves.py`
 

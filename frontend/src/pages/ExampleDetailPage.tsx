@@ -14,6 +14,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { exampleProjects } from '../data/examples';
 import { loadExample, type LibraryInstallProgress } from '../utils/loadExample';
 import { AppHeader } from '../components/layout/AppHeader';
+import { CircuitPreview } from '../components/examples/CircuitPreview';
 import { useSEO } from '../utils/useSEO';
 
 const DOMAIN = 'https://velxio.dev';
@@ -114,6 +115,14 @@ export const ExampleDetailPage: React.FC = () => {
           background: '#252526', border: '1px solid #333', borderRadius: 12,
           padding: '40px 48px',
         }}>
+
+          {/* Circuit preview */}
+          <div style={{
+            width: '100%', borderRadius: 8, overflow: 'hidden',
+            marginBottom: 28, border: '1px solid #333',
+          }}>
+            <CircuitPreview example={example} width={760} height={240} background="#111" style={{ width: '100%', height: 240, borderRadius: 7 }} />
+          </div>
 
           {/* Badges */}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20 }}>

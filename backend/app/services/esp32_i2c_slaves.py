@@ -147,7 +147,7 @@ class BMP280Slave:
         self._wu16(a, v & 0xFFFF)
 
     def _init_calibration(self) -> None:
-        self.regs[0xD0] = 0x60  # chip_id BMP280
+        self.regs[0xD0] = 0x58  # chip_id BMP280 (production silicon; BME280 uses 0x60)
         self.regs[0xF3] = 0x00  # status  (done)
         self._wu16(0x88, self.DIG_T1); self._ws16(0x8A, self.DIG_T2); self._ws16(0x8C, self.DIG_T3)
         self._wu16(0x8E, self.DIG_P1); self._ws16(0x90, self.DIG_P2); self._ws16(0x92, self.DIG_P3)

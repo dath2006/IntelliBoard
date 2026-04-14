@@ -6,6 +6,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { exampleProjects, type ExampleProject } from '../../data/examples';
+import { CircuitPreview } from './CircuitPreview';
 import './ExamplesGallery.css';
 
 interface ExamplesGalleryProps {
@@ -208,17 +209,13 @@ export const ExamplesGallery: React.FC<ExamplesGalleryProps> = ({ onLoadExample 
                 {example.thumbnail ? (
                   <img src={example.thumbnail} alt={example.title} className="example-preview-image" />
                 ) : (
-                  <div className="example-placeholder-new">
-                    <div className="placeholder-icon">{getCategoryIcon(example.category)}</div>
-                    <div className="placeholder-text">
-                      <div className="component-count">
-                        {example.components.length} component{example.components.length !== 1 ? 's' : ''}
-                      </div>
-                      <div className="wire-count">
-                        {example.wires.length} wire{example.wires.length !== 1 ? 's' : ''}
-                      </div>
-                    </div>
-                  </div>
+                  <CircuitPreview
+                    example={example}
+                    width={300}
+                    height={180}
+                    background="#0a0a0c"
+                    style={{ width: '100%', height: '100%' }}
+                  />
                 )}
               </div>
               <div className="example-info">
