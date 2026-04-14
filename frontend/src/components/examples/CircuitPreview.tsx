@@ -207,10 +207,6 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
     }
   });
 
-  // Wire endpoints also need to resolve by componentId
-  // Build a fast id→id map for wire routing (componentId → item.id)
-  const idSet = new Set(items.map(i => i.id));
-
   return (
     <div
       className={className}
@@ -250,31 +246,6 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
         );
       })}
 
-      {/* ── Wire overlay ─────────────────────────────────────────────────── */}
-      <svg
-        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-        width={width}
-        height={height}
-      >
-        {example.wires?.map((wire, i) => {
-          const from = centreMap[wire.start.componentId] ?? (idSet.has(wire.start.componentId) ? undefined : null);
-          const to   = centreMap[wire.end.componentId]   ?? (idSet.has(wire.end.componentId)   ? undefined : null);
-          if (!from || !to) return null;
-          const ddx = to[0] - from[0], ddy = to[1] - from[1];
-          if (ddx * ddx + ddy * ddy < 9) return null;
-          return (
-            <line
-              key={i}
-              x1={from[0]} y1={from[1]}
-              x2={to[0]}   y2={to[1]}
-              stroke={wire.color || '#888'}
-              strokeWidth={Math.max(1, 1.5 * scale)}
-              strokeOpacity={0.75}
-              strokeLinecap="round"
-            />
-          );
-        })}
-      </svg>
     </div>
   );
 };
