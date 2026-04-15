@@ -4797,6 +4797,164 @@ void loop() {
       { id: 'e32o-scl', start: { componentId: 'esp32', pinName: '22'  }, end: { componentId: 'e32-oled1', pinName: 'CLK'  }, color: '#ff8800' },
     ],
   },
+
+  // ─── ATtiny85 Examples ───────────────────────────────────────────────────────
+
+  {
+    id: 'attiny85-blink',
+    title: 'ATtiny85: Blink LED',
+    description: 'Classic blink on the ATtiny85 built-in LED (PB1). Great first sketch for this tiny 8-bit chip.',
+    category: 'basics',
+    difficulty: 'beginner',
+    boardFilter: 'attiny85',
+    boards: [{ boardKind: 'attiny85', x: 120, y: 160, code: `// ATtiny85 — Blink built-in LED on PB1
+// Pin 1 = PB1 = OC0B/OC1A (also Digispark LED)
+
+void setup() {
+  pinMode(1, OUTPUT);  // PB1 as output
+}
+
+void loop() {
+  digitalWrite(1, HIGH);
+  delay(500);
+  digitalWrite(1, LOW);
+  delay(500);
+}` }],
+    code: '',
+    components: [],
+    wires: [],
+  },
+
+  {
+    id: 'attiny85-button-led',
+    title: 'ATtiny85: Button + LED',
+    description: 'Press the button on PB0 to light the LED on PB1. Uses internal pull-up resistor — no external resistor needed.',
+    category: 'basics',
+    difficulty: 'beginner',
+    boardFilter: 'attiny85',
+    boards: [{ boardKind: 'attiny85', x: 100, y: 150, code: `// ATtiny85 — Button on PB0, LED on PB1
+// Button wiring: one leg to PB0, other leg to GND
+// INPUT_PULLUP means HIGH = released, LOW = pressed
+
+void setup() {
+  pinMode(0, INPUT_PULLUP);  // PB0 — button with internal pull-up
+  pinMode(1, OUTPUT);         // PB1 — LED
+}
+
+void loop() {
+  bool pressed = (digitalRead(0) == LOW);
+  digitalWrite(1, pressed ? HIGH : LOW);
+}` }],
+    code: '',
+    components: [
+      { type: 'wokwi-pushbutton', id: 'tiny-btn1', x: 380, y: 130, properties: { color: 'green' } },
+      { type: 'wokwi-led',        id: 'tiny-led1', x: 380, y: 240, properties: { color: 'red' } },
+    ],
+    wires: [
+      { id: 'tb-pb0',  start: { componentId: 'attiny85', pinName: 'PB0' }, end: { componentId: 'tiny-btn1', pinName: '1.l' }, color: '#ffcc00' },
+      { id: 'tb-gnd1', start: { componentId: 'attiny85', pinName: 'GND' }, end: { componentId: 'tiny-btn1', pinName: '2.l' }, color: '#000000' },
+      { id: 'tb-pb1',  start: { componentId: 'attiny85', pinName: 'PB1' }, end: { componentId: 'tiny-led1', pinName: 'A'   }, color: '#ff4444' },
+      { id: 'tb-gnd2', start: { componentId: 'attiny85', pinName: 'GND' }, end: { componentId: 'tiny-led1', pinName: 'C'   }, color: '#000000' },
+    ],
+  },
+
+  {
+    id: 'attiny85-pwm-fade',
+    title: 'ATtiny85: PWM LED Fade',
+    description: 'Smoothly fade an LED in and out using analogWrite() on PB1 (OC0B). Shows Timer0 PWM on the ATtiny85.',
+    category: 'basics',
+    difficulty: 'intermediate',
+    boardFilter: 'attiny85',
+    boards: [{ boardKind: 'attiny85', x: 100, y: 150, code: `// ATtiny85 — PWM LED fade on PB1 (OC0B / Timer0)
+// analogWrite() uses Timer0 on the ATtiny85
+
+void setup() {
+  pinMode(1, OUTPUT);  // PB1 = OC0B (PWM capable)
+}
+
+void loop() {
+  // Fade in
+  for (int brightness = 0; brightness <= 255; brightness++) {
+    analogWrite(1, brightness);
+    delay(6);
+  }
+  // Fade out
+  for (int brightness = 255; brightness >= 0; brightness--) {
+    analogWrite(1, brightness);
+    delay(6);
+  }
+  delay(200);
+}` }],
+    code: '',
+    components: [
+      { type: 'wokwi-led',       id: 'tiny-fade-led', x: 380, y: 200, properties: { color: 'yellow' } },
+      { type: 'wokwi-resistor',  id: 'tiny-fade-r1',  x: 380, y: 300, properties: { resistance: '220' } },
+    ],
+    wires: [
+      { id: 'tf-pb1',  start: { componentId: 'attiny85',     pinName: 'PB1' }, end: { componentId: 'tiny-fade-led', pinName: 'A' }, color: '#ffcc00' },
+      { id: 'tf-led-r', start: { componentId: 'tiny-fade-led', pinName: 'C'   }, end: { componentId: 'tiny-fade-r1',  pinName: '1' }, color: '#888888' },
+      { id: 'tf-gnd',  start: { componentId: 'attiny85',     pinName: 'GND'  }, end: { componentId: 'tiny-fade-r1',  pinName: '2' }, color: '#000000' },
+    ],
+  },
+
+  {
+    id: 'attiny85-ntc-sensor',
+    title: 'ATtiny85: NTC Temperature Sensor',
+    description: 'Read temperature from an NTC thermistor on PB3 (ADC3). The LED on PB1 blinks faster as temperature rises.',
+    category: 'sensors',
+    difficulty: 'intermediate',
+    boardFilter: 'attiny85',
+    boards: [{ boardKind: 'attiny85', x: 100, y: 150, code: `// ATtiny85 — NTC Thermistor on PB3 (ADC3)
+// Wiring: NTC between VCC and PB3, 10k resistor between PB3 and GND
+// LED on PB1: blinks faster when temperature increases
+
+#define NTC_PIN  3   // PB3 = ADC3
+#define LED_PIN  1   // PB1
+
+const float VCC        = 5.0;
+const float SERIES_R   = 10000.0;
+const float NOM_R      = 10000.0;   // NTC nominal resistance at 25°C
+const float NOM_TEMP   = 25.0;
+const float B_COEFF    = 3950.0;
+
+float readTemperature() {
+  int raw = analogRead(NTC_PIN);
+  float resistance = SERIES_R * (1023.0 / raw - 1.0);
+  float steinhart = resistance / NOM_R;
+  steinhart = log(steinhart) / B_COEFF;
+  steinhart += 1.0 / (NOM_TEMP + 273.15);
+  return (1.0 / steinhart) - 273.15;
+}
+
+void setup() {
+  pinMode(LED_PIN, OUTPUT);
+}
+
+void loop() {
+  float temp = readTemperature();
+  // Blink delay: 1000ms at 0°C down to 100ms at 100°C
+  int blinkDelay = (int)(1000.0 - temp * 9.0);
+  blinkDelay = constrain(blinkDelay, 100, 1000);
+
+  digitalWrite(LED_PIN, HIGH);
+  delay(blinkDelay / 2);
+  digitalWrite(LED_PIN, LOW);
+  delay(blinkDelay / 2);
+}` }],
+    code: '',
+    components: [
+      { type: 'wokwi-ntc-temperature-sensor', id: 'tiny-ntc1', x: 380, y: 150, properties: { temperature: '25' } },
+      { type: 'wokwi-led',                    id: 'tiny-ntc-led', x: 380, y: 300, properties: { color: 'red' } },
+    ],
+    wires: [
+      { id: 'tn-vcc',  start: { componentId: 'attiny85',    pinName: 'VCC'  }, end: { componentId: 'tiny-ntc1',    pinName: 'VCC' }, color: '#ff4444' },
+      { id: 'tn-gnd',  start: { componentId: 'attiny85',    pinName: 'GND'  }, end: { componentId: 'tiny-ntc1',    pinName: 'GND' }, color: '#000000' },
+      { id: 'tn-out',  start: { componentId: 'attiny85',    pinName: 'PB3'  }, end: { componentId: 'tiny-ntc1',    pinName: 'OUT' }, color: '#aa44ff' },
+      { id: 'tn-led',  start: { componentId: 'attiny85',    pinName: 'PB1'  }, end: { componentId: 'tiny-ntc-led', pinName: 'A'   }, color: '#ff4444' },
+      { id: 'tn-lgnd', start: { componentId: 'attiny85',    pinName: 'GND'  }, end: { componentId: 'tiny-ntc-led', pinName: 'C'   }, color: '#000000' },
+    ],
+  },
+
 ];
 
 // Get examples by category

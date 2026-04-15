@@ -30,6 +30,7 @@ const BOARD_TABS: BoardTab[] = [
   { id: 'raspberry-pi-pico',  label: 'Pico',            color: '#ffffff', bg: '#c11c31' },
   { id: 'esp32',              label: 'ESP32 (Xtensa)',  color: '#ffffff', bg: '#e77d11' },
   { id: 'esp32-c3',           label: 'ESP32-C3 (RISC-V)', color: '#ffffff', bg: '#27ae60' },
+  { id: 'attiny85',           label: 'ATtiny85',         color: '#ffffff', bg: '#5d4037' },
   { id: 'multi',              label: 'Multi-Board',     color: '#ffffff', bg: '#7b2d8b' },
 ];
 
