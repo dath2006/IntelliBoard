@@ -29,6 +29,7 @@ const CATEGORY_MAP: Record<string, ComponentCategory> = {
   'pir-motion-sensor': 'sensors',
   'mq2-gas-sensor': 'sensors',
   'mpu6050': 'sensors',
+  'bmp280': 'sensors',
   'ds18b20-temp': 'sensors',
   'ntc-temperature-sensor': 'sensors',
   'photoresistor-sensor': 'sensors',

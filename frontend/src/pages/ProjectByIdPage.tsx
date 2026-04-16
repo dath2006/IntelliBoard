@@ -7,13 +7,16 @@ import { useProjectStore } from '../store/useProjectStore';
 import { useSEO } from '../utils/useSEO';
 import { EditorPage } from './EditorPage';
 
+const DOMAIN = 'https://velxio.dev';
+
+interface ProjectMeta {
+  name: string;
+  description: string;
+  ownerUsername: string;
+  isPublic: boolean;
+}
+
 export const ProjectByIdPage: React.FC = () => {
-  useSEO({
-    title: 'Project — Velxio Arduino Emulator',
-    description: 'View and simulate this Arduino project on Velxio — free, open-source multi-board emulator.',
-    url: 'https://velxio.dev/editor',
-    noindex: true,
-  });
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const loadFiles = useEditorStore((s) => s.loadFiles);
@@ -23,6 +26,25 @@ export const ProjectByIdPage: React.FC = () => {
   const currentProject = useProjectStore((s) => s.currentProject);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
+  const [projectMeta, setProjectMeta] = useState<ProjectMeta | null>(null);
+
+  // SEO: update once we have real project data; use generic noindex fallback until then.
+  useSEO(
+    projectMeta && projectMeta.isPublic
+      ? {
+          title: `${projectMeta.name} by ${projectMeta.ownerUsername} | Velxio`,
+          description: projectMeta.description
+            ? `${projectMeta.description} — Simulate and remix this Arduino project on Velxio.`
+            : `Arduino project by ${projectMeta.ownerUsername}. View and simulate it free on Velxio.`,
+          url: `${DOMAIN}/project/${id}`,
+        }
+      : {
+          title: 'Project — Velxio Arduino Emulator',
+          description: 'View and simulate this Arduino project on Velxio — free, open-source multi-board emulator.',
+          url: `${DOMAIN}/editor`,
+          noindex: true,
+        }
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -49,6 +71,12 @@ export const ProjectByIdPage: React.FC = () => {
           slug: project.slug,
           ownerUsername: project.owner_username,
           isPublic: project.is_public,
+        });
+        setProjectMeta({
+          name: project.name ?? 'Untitled Project',
+          description: project.description ?? '',
+          ownerUsername: project.owner_username ?? '',
+          isPublic: project.is_public ?? false,
         });
         setReady(true);
       })

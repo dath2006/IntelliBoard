@@ -39,10 +39,21 @@ fi
 # Start FastAPI backend in the background on port 8001
 echo "🚀 Starting Velxio Backend..."
 uvicorn app.main:app --host 127.0.0.1 --port 8001 &
+UVICORN_PID=$!
 
 # Wait for backend to be healthy (optional but good practice)
 sleep 2
 
-# Start Nginx in the foreground to keep the container running
+# Start Nginx in the background so we can monitor both processes
 echo "🌐 Starting Nginx Web Server on port 80..."
-exec nginx -g "daemon off;"
+nginx -g "daemon off;" &
+NGINX_PID=$!
+
+# If either process dies, exit so Docker's restart policy can recover the
+# container. Previously uvicorn could crash silently while nginx kept the
+# container "up", leaving every /api/* request returning 502 Bad Gateway.
+wait -n "$UVICORN_PID" "$NGINX_PID"
+EXIT_CODE=$?
+echo "⚠️  A core process exited (code=$EXIT_CODE). Shutting down container so Docker can restart it."
+kill "$UVICORN_PID" "$NGINX_PID" 2>/dev/null || true
+exit "$EXIT_CODE"

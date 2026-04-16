@@ -190,28 +190,35 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
     if (activeBoardId) {
       const board = boards.find((b) => b.id === activeBoardId);
 
-      // MicroPython mode: auto-load firmware + files, then start
+      // MicroPython mode: stop any running session first, then reload firmware + start
       if (board?.languageMode === 'micropython') {
         trackRunSimulation(board.boardKind);
-        if (!board.compiledProgram) {
-          // Need to load MicroPython first
-          setCompiling(true);
-          setMessage(null);
-          addLog({ timestamp: new Date(), type: 'info', message: 'MicroPython: loading firmware and user files...' });
-          try {
-            const groupFiles = useEditorStore.getState().getGroupFiles(board.activeFileGroupId);
-            const pyFiles = groupFiles.map((f) => ({ name: f.name, content: f.content }));
-            await loadMicroPythonProgram(activeBoardId, pyFiles);
-            addLog({ timestamp: new Date(), type: 'success', message: 'MicroPython firmware loaded' });
-          } catch (err) {
-            const errMsg = err instanceof Error ? err.message : 'Failed to load MicroPython';
-            addLog({ timestamp: new Date(), type: 'error', message: errMsg });
-            setMessage({ type: 'error', text: errMsg });
-            setCompiling(false);
-            return;
-          }
-          setCompiling(false);
+
+        // Always stop the current session so the new run gets a clean QEMU boot.
+        // This also prevents the double start_esp32 that occurs when the bridge
+        // is already connected and startBoard() is called again.
+        if (board.running) {
+          stopBoard(activeBoardId);
+          // Give the WebSocket a moment to close cleanly before reconnecting.
+          await new Promise(resolve => setTimeout(resolve, 300));
         }
+
+        setCompiling(true);
+        setMessage(null);
+        addLog({ timestamp: new Date(), type: 'info', message: 'MicroPython: loading firmware and user files...' });
+        try {
+          const groupFiles = useEditorStore.getState().getGroupFiles(board.activeFileGroupId);
+          const pyFiles = groupFiles.map((f) => ({ name: f.name, content: f.content }));
+          await loadMicroPythonProgram(activeBoardId, pyFiles);
+          addLog({ timestamp: new Date(), type: 'success', message: 'MicroPython firmware loaded' });
+        } catch (err) {
+          const errMsg = err instanceof Error ? err.message : 'Failed to load MicroPython';
+          addLog({ timestamp: new Date(), type: 'error', message: errMsg });
+          setMessage({ type: 'error', text: errMsg });
+          setCompiling(false);
+          return;
+        }
+        setCompiling(false);
         startBoard(activeBoardId);
         setMessage(null);
         return;
@@ -589,23 +596,7 @@ export const EditorToolbar = ({ consoleOpen, setConsoleOpen, compileLogs: _compi
         </div>
 
         <div className="toolbar-group toolbar-group-right">
-          {/* Status message */}
-          {message && (
-            <span className={`tb-status tb-status-${message.type}`} title={message.text}>
-              {message.type === 'success' ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="20 6 9 17 4 12" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="12" y1="8" x2="12" y2="12" />
-                  <line x1="12" y1="16" x2="12.01" y2="16" />
-                </svg>
-              )}
-              <span className="tb-status-text">{message.text}</span>
-            </span>
-          )}
+         
 
           {/* Hidden file input for import (always present) */}
           <input

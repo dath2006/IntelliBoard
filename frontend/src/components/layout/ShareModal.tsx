@@ -3,6 +3,7 @@
  */
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useProjectStore } from '../../store/useProjectStore';
 import { updateProject } from '../../services/projectService';
 
@@ -40,7 +41,7 @@ export const ShareModal: React.FC<ShareModalProps> = ({ onClose }) => {
     }
   };
 
-  return (
+  return createPortal(
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         <h2 style={styles.title}>Share project</h2>
@@ -111,7 +112,8 @@ export const ShareModal: React.FC<ShareModalProps> = ({ onClose }) => {
           <button onClick={onClose} style={styles.closeBtn}>Close</button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 

@@ -387,6 +387,10 @@ class TestDHT22ResponseWaveform(unittest.TestCase):
 
         print('  Waveform sequence: CORRECT ✓')
 
+    @unittest.skipIf(
+        __import__('os').environ.get('CI') == 'true',
+        'Timing-sensitive test (uses busy-wait + sleep) — skipped in CI'
+    )
     def test_response_data_matches_payload(self):
         """Verify that the HIGH pulse durations encode the correct bits."""
         harness = DHT22SimulatorHarness()

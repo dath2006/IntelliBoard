@@ -648,12 +648,12 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
       if (isEsp32Kind(board.boardKind)) {
         // ESP32 path: load MicroPython firmware via QEMU bridge, inject code via raw-paste REPL
-        const { getEsp32Firmware, uint8ArrayToBase64 } = await import('../simulation/Esp32MicroPythonLoader');
+        const { getEsp32Firmware, padToFlashSize, uint8ArrayToBase64 } = await import('../simulation/Esp32MicroPythonLoader');
         const esp32Bridge = getEsp32Bridge(boardId);
         if (!esp32Bridge) return;
 
         const firmware = await getEsp32Firmware(board.boardKind);
-        const b64 = uint8ArrayToBase64(firmware);
+        const b64 = uint8ArrayToBase64(padToFlashSize(firmware, board.boardKind));
         esp32Bridge.loadFirmware(b64);
 
         // Queue code injection for after REPL boots
@@ -697,10 +697,11 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         ),
       }));
 
-      // Replace file group with appropriate default files
+      // Replace file group with appropriate default files and activate it
       const editorStore = useEditorStore.getState();
       editorStore.deleteFileGroup(board.activeFileGroupId);
       editorStore.createFileGroup(board.activeFileGroupId, mode);
+      editorStore.setActiveGroup(board.activeFileGroupId);
     },
 
     startBoard: (boardId: string) => {

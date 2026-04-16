@@ -1,18 +1,19 @@
 """
 Tests for ESP32 I2C slave state machines.
 
-Covers BMP280Slave, DS1307Slave, DS3231Slave, and I2CWriteSink from
-app/services/esp32_i2c_slaves.py — the Python register-map emulators
-that handle I2C traffic from QEMU-simulated ESP32 firmware.
+Covers BMP280Slave, DS1307Slave, DS3231Slave, I2CWriteSink, and MPU6050Slave
+from app/services/esp32_i2c_slaves.py.
 
-Actual picsimlab I2C event encoding (confirmed by observing real QEMU events):
-  event & 0xFF   = operation type:
-    0x01 = START  → slave must return 1 (ACK = device present)
-    0x05 = WRITE  (first byte / register address)  → slave returns 1 (ACK)
-    0x06 = WRITE  (subsequent bytes / data)         → slave returns 1 (ACK)
-    0x03 = READ   → slave returns register byte at current pointer
-    0x00 = STOP   → slave resets state
-  (event >> 8) & 0xFF = data byte (for WRITE events)
+Correct picsimlab I2C event encoding (from hw/i2c/picsimlab_i2c.c + QEMU i2c.h):
+  event & 0xFF  = operation type:
+    0x00 = I2C_START_RECV  — firmware called requestFrom  (read  direction START)
+    0x01 = I2C_START_SEND  — firmware called beginTransmission (write direction START)
+    0x03 = I2C_FINISH      — end of transaction (STOP or RSTART between write+read)
+    0x05 = WRITE byte      — (event >> 8) & 0xFF is the data byte
+    0x06 = READ  byte      — return value is the data byte to deliver to firmware
+
+  ACK convention: return 0 = ACK (success), non-zero = NACK.
+  For READ events: return value is the data byte sent to the firmware.
 
 Run from the backend/ directory:
     python test_esp32_i2c_slaves.py
@@ -22,8 +23,8 @@ import sys
 import unittest
 from pathlib import Path
 
-# Ensure backend/ is importable as a package root
-sys.path.insert(0, str(Path(__file__).parent))
+# Ensure backend/ is importable (for direct execution; pytest uses conftest.py)
+sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent / 'backend'))
 
 from app.services.esp32_i2c_slaves import (
     BMP280Slave,
@@ -31,27 +32,33 @@ from app.services.esp32_i2c_slaves import (
     DS3231Slave,
     I2CWriteSink,
     MPU6050Slave,
+    I2C_START_RECV,
+    I2C_START_SEND,
+    I2C_FINISH,
+    I2C_WRITE,
+    I2C_READ,
 )
 
 
-# ── I2C protocol helpers (correct picsimlab encoding) ─────────────────────────
-
-I2C_START = 0x0001
-I2C_STOP  = 0x0000
-I2C_READ  = 0x0003
-
+# ── I2C protocol helpers ──────────────────────────────────────────────────────
 
 def i2c_write(byte: int) -> int:
-    """WRITE event: data in high byte, type 0x05 in low byte."""
-    return ((byte & 0xFF) << 8) | 0x05
+    """WRITE event: data in high byte, op 0x05 in low byte."""
+    return ((byte & 0xFF) << 8) | I2C_WRITE
 
 
 def i2c_read_seq(slave, reg: int, n: int) -> list[int]:
-    """Set register pointer then read n bytes sequentially."""
-    slave.handle_event(I2C_START)
-    slave.handle_event(i2c_write(reg))
+    """Simulate write-then-read: write register address, then read n bytes.
+
+    Models the Adafruit BusIO write_then_read pattern:
+      beginTransmission → write(reg) → endTransmission(false) → requestFrom → read()*n
+    """
+    slave.handle_event(I2C_START_SEND)   # write direction START
+    slave.handle_event(i2c_write(reg))   # set register pointer
+    slave.handle_event(I2C_FINISH)       # RSTART (repeated start before read phase)
+    slave.handle_event(I2C_START_RECV)   # read direction START
     data = [slave.handle_event(I2C_READ) for _ in range(n)]
-    slave.handle_event(I2C_STOP)
+    slave.handle_event(I2C_FINISH)       # STOP
     return data
 
 
@@ -76,18 +83,22 @@ class TestBMP280Slave(unittest.TestCase):
 
     # ── I2C protocol ───────────────────────────────────────────────────────────
 
-    def test_ack_on_start(self):
-        result = self.slave.handle_event(I2C_START)
-        self.assertEqual(result, 1, 'START must return 1 (device present)')
+    def test_ack_on_start_send(self):
+        result = self.slave.handle_event(I2C_START_SEND)
+        self.assertEqual(result, 0, 'START_SEND must return 0 (ACK)')
+
+    def test_ack_on_start_recv(self):
+        result = self.slave.handle_event(I2C_START_RECV)
+        self.assertEqual(result, 0, 'START_RECV must return 0 (ACK)')
 
     def test_ack_on_write(self):
-        self.slave.handle_event(I2C_START)
+        self.slave.handle_event(I2C_START_SEND)
         result = self.slave.handle_event(i2c_write(0xD0))
-        self.assertEqual(result, 1, 'WRITE must return 1 (ACK)')
+        self.assertEqual(result, 0, 'WRITE must return 0 (ACK)')
 
-    def test_stop_returns_zero(self):
-        self.slave.handle_event(I2C_START)
-        result = self.slave.handle_event(I2C_STOP)
+    def test_finish_returns_zero(self):
+        self.slave.handle_event(I2C_START_SEND)
+        result = self.slave.handle_event(I2C_FINISH)
         self.assertEqual(result, 0)
 
     # ── Chip identity ──────────────────────────────────────────────────────────
@@ -161,21 +172,26 @@ class TestBMP280Slave(unittest.TestCase):
     # ── State machine ─────────────────────────────────────────────────────────
 
     def test_write_sets_register_ptr(self):
-        self.slave.handle_event(I2C_START)
+        """Write-then-read: write reg address 0xD0, then read returns chip_id."""
+        self.slave.handle_event(I2C_START_SEND)
         self.slave.handle_event(i2c_write(0xD0))   # set ptr to chip_id reg
+        self.slave.handle_event(I2C_FINISH)
+        self.slave.handle_event(I2C_START_RECV)
         val = self.slave.handle_event(I2C_READ)
         self.assertEqual(val, 0x60)
 
-    def test_stop_resets_first_byte_flag(self):
-        """After STOP, the next transaction's first WRITE must set reg_ptr, not write data."""
-        self.slave.handle_event(I2C_START)
+    def test_finish_resets_first_byte_flag(self):
+        """After FINISH, the next transaction's first WRITE must set reg_ptr."""
+        self.slave.handle_event(I2C_START_SEND)
         self.slave.handle_event(i2c_write(0xD0))
-        self.slave.handle_event(I2C_STOP)
-        # New transaction: WRITE 0xD0 again → should set reg_ptr, not write to 0xD0
-        self.slave.handle_event(I2C_START)
+        self.slave.handle_event(I2C_FINISH)
+        # New transaction: WRITE 0xD0 again → should set reg_ptr, not write data
+        self.slave.handle_event(I2C_START_SEND)
         self.slave.handle_event(i2c_write(0xD0))
+        self.slave.handle_event(I2C_FINISH)
+        self.slave.handle_event(I2C_START_RECV)
         val = self.slave.handle_event(I2C_READ)
-        self.assertEqual(val, 0x60, 'chip_id should still be 0x60 after STOP + new transaction')
+        self.assertEqual(val, 0x60, 'chip_id should still be 0x60 after FINISH + new transaction')
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -187,12 +203,12 @@ class TestDS1307Slave(unittest.TestCase):
     def setUp(self):
         self.slave = DS1307Slave()
 
-    def test_ack_on_start(self):
-        self.assertEqual(self.slave.handle_event(I2C_START), 1)
+    def test_ack_on_start_send(self):
+        self.assertEqual(self.slave.handle_event(I2C_START_SEND), 0)
 
     def test_ack_on_write(self):
-        self.slave.handle_event(I2C_START)
-        self.assertEqual(self.slave.handle_event(i2c_write(0x00)), 1)
+        self.slave.handle_event(I2C_START_SEND)
+        self.assertEqual(self.slave.handle_event(i2c_write(0x00)), 0)
 
     def test_seconds_is_valid_bcd(self):
         seconds = i2c_read_seq(self.slave, 0x00, 1)[0]
@@ -293,65 +309,68 @@ class TestI2CWriteSink(unittest.TestCase):
         self.emitted: list[dict] = []
         self.sink = I2CWriteSink(addr=0x3C, emit_fn=self.emitted.append)
 
-    def test_ack_on_start(self):
-        self.assertEqual(self.sink.handle_event(I2C_START), 1)
+    def test_ack_on_start_send(self):
+        self.assertEqual(self.sink.handle_event(I2C_START_SEND), 0)
+
+    def test_ack_on_start_recv(self):
+        self.assertEqual(self.sink.handle_event(I2C_START_RECV), 0)
 
     def test_ack_on_write(self):
-        self.sink.handle_event(I2C_START)
+        self.sink.handle_event(I2C_START_SEND)
         for byte in [0x00, 0x21, 0xAB]:
             result = self.sink.handle_event(i2c_write(byte))
-            self.assertEqual(result, 1, f'WRITE 0x{byte:02X} must return 1 (ACK)')
+            self.assertEqual(result, 0, f'WRITE 0x{byte:02X} must return 0 (ACK)')
 
     def test_read_returns_0xff(self):
         """Write-only device: READ must return 0xFF (no data to send)."""
-        self.sink.handle_event(I2C_START)
+        self.sink.handle_event(I2C_START_SEND)
         result = self.sink.handle_event(I2C_READ)
         self.assertEqual(result, 0xFF)
 
-    def test_emits_on_stop(self):
-        """After 3 writes + STOP, emit_fn must be called exactly once."""
-        self.sink.handle_event(I2C_START)
+    def test_emits_on_finish(self):
+        """After 3 writes + FINISH, emit_fn must be called exactly once."""
+        self.sink.handle_event(I2C_START_SEND)
         for b in [0x00, 0x21, 0x7F]:
             self.sink.handle_event(i2c_write(b))
-        self.sink.handle_event(I2C_STOP)
-        self.assertEqual(len(self.emitted), 1, 'emit_fn must be called once on STOP')
+        self.sink.handle_event(I2C_FINISH)
+        self.assertEqual(len(self.emitted), 1, 'emit_fn must be called once on FINISH')
 
     def test_emit_payload_addr(self):
-        self.sink.handle_event(I2C_START)
+        self.sink.handle_event(I2C_START_SEND)
         self.sink.handle_event(i2c_write(0xAB))
-        self.sink.handle_event(I2C_STOP)
+        self.sink.handle_event(I2C_FINISH)
         self.assertEqual(self.emitted[0]['addr'], 0x3C)
 
     def test_emit_payload_type(self):
-        self.sink.handle_event(I2C_START)
+        self.sink.handle_event(I2C_START_SEND)
         self.sink.handle_event(i2c_write(0xAB))
-        self.sink.handle_event(I2C_STOP)
+        self.sink.handle_event(I2C_FINISH)
         self.assertEqual(self.emitted[0]['type'], 'i2c_transaction')
 
     def test_emit_payload_data(self):
         bytes_ = [0x00, 0x21, 0x7F]
-        self.sink.handle_event(I2C_START)
+        self.sink.handle_event(I2C_START_SEND)
         for b in bytes_:
             self.sink.handle_event(i2c_write(b))
-        self.sink.handle_event(I2C_STOP)
+        self.sink.handle_event(I2C_FINISH)
         self.assertEqual(self.emitted[0]['data'], bytes_)
 
     def test_no_emit_for_empty_buffer(self):
-        """START then immediate STOP with no writes must NOT emit."""
-        self.sink.handle_event(I2C_START)
-        self.sink.handle_event(I2C_STOP)
+        """START then immediate FINISH with no writes must NOT emit."""
+        self.sink.handle_event(I2C_START_SEND)
+        self.sink.handle_event(I2C_FINISH)
         self.assertEqual(len(self.emitted), 0, 'Empty buffer must not trigger emit_fn')
 
     def test_resets_buffer_after_emit(self):
         """Second transaction accumulates fresh bytes, not leftover from first."""
         # First transaction: writes [0xAA]
-        self.sink.handle_event(I2C_START)
+        self.sink.handle_event(I2C_START_SEND)
         self.sink.handle_event(i2c_write(0xAA))
-        self.sink.handle_event(I2C_STOP)
+        self.sink.handle_event(I2C_FINISH)
         # Second transaction: writes [0xBB]
-        self.sink.handle_event(I2C_START)
+        self.sink.handle_event(I2C_START_SEND)
         self.sink.handle_event(i2c_write(0xBB))
-        self.sink.handle_event(I2C_STOP)
+        self.sink.handle_event(I2C_FINISH)
         self.assertEqual(len(self.emitted), 2)
         self.assertEqual(self.emitted[0]['data'], [0xAA])
         self.assertEqual(self.emitted[1]['data'], [0xBB])
@@ -359,15 +378,15 @@ class TestI2CWriteSink(unittest.TestCase):
     def test_custom_addr_forwarded(self):
         """Sink created with addr=0x27 emits with that addr."""
         sink = I2CWriteSink(addr=0x27, emit_fn=self.emitted.append)
-        sink.handle_event(I2C_START)
+        sink.handle_event(I2C_START_SEND)
         sink.handle_event(i2c_write(0x38))
-        sink.handle_event(I2C_STOP)
+        sink.handle_event(I2C_FINISH)
         self.assertEqual(self.emitted[0]['addr'], 0x27)
 
-    def test_stop_return_value(self):
-        """STOP always returns 0."""
-        self.sink.handle_event(I2C_START)
-        result = self.sink.handle_event(I2C_STOP)
+    def test_finish_return_value(self):
+        """FINISH always returns 0."""
+        self.sink.handle_event(I2C_START_SEND)
+        result = self.sink.handle_event(I2C_FINISH)
         self.assertEqual(result, 0)
 
 
@@ -385,47 +404,32 @@ class TestMPU6050Slave(unittest.TestCase):
         result = i2c_read_seq(self.mpu, 0x75, 1)
         self.assertEqual(result[0], 0x68)
 
-    def test_start_ack(self):
-        """START event must return 1 (ACK — device present)."""
-        self.assertEqual(self.mpu.handle_event(I2C_START), 1)
+    def test_start_send_ack(self):
+        """START_SEND event must return 0 (ACK)."""
+        self.assertEqual(self.mpu.handle_event(I2C_START_SEND), 0)
 
-    def test_begin_no_write_events(self):
-        """Simulates Adafruit BusIO write-then-read: START then READ, no WRITE.
-        picsimlab does not fire WRITE callbacks for write-then-read transactions,
-        so the slave must return WHO_AM_I (0x68) on the first READ regardless."""
+    def test_start_recv_ack(self):
+        """START_RECV event must return 0 (ACK)."""
+        self.assertEqual(self.mpu.handle_event(I2C_START_RECV), 0)
+
+    def test_write_then_read_who_am_i(self):
+        """Full write-then-read: write reg 0x75, then read returns 0x68."""
         m = MPU6050Slave()
-        self.assertEqual(m.handle_event(I2C_START), 1)  # START → ACK
-        result = m.handle_event(I2C_READ)               # READ without prior WRITE
-        self.assertEqual(result, 0x68,
-            f"Expected WHO_AM_I=0x68 without WRITE, got 0x{result:02x}")
+        m.handle_event(I2C_START_SEND)           # beginTransmission
+        m.handle_event(i2c_write(0x75))           # write register address
+        m.handle_event(I2C_FINISH)                # RSTART
+        m.handle_event(I2C_START_RECV)            # requestFrom
+        result = m.handle_event(I2C_READ)         # read byte
+        self.assertEqual(result, 0x68, f"WHO_AM_I must be 0x68, got 0x{result:02x}")
 
-    def test_data_read_after_begin(self):
-        """After begin() succeeds (three WHO_AM_I reads), START resets reg_ptr to 0x3B.
-
-        Adafruit_MPU6050::begin() fires THREE START+READ sequences before data reads:
-          1. Wire.begin(sda, scl) bus-init probe → START+READ(WHO_AM_I)
-          2. _wire->begin() inside i2c_dev->begin() → START+READ(WHO_AM_I)
-          3. chip_id_register.read() → START+READ(WHO_AM_I)  ← must still return 0x68
-        Only after all three return 0x68 does the slave switch to data mode.
-        """
+    def test_detected_pattern(self):
+        """detected() pattern: START_SEND then FINISH (no data bytes) returns ACK."""
         m = MPU6050Slave()
-        # First WHO_AM_I read: Wire.begin(sda, scl) bus-init probe
-        m.handle_event(I2C_START)
-        r1 = m.handle_event(I2C_READ)
-        self.assertEqual(r1, 0x68, "First WHO_AM_I read must return 0x68")
-        # Second WHO_AM_I read: _wire->begin() inside i2c_dev->begin()
-        m.handle_event(I2C_START)
-        r2 = m.handle_event(I2C_READ)
-        self.assertEqual(r2, 0x68, "Second WHO_AM_I read must return 0x68")
-        # Third WHO_AM_I read: chip_id_register.read() — count reaches 3
-        m.handle_event(I2C_START)
-        r3 = m.handle_event(I2C_READ)
-        self.assertEqual(r3, 0x68, "Third WHO_AM_I read (chip_id check) must return 0x68")
-        # Now _who_am_i_count=3 → next START switches to data mode
-        m.handle_event(I2C_START)
-        first_accel_byte = m.handle_event(I2C_READ)
-        self.assertEqual(first_accel_byte, m.regs[0x3B],
-            "After three WHO_AM_I reads, START should reset reg_ptr to 0x3B (accel block)")
+        # beginTransmission + endTransmission (no data)
+        r1 = m.handle_event(I2C_START_SEND)
+        self.assertEqual(r1, 0, "START_SEND must return 0 (ACK) for detected()")
+        r2 = m.handle_event(I2C_FINISH)
+        self.assertEqual(r2, 0, "FINISH must return 0")
 
     def test_accel_z_default_1g(self):
         """ACCEL_Z should default to +1g = 0x4000 (MSB=0x40, LSB=0x00)."""
@@ -441,12 +445,20 @@ class TestMPU6050Slave(unittest.TestCase):
         # 1g at ±2g full-scale = 16384 = 0x4000
         self.assertEqual(accel_x, 0x4000)
 
+    def test_sequential_read_14_bytes(self):
+        """getEvent() reads 14 bytes from 0x3B — all must come from correct regs."""
+        result = i2c_read_seq(self.mpu, 0x3B, 14)
+        self.assertEqual(len(result), 14)
+        expected = list(self.mpu.regs[0x3B:0x3B + 14])
+        self.assertEqual(result, expected, "14-byte read from 0x3B must match register map")
+
     def test_device_reset_bit_auto_cleared(self):
         """Writing 0x80 to PWR_MGMT_1 (0x6B) must auto-clear bit 7 immediately."""
-        self.mpu.handle_event(I2C_START)
-        self.mpu.handle_event(i2c_write(0x6B))  # register address
-        self.mpu.handle_event(0x8006)            # write 0x80 (DEVICE_RESET)
-        # Read back: bit 7 should be 0 (reset complete)
+        self.mpu.handle_event(I2C_START_SEND)
+        self.mpu.handle_event(i2c_write(0x6B))   # register address
+        self.mpu.handle_event(i2c_write(0x80))   # write 0x80 (DEVICE_RESET bit)
+        self.mpu.handle_event(I2C_FINISH)
+        # Read back: bit 7 should be 0 (auto-cleared)
         result = i2c_read_seq(self.mpu, 0x6B, 1)
         self.assertEqual(result[0] & 0x80, 0, "DEVICE_RESET bit must auto-clear")
 
@@ -455,6 +467,26 @@ class TestMPU6050Slave(unittest.TestCase):
         mpu69 = MPU6050Slave(addr=0x69)
         result = i2c_read_seq(mpu69, 0x75, 1)
         self.assertEqual(result[0], 0x68)
+
+    def test_reg_ptr_preserved_across_rstart(self):
+        """Write sets reg_ptr; FINISH then START_RECV should NOT reset reg_ptr."""
+        m = MPU6050Slave()
+        m.handle_event(I2C_START_SEND)
+        m.handle_event(i2c_write(0x75))   # set reg_ptr = 0x75
+        m.handle_event(I2C_FINISH)        # RSTART — must NOT reset reg_ptr
+        m.handle_event(I2C_START_RECV)    # read direction START
+        val = m.handle_event(I2C_READ)
+        self.assertEqual(val, 0x68, "reg_ptr must be preserved across RSTART")
+
+    def test_write_to_reg(self):
+        """Writing two bytes sets reg address then reg value."""
+        m = MPU6050Slave()
+        m.handle_event(I2C_START_SEND)
+        m.handle_event(i2c_write(0x6B))   # reg address
+        m.handle_event(i2c_write(0x01))   # value
+        m.handle_event(I2C_FINISH)
+        result = i2c_read_seq(m, 0x6B, 1)
+        self.assertEqual(result[0], 0x01)
 
 
 # ── Runner ────────────────────────────────────────────────────────────────────

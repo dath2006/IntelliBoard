@@ -359,19 +359,160 @@ class ESPIDFCompiler:
         logger.warning('[espidf] Arduino libraries dir not found')
         return None
 
-    # Built-in headers that do NOT require external library source
+    # Headers that will NEVER appear in any Arduino library directory:
+    #   - C/C++ standard library headers
+    #   - Arduino core API types compiled directly into arduino-esp32 (not installable)
+    #
+    # Everything else (Wire.h, SPI.h, WiFi.h, Adafruit_GFX.h, …) is resolved
+    # dynamically: user-installed libs → IDF component; arduino-esp32 bundled
+    # libs → skip (already compiled in); not found → warning.
     _BUILTIN_HEADERS = frozenset({
-        'Arduino.h', 'Wire.h', 'SPI.h', 'SPI.H', 'WiFi.h', 'EEPROM.h',
-        'SD.h', 'Servo.h', 'LiquidCrystal.h', 'Ethernet.h', 'IPAddress.h',
-        'HardwareSerial.h', 'Stream.h', 'Print.h', 'WString.h', 'pgmspace.h',
+        # C/C++ standard library
         'math.h', 'stdint.h', 'stdio.h', 'stdlib.h', 'string.h', 'stdarg.h',
-        'WebServer.h', 'HTTPClient.h', 'WiFiClient.h', 'WiFiServer.h',
-        'BluetoothSerial.h', 'BLEDevice.h',
-        'FS.h', 'SPIFFS.h', 'LittleFS.h',
-        'esp_system.h', 'esp_wifi.h', 'esp_event.h', 'nvs_flash.h',
-        'freertos/FreeRTOS.h', 'freertos/task.h',
-        'Adafruit_GFX.h',  # bundled with arduino-esp32 sometimes
+        'stddef.h', 'stdbool.h', 'float.h', 'limits.h', 'assert.h',
+        # Arduino core types — part of arduino-esp32 source, not installable libraries
+        'Arduino.h', 'HardwareSerial.h', 'Stream.h', 'Print.h', 'WString.h',
+        'pgmspace.h', 'IPAddress.h',
     })
+
+    # Core arduino-esp32 bundled libraries — already compiled into the IDF component,
+    # must NOT be duplicated as separate user_libs components.
+    _CORE_ESP32_LIBS: frozenset[str] = frozenset({
+        'Wire', 'SPI', 'WiFi', 'EEPROM', 'SD', 'FS',
+        'LittleFS', 'SPIFFS', 'WebServer', 'HTTPClient',
+        'WiFiClientSecure', 'BluetoothSerial', 'BLE',
+        'Preferences', 'Update', 'Ticker',
+    })
+
+    def _resolve_library_components(
+        self,
+        ext_headers: list[str],
+        arduino_libs: Path | None,
+        esp32_libs: Path | None,
+        arduino_comp_name: str,
+        user_libs_dir: Path,
+    ) -> tuple[list[str], dict[str, str]]:
+        """
+        BFS over ext_headers (and transitive includes) to discover all external
+        Arduino libraries and merge them into a single 'user_libs_all' IDF component.
+
+        All library files are copied flat into one directory, so every header is
+        visible to every other header and source file without any cross-component
+        REQUIRES propagation — which is unreliable in ESP-IDF 4.x for deeply
+        nested transitive dependencies.
+
+        Search priority per header:
+          1. arduino_libs (user-installed via Library Manager) → merge into component
+          2. esp32_libs   (bundled with arduino-esp32) → skip core libs (Wire, SPI, …);
+             merge non-core libs (e.g. Adafruit libs shipped with arduino-esp32)
+          3. not found → warning only
+
+        Returns:
+            component_names  — ['user_libs_all'] if any lib found, else []
+            header_to_comp   — every resolved header → 'user_libs_all'
+        """
+        logger.info(f'[espidf] ext_headers detected: {ext_headers}')
+        logger.info(f'[espidf] arduino_libs: {arduino_libs}')
+        logger.info(f'[espidf] esp32_libs: {esp32_libs}')
+
+        comp_dir = user_libs_dir / 'user_libs_all'
+        comp_dir.mkdir(exist_ok=True)
+
+        cpp_files: list[str] = []
+        seen_names: set[str] = set()
+        header_to_comp: dict[str, str] = {}
+        found_any = False
+
+        headers_to_resolve: list[str] = list(ext_headers)
+        resolved_headers: set[str] = set()
+
+        while headers_to_resolve:
+            header = headers_to_resolve.pop(0)
+            if header in resolved_headers:
+                continue
+            resolved_headers.add(header)
+
+            src_root = (
+                self._find_library_for_header(header, arduino_libs)
+                if arduino_libs and arduino_libs.is_dir()
+                else None
+            )
+
+            if src_root is None and esp32_libs and esp32_libs.is_dir():
+                esp32_root = self._find_library_for_header(header, esp32_libs)
+                if esp32_root:
+                    lib_name = esp32_root.parent.name if esp32_root.name == 'src' else esp32_root.name
+                    if lib_name in self._CORE_ESP32_LIBS:
+                        logger.debug(f'[espidf] <{header}> is bundled core lib "{lib_name}", skipping')
+                    else:
+                        logger.info(f'[espidf] <{header}> found in esp32_libs as "{lib_name}", merging')
+                        src_root = esp32_root
+
+            if src_root:
+                lib_dir_name = src_root.parent.name if src_root.name == 'src' else src_root.name
+                logger.info(f'[espidf] Merging "{lib_dir_name}" into user_libs_all for <{header}>')
+                found_any = True
+                header_to_comp[header] = 'user_libs_all'
+
+                # Copy all source files flat into the merged component directory.
+                # First-writer wins for name conflicts (rare across Arduino libs).
+                for pattern in ('*.h', '*.cpp', '*.c', 'src/*.h', 'src/*.cpp', 'src/*.c'):
+                    glob_root = src_root.parent if pattern.startswith('src/') else src_root
+                    for f in glob_root.glob(pattern):
+                        if not f.is_file():
+                            continue
+                        if f.name not in seen_names:
+                            shutil.copy2(f, comp_dir / f.name)
+                            seen_names.add(f.name)
+                        if f.suffix in ('.cpp', '.c') and f.name not in cpp_files:
+                            cpp_files.append(f.name)
+
+                # Also handle libraries that use an src/ subdirectory layout.
+                src_sub = (src_root / 'src') if (src_root / 'src').is_dir() else None
+                if src_sub is None and (src_root.parent / 'src').is_dir():
+                    src_sub = src_root.parent / 'src'
+                if src_sub:
+                    for f in src_sub.glob('**/*'):
+                        if not f.is_file() or f.suffix not in ('.h', '.cpp', '.c'):
+                            continue
+                        if f.name not in seen_names:
+                            shutil.copy2(f, comp_dir / f.name)
+                            seen_names.add(f.name)
+                        if f.suffix in ('.cpp', '.c') and f.name not in cpp_files:
+                            cpp_files.append(f.name)
+
+                # Scan newly copied headers for transitive includes.
+                for lib_file in comp_dir.glob('*.h'):
+                    try:
+                        lib_content = lib_file.read_text(encoding='utf-8', errors='ignore')
+                        for th in self._detect_external_includes(lib_content):
+                            if th not in resolved_headers:
+                                headers_to_resolve.append(th)
+                    except OSError:
+                        pass
+            else:
+                logger.warning(f'[espidf] Library for <{header}> not found — build may fail')
+
+        if not found_any:
+            return [], {}
+
+        srcs_line = 'SRCS ' + ' '.join(f'"{f}"' for f in sorted(cpp_files)) if cpp_files else ''
+        cmake_content = (
+            '# Auto-generated by Velxio — all user libraries merged into one component.\n'
+            '# Single flat directory: every header sees every other header without\n'
+            '# cross-component REQUIRES propagation.\n'
+            'idf_component_register(\n'
+            f'    {srcs_line}\n'
+            '    INCLUDE_DIRS "."\n'
+            f'    REQUIRES {arduino_comp_name}\n'
+            ')\n'
+        )
+        (comp_dir / 'CMakeLists.txt').write_text(cmake_content, encoding='utf-8')
+        logger.info(
+            f'[espidf] user_libs_all: {len(cpp_files)} source files, '
+            f'{len(header_to_comp)} resolved headers'
+        )
+        return ['user_libs_all'], header_to_comp
 
     def _detect_external_includes(self, code: str) -> list[str]:
         """Return library header names that are likely from external libraries."""
@@ -666,89 +807,34 @@ class ESPIDFCompiler:
                     user_libs_dir = project_dir / 'user_libs'
                     user_libs_dir.mkdir(exist_ok=True)
 
-                    # Search order: esp32-bundled libraries first, then user-installed
-                    esp32_libs = Path(self.arduino_path) / 'libraries' if self.arduino_path else None
+                    esp32_libs   = Path(self.arduino_path) / 'libraries' if self.arduino_path else None
                     arduino_libs = self._find_arduino_libraries_dir()
-                    search_bases = [b for b in [esp32_libs, arduino_libs] if b and b.is_dir()]
 
-                    # Phase 1: BFS to discover all needed libraries including transitives
-                    headers_to_resolve: list[str] = list(ext_headers)
-                    resolved_headers: set[str] = set()
-                    header_to_comp: dict[str, str] = {}  # header → component name
+                    component_names, _ = self._resolve_library_components(
+                        ext_headers, arduino_libs, esp32_libs,
+                        arduino_comp_name, user_libs_dir,
+                    )
 
-                    while headers_to_resolve:
-                        header = headers_to_resolve.pop(0)
-                        if header in resolved_headers:
-                            continue
-                        resolved_headers.add(header)
-
-                        src_root = None
-                        for search_base in search_bases:
-                            src_root = self._find_library_for_header(header, search_base)
-                            if src_root:
-                                break
-
-                        if src_root:
-                            comp_name = self._create_idf_component(
-                                header, src_root, user_libs_dir, arduino_comp_name
-                            )
-                            if comp_name not in component_names:
-                                component_names.append(comp_name)
-                            header_to_comp[header] = comp_name
-
-                            # Scan copied library files for further external includes
-                            comp_dir = user_libs_dir / comp_name
-                            for lib_file in comp_dir.glob('*.h'):
-                                try:
-                                    lib_content = lib_file.read_text(encoding='utf-8', errors='ignore')
-                                    for th in self._detect_external_includes(lib_content):
-                                        if th not in resolved_headers:
-                                            headers_to_resolve.append(th)
-                                except OSError:
-                                    pass
-                        else:
-                            logger.warning(f'[espidf] Library for <{header}> not found — build may fail')
-
-                    # Phase 2: patch inter-component REQUIRES so each component can
-                    # see the headers of libraries it transitively includes
-                    for comp_name in component_names:
-                        comp_dir = user_libs_dir / comp_name
-                        extra_reqs: list[str] = []
-                        for lib_file in comp_dir.glob('*.h'):
-                            try:
-                                content = lib_file.read_text(encoding='utf-8', errors='ignore')
-                                for dep_h in self._detect_external_includes(content):
-                                    dep_comp = header_to_comp.get(dep_h)
-                                    if dep_comp and dep_comp != comp_name and dep_comp not in extra_reqs:
-                                        extra_reqs.append(dep_comp)
-                            except OSError:
-                                pass
-                        if extra_reqs:
-                            cmake_path = comp_dir / 'CMakeLists.txt'
-                            cmake_text = cmake_path.read_text(encoding='utf-8')
-                            cmake_text = cmake_text.replace(
-                                f'REQUIRES {arduino_comp_name}',
-                                f'REQUIRES {arduino_comp_name} {" ".join(extra_reqs)}',
-                            )
-                            cmake_path.write_text(cmake_text, encoding='utf-8')
-                            logger.info(f'[espidf] {comp_name} REQUIRES += {extra_reqs}')
-
-                # Patch main/CMakeLists.txt to REQUIRES the library components.
-                # The template uses CMake variable syntax: REQUIRES ${_arduino_comp_name}
-                if component_names:
+                # Patch main/CMakeLists.txt — REQUIRES and INCLUDE_DIRS for user_libs_all.
+                # The single merged component means one entry covers all external headers.
+                if component_names:  # always ['user_libs_all'] when any lib was found
                     cmake_path = project_dir / 'main' / 'CMakeLists.txt'
                     cmake_text = cmake_path.read_text(encoding='utf-8')
-                    main_reqs = ' '.join(component_names)
-                    # Replace both possible forms: CMake variable (template) or literal (pre-patched)
+
                     for old_req in [r'REQUIRES ${_arduino_comp_name}', f'REQUIRES {arduino_comp_name}']:
                         if old_req in cmake_text:
                             cmake_text = cmake_text.replace(
-                                old_req,
-                                f'{old_req} {main_reqs}',
+                                old_req, f'{old_req} user_libs_all'
                             )
                             break
+
+                    cmake_text = cmake_text.replace(
+                        'INCLUDE_DIRS "."',
+                        'INCLUDE_DIRS "." "../user_libs/user_libs_all"',
+                    )
+
                     cmake_path.write_text(cmake_text, encoding='utf-8')
-                    logger.info(f'[espidf] Added {len(component_names)} library component(s) to REQUIRES')
+                    logger.info('[espidf] Patched main CMakeLists: REQUIRES += user_libs_all, INCLUDE_DIRS += user_libs_all')
             else:
                 # Pure ESP-IDF mode: translate sketch
                 translated = self._translate_sketch_to_espidf(main_content)
