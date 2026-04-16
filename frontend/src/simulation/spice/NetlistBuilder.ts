@@ -219,5 +219,48 @@ function detectFloatingNets(netNames: Map<string, string>, cards: string[]): Set
   return floating;
 }
 
+/**
+ * Build a wireId → netName map using the same Union-Find logic as buildNetlist.
+ * Lightweight (no SPICE call) — suitable for the overlay to look up voltages.
+ */
+export function buildWireNetMap(
+  input: Pick<BuildNetlistInput, 'components' | 'wires' | 'boards'>,
+): Map<string, string> {
+  const { wires, boards, components } = input;
+  const uf = new UnionFind();
+  const pin = (cId: string, pName: string) => `${cId}:${pName}`;
+
+  for (const w of wires) {
+    const a = pin(w.start.componentId, w.start.pinName);
+    const b = pin(w.end.componentId, w.end.pinName);
+    uf.add(a);
+    uf.add(b);
+    uf.union(a, b);
+  }
+
+  for (const board of boards) {
+    for (const pName of board.groundPinNames ?? []) uf.setCanonical(pin(board.id, pName), '0');
+    for (const pName of board.vccPinNames ?? []) uf.setCanonical(pin(board.id, pName), 'vcc_rail');
+  }
+  for (const comp of components) {
+    if (comp.metadataId.startsWith('instr-')) continue;
+    for (const pName of pinsReferencedByWires(comp.id, wires)) {
+      if (GROUND_PIN_RE.test(pName)) uf.setCanonical(pin(comp.id, pName), '0');
+      else if (VCC_PIN_RE.test(pName)) uf.setCanonical(pin(comp.id, pName), 'vcc_rail');
+    }
+  }
+
+  const netNames = assignDeterministicNetNames(uf);
+  const result = new Map<string, string>();
+  for (const w of wires) {
+    const key = pin(w.start.componentId, w.start.pinName);
+    if (uf.has(key)) {
+      const netName = netNames.get(uf.find(key));
+      if (netName) result.set(w.id, netName);
+    }
+  }
+  return result;
+}
+
 /** Re-export types for callers. */
 export type { BuildNetlistInput, ComponentForSpice, BoardForSpice, WireForSpice } from './types';

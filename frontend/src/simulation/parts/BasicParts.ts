@@ -132,7 +132,7 @@ PartSimulationRegistry.register('dip-switch-8', {
  * LED stays off regardless of the anode state.
  */
 PartSimulationRegistry.register('led', {
-    attachEvents: (element, simulator, getArduinoPinHelper) => {
+    attachEvents: (element, simulator, getArduinoPinHelper, componentId) => {
         const pinManager = (simulator as any).pinManager;
         if (!pinManager) return () => {};
 
@@ -141,23 +141,36 @@ PartSimulationRegistry.register('led', {
         let anodeHigh  = false;
         let cathodeLow = false;
 
-        const update = () => { el.value = anodeHigh && cathodeLow; };
+        const update = () => {
+            // When electrical mode is active, use real branch current for
+            // analog brightness (0..1) instead of boolean on/off. The SPICE
+            // mapper emits a diode card `D_<componentId>` whose branch current
+            // is stored in `branchCurrents`.
+            try {
+                const { useElectricalStore } = require('../../store/useElectricalStore');
+                const { mode, branchCurrents } = useElectricalStore.getState();
+                if (mode !== 'off') {
+                    const iKey = `d_${componentId}`;
+                    const current = Math.abs(branchCurrents[iKey] ?? 0);
+                    el.value = current > 1e-6;
+                    el.brightness = Math.min(1, current / 0.020); // 20 mA = full brightness
+                    return;
+                }
+            } catch { /* store not available — fall through to digital mode */ }
+            el.value = anodeHigh && cathodeLow;
+        };
 
         // Cathode pin: -1 means wired to GND (always LOW), >=0 means GPIO
         const cathodePin = getArduinoPinHelper('C');
         if (cathodePin === -1) {
-            // Wired to GND — always LOW
             cathodeLow = true;
         } else if (cathodePin !== null && cathodePin >= 0) {
-            // Wired to a GPIO — track its state
             unsubs.push(pinManager.onPinChange(cathodePin, (_: number, state: boolean) => {
-                cathodeLow = !state; // cathode needs to be LOW for current to flow
+                cathodeLow = !state;
                 update();
             }));
         }
-        // cathodePin === null → not wired → cathodeLow stays false → LED off
 
-        // Anode pin
         const anodePin = getArduinoPinHelper('A');
         if (anodePin !== null && anodePin >= 0) {
             unsubs.push(pinManager.onPinChange(anodePin, (_: number, state: boolean) => {
@@ -165,6 +178,18 @@ PartSimulationRegistry.register('led', {
                 update();
             }));
         }
+
+        // Also subscribe to electrical store changes to update brightness
+        // whenever the SPICE solver delivers a new result.
+        try {
+            const { useElectricalStore } = require('../../store/useElectricalStore');
+            const unsubElectrical = useElectricalStore.subscribe(
+                (state: { branchCurrents: Record<string, number> }, prev: { branchCurrents: Record<string, number> }) => {
+                    if (state.branchCurrents !== prev.branchCurrents) update();
+                },
+            );
+            unsubs.push(unsubElectrical);
+        } catch { /* store not available */ }
 
         return () => { unsubs.forEach(u => u()); };
     },

@@ -58,7 +58,7 @@ export const useElectricalStore = create<ElectricalState>((set, get) => {
   });
 
   return {
-    mode: 'off',
+    mode: ELECTRICAL_SIM_ENABLED ? 'spice' : 'off',
     nodeVoltages: {},
     branchCurrents: {},
     converged: true,

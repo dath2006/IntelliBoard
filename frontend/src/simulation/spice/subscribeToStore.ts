@@ -14,21 +14,52 @@ import type { PinSourceState } from './types';
 import type { BoardKind } from '../../types/board';
 
 // Which Arduino-style pin name maps to which ADC channel, per board.
-// (Keep narrow for Phase 8.3 — extend as boards are added.)
+// Used to inject SPICE-solved voltages back into the MCU's ADC peripheral.
+function adcRange(prefix: string, start: number, count: number) {
+  return Array.from({ length: count }, (_, i) => ({
+    pinName: `${prefix}${start + i}`,
+    channel: i,
+  }));
+}
+
+const ADC_6CH = adcRange('A', 0, 6);  // A0..A5
+const ADC_8CH = adcRange('A', 0, 8);  // A0..A7
+const ADC_16CH = adcRange('A', 0, 16); // A0..A15
+
 const ADC_PIN_MAP: Partial<Record<BoardKind, Array<{ pinName: string; channel: number }>>> = {
-  'arduino-uno': [
-    { pinName: 'A0', channel: 0 },
-    { pinName: 'A1', channel: 1 },
-    { pinName: 'A2', channel: 2 },
-    { pinName: 'A3', channel: 3 },
-    { pinName: 'A4', channel: 4 },
-    { pinName: 'A5', channel: 5 },
+  // AVR boards
+  'arduino-uno':  ADC_6CH,
+  'arduino-nano': ADC_8CH,
+  'arduino-mega': ADC_16CH,
+  'attiny85':     adcRange('A', 0, 4), // A0..A3 (PB2-PB5)
+
+  // RP2040 boards — 4 ADC channels (GP26-GP29)
+  'raspberry-pi-pico': [
+    { pinName: 'GP26', channel: 0 }, { pinName: 'GP27', channel: 1 },
+    { pinName: 'GP28', channel: 2 }, { pinName: 'GP29', channel: 3 },
   ],
-  'arduino-nano': [
-    { pinName: 'A0', channel: 0 }, { pinName: 'A1', channel: 1 }, { pinName: 'A2', channel: 2 },
-    { pinName: 'A3', channel: 3 }, { pinName: 'A4', channel: 4 }, { pinName: 'A5', channel: 5 },
-    { pinName: 'A6', channel: 6 }, { pinName: 'A7', channel: 7 },
+  'pi-pico-w': [
+    { pinName: 'GP26', channel: 0 }, { pinName: 'GP27', channel: 1 },
+    { pinName: 'GP28', channel: 2 }, { pinName: 'GP29', channel: 3 },
   ],
+
+  // ESP32 variants — most GPIOs can be ADC but the common ones are:
+  // ADC1: GPIO 32-39 (channels 0-7), ADC2: GPIO 0,2,4,12-15,25-27
+  // Simplified to the 8 most-used pins (GPIO 32-39 = ADC1)
+  'esp32':              adcRange('GPIO', 32, 8),
+  'esp32-devkit-c-v4':  adcRange('GPIO', 32, 8),
+  'esp32-cam':          adcRange('GPIO', 32, 8),
+  'wemos-lolin32-lite': adcRange('GPIO', 32, 8),
+
+  // ESP32-S3 — ADC1 channels on GPIO 1-10, ADC2 on GPIO 11-20
+  'esp32-s3':           adcRange('GPIO', 1, 10),
+  'xiao-esp32-s3':      adcRange('GPIO', 1, 10),
+  'arduino-nano-esp32': adcRange('A', 0, 8),
+
+  // ESP32-C3 — ADC1 channels on GPIO 0-4, ADC2 on GPIO 5
+  'esp32-c3':                      adcRange('GPIO', 0, 6),
+  'xiao-esp32-c3':                 adcRange('GPIO', 0, 6),
+  'aitewinrobot-esp32c3-supermini': adcRange('GPIO', 0, 6),
 };
 
 export function wireElectricalSolver(): () => void {
