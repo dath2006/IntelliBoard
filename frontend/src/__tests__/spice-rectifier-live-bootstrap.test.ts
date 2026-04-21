@@ -22,17 +22,39 @@ function rectifierSnapshot() {
       { id: 'rl', metadataId: 'resistor', properties: { value: '1000' } },
     ],
     wires: [
-      { id: 'w1', start: { componentId: 'sg1', pinName: 'SIG' }, end: { componentId: 'd1', pinName: 'A' } },
-      { id: 'w2', start: { componentId: 'd1', pinName: 'C' }, end: { componentId: 'rl', pinName: '1' } },
-      { id: 'w3', start: { componentId: 'rl', pinName: '2' }, end: { componentId: 'arduino-uno', pinName: 'GND' } },
-      { id: 'w4', start: { componentId: 'sg1', pinName: 'GND' }, end: { componentId: 'arduino-uno', pinName: 'GND' } },
-      { id: 'w5', start: { componentId: 'd1', pinName: 'C' }, end: { componentId: 'arduino-uno', pinName: 'A0' } },
+      {
+        id: 'w1',
+        start: { componentId: 'sg1', pinName: 'SIG' },
+        end: { componentId: 'd1', pinName: 'A' },
+      },
+      {
+        id: 'w2',
+        start: { componentId: 'd1', pinName: 'C' },
+        end: { componentId: 'rl', pinName: '1' },
+      },
+      {
+        id: 'w3',
+        start: { componentId: 'rl', pinName: '2' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
+      {
+        id: 'w4',
+        start: { componentId: 'sg1', pinName: 'GND' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
+      {
+        id: 'w5',
+        start: { componentId: 'd1', pinName: 'C' },
+        end: { componentId: 'arduino-uno', pinName: 'A0' },
+      },
     ],
-    boards: [{
-      id: 'arduino-uno',
-      boardKind: 'arduino-uno' as const,
-      pinStates: {},
-    }],
+    boards: [
+      {
+        id: 'arduino-uno',
+        boardKind: 'arduino-uno' as const,
+        pinStates: {},
+      },
+    ],
   };
 }
 
@@ -57,7 +79,11 @@ describe('Half-Wave Rectifier — wireElectricalSolver live bootstrap', () => {
     while (rafCallbacks.length > 0) {
       const cbs = rafCallbacks.splice(0, rafCallbacks.length);
       for (const cb of cbs) {
-        try { cb(); } catch (e) { console.warn('RAF cb threw', e); }
+        try {
+          cb();
+        } catch (e) {
+          console.warn('RAF cb threw', e);
+        }
       }
       break;
     }

@@ -1,5 +1,5 @@
 /**
- * <wokwi-capacitor-electrolytic> — polarized aluminum-can capacitor.
+ * <velxio-capacitor-electrolytic> — polarized aluminum-can capacitor.
  *
  * Vertical cylinder seen from the side, with a stripe down one side
  * marking the negative terminal (real-world convention). Two leads come
@@ -50,7 +50,7 @@ export class CapacitorElectrolyticElement extends HTMLElement {
   // the canvas scale them — so we just keep them in viewBox units * a
   // small factor for visual alignment with the leads).
   readonly pinInfo: ElementPin[] = [
-    { name: '+', x: 8.6,  y: 53, signals: [] },
+    { name: '+', x: 8.6, y: 53, signals: [] },
     { name: '−', x: 25.5, y: 53, signals: [] },
   ];
 
@@ -68,6 +68,6 @@ export class CapacitorElectrolyticElement extends HTMLElement {
   }
 }
 
-if (!customElements.get('wokwi-capacitor-electrolytic')) {
-  customElements.define('wokwi-capacitor-electrolytic', CapacitorElectrolyticElement);
+if (!customElements.get('velxio-capacitor-electrolytic')) {
+  customElements.define('velxio-capacitor-electrolytic', CapacitorElectrolyticElement);
 }

@@ -24,65 +24,65 @@ import { INLINE_SVGS } from './InlineComponentSVGs';
 // A CompDef either points to a static file under /component-svgs/ (svg set) or
 // to an inline React component rendered via an inline <svg> (inline set).
 interface CompDef {
-  svg: string;   // filename under /component-svgs/ (empty string for inline)
+  svg: string; // filename under /component-svgs/ (empty string for inline)
   inline?: React.FC<{ w: number; h: number }>;
-  w: number;     // natural width in canvas-space pixels
-  h: number;     // natural height in canvas-space pixels
+  w: number; // natural width in canvas-space pixels
+  h: number; // natural height in canvas-space pixels
 }
 
 const COMP_DEFS: Record<string, CompDef> = {
   // Boards
-  'wokwi-arduino-uno':             { svg: 'arduino-uno.svg',             w: 274, h: 202 },
-  'wokwi-arduino-nano':            { svg: 'arduino-nano.svg',            w: 170, h:  67 },
-  'wokwi-arduino-mega':            { svg: 'arduino-mega.svg',            w: 388, h: 192 },
-  'wokwi-esp32-devkit-v1':         { svg: 'esp32-devkit-v1.svg',         w: 107, h: 204 },
+  'wokwi-arduino-uno': { svg: 'arduino-uno.svg', w: 274, h: 202 },
+  'wokwi-arduino-nano': { svg: 'arduino-nano.svg', w: 170, h: 67 },
+  'wokwi-arduino-mega': { svg: 'arduino-mega.svg', w: 388, h: 192 },
+  'wokwi-esp32-devkit-v1': { svg: 'esp32-devkit-v1.svg', w: 107, h: 204 },
   // Passive / output
-  'wokwi-led':                     { svg: 'led.svg',                     w:  40, h:  50 },
-  'wokwi-rgb-led':                 { svg: 'rgb-led.svg',                 w:  42, h:  73 },
-  'wokwi-resistor':                { svg: 'resistor.svg',                w:  59, h:  11 },
-  'wokwi-neopixel':                { svg: 'neopixel.svg',                w:  21, h:  19 },
-  'wokwi-neopixel-matrix':         { svg: 'neopixel-matrix.svg',         w:  97, h:  87 },
-  'wokwi-led-ring':                { svg: 'led-ring.svg',                w: 118, h: 129 },
-  'wokwi-buzzer':                  { svg: 'buzzer.svg',                  w:  30, h:  30 },
+  'wokwi-led': { svg: 'led.svg', w: 40, h: 50 },
+  'wokwi-rgb-led': { svg: 'rgb-led.svg', w: 42, h: 73 },
+  'wokwi-resistor': { svg: 'resistor.svg', w: 59, h: 11 },
+  'wokwi-neopixel': { svg: 'neopixel.svg', w: 21, h: 19 },
+  'wokwi-neopixel-matrix': { svg: 'neopixel-matrix.svg', w: 97, h: 87 },
+  'wokwi-led-ring': { svg: 'led-ring.svg', w: 118, h: 129 },
+  'wokwi-buzzer': { svg: 'buzzer.svg', w: 30, h: 30 },
   // Input
-  'wokwi-pushbutton':              { svg: 'pushbutton.svg',              w:  67, h:  45 },
-  'wokwi-pushbutton-6mm':          { svg: 'pushbutton-6mm.svg',          w:  28, h:  23 },
-  'wokwi-potentiometer':           { svg: 'potentiometer.svg',           w:  76, h:  76 },
-  'wokwi-analog-joystick':         { svg: 'analog-joystick.svg',         w: 103, h: 120 },
+  'wokwi-pushbutton': { svg: 'pushbutton.svg', w: 67, h: 45 },
+  'wokwi-pushbutton-6mm': { svg: 'pushbutton-6mm.svg', w: 28, h: 23 },
+  'wokwi-potentiometer': { svg: 'potentiometer.svg', w: 76, h: 76 },
+  'wokwi-analog-joystick': { svg: 'analog-joystick.svg', w: 103, h: 120 },
   // Sensors
-  'wokwi-dht22':                   { svg: 'dht22.svg',                   w:  57, h: 117 },
-  'wokwi-hc-sr04':                 { svg: 'hc-sr04.svg',                 w: 170, h:  94 },
-  'wokwi-mpu6050':                 { svg: 'mpu6050.svg',                 w:  82, h:  61 },
-  'wokwi-ntc-temperature-sensor':  { svg: 'ntc-temperature-sensor.svg',  w: 136, h:  72 },
-  'wokwi-photoresistor-sensor':    { svg: 'photoresistor-sensor.svg',    w: 174, h:  62 },
-  'wokwi-pir-motion-sensor':       { svg: 'pir-motion-sensor.svg',       w:  91, h:  92 },
-  'wokwi-ds1307':                  { svg: 'ds1307.svg',                  w:  98, h:  84 },
-  'wokwi-bmp280':                  { svg: 'mpu6050.svg',                 w:  82, h:  61 },
+  'wokwi-dht22': { svg: 'dht22.svg', w: 57, h: 117 },
+  'wokwi-hc-sr04': { svg: 'hc-sr04.svg', w: 170, h: 94 },
+  'wokwi-mpu6050': { svg: 'mpu6050.svg', w: 82, h: 61 },
+  'wokwi-ntc-temperature-sensor': { svg: 'ntc-temperature-sensor.svg', w: 136, h: 72 },
+  'wokwi-photoresistor-sensor': { svg: 'photoresistor-sensor.svg', w: 174, h: 62 },
+  'wokwi-pir-motion-sensor': { svg: 'pir-motion-sensor.svg', w: 91, h: 92 },
+  'wokwi-ds1307': { svg: 'ds1307.svg', w: 98, h: 84 },
+  'velxio-bmp280': { svg: 'mpu6050.svg', w: 82, h: 61 },
   // Displays
-  'wokwi-7segment':                { svg: '7segment.svg',                w:  47, h:  83 },
-  'wokwi-ili9341':                 { svg: 'ili9341.svg',                 w: 176, h: 293 },
-  'wokwi-lcd2004':                 { svg: 'lcd2004.svg',                 w: 356, h: 180 },
+  'wokwi-7segment': { svg: '7segment.svg', w: 47, h: 83 },
+  'wokwi-ili9341': { svg: 'ili9341.svg', w: 176, h: 293 },
+  'wokwi-lcd2004': { svg: 'lcd2004.svg', w: 356, h: 180 },
   // Motors
-  'wokwi-servo':                   { svg: 'servo.svg',                   w: 170, h: 120 },
+  'wokwi-servo': { svg: 'servo.svg', w: 170, h: 120 },
 };
 
 // Board SVG definitions — used when the board is implicit (pico / esp32 pattern)
 const BOARD_DEFS: Record<string, CompDef> = {
-  'arduino-uno':       { svg: 'arduino-uno.svg',       w: 274, h: 202 },
-  'arduino-nano':      { svg: 'arduino-nano.svg',      w: 170, h:  67 },
-  'arduino-mega':      { svg: 'arduino-mega.svg',      w: 388, h: 192 },
-  'raspberry-pi-pico': { svg: 'raspberry-pi-pico.svg', w:  79, h: 200 },
-  'raspberry-pi-3':    { svg: 'raspberry-pi-3.svg',    w: 200, h: 135 },
-  'esp32':             { svg: 'esp32-devkit-v1.svg',   w: 107, h: 204 },
-  'esp32-s3':          { svg: 'esp32-devkit-v1.svg',   w: 107, h: 204 },
-  'esp32-c3':          { svg: 'esp32-devkit-v1.svg',   w: 107, h: 204 },
+  'arduino-uno': { svg: 'arduino-uno.svg', w: 274, h: 202 },
+  'arduino-nano': { svg: 'arduino-nano.svg', w: 170, h: 67 },
+  'arduino-mega': { svg: 'arduino-mega.svg', w: 388, h: 192 },
+  'raspberry-pi-pico': { svg: 'raspberry-pi-pico.svg', w: 79, h: 200 },
+  'raspberry-pi-3': { svg: 'raspberry-pi-3.svg', w: 200, h: 135 },
+  esp32: { svg: 'esp32-devkit-v1.svg', w: 107, h: 204 },
+  'esp32-s3': { svg: 'esp32-devkit-v1.svg', w: 107, h: 204 },
+  'esp32-c3': { svg: 'esp32-devkit-v1.svg', w: 107, h: 204 },
 };
 
 // LED color → SVG filename
 const LED_COLOR_SVG: Record<string, string> = {
-  red:    'led.svg',
-  green:  'led-green.svg',
-  blue:   'led-blue.svg',
+  red: 'led.svg',
+  green: 'led-green.svg',
+  blue: 'led-blue.svg',
   yellow: 'led-yellow.svg',
 };
 
@@ -100,19 +100,33 @@ function getCompDef(type: string, props: Record<string, any>): CompDef {
 
 const unknownGlyph: React.FC<{ w: number; h: number }> = ({ w, h }) => (
   <svg width={w} height={h} viewBox="0 0 60 40" xmlns="http://www.w3.org/2000/svg">
-    <rect x="2" y="2" width="56" height="36" rx="3" fill="#3b3b3b" stroke="#888" strokeWidth="1" strokeDasharray="3,2"/>
-    <text x="30" y="24" textAnchor="middle" fontSize="9" fill="#ccc">?</text>
+    <rect
+      x="2"
+      y="2"
+      width="56"
+      height="36"
+      rx="3"
+      fill="#3b3b3b"
+      stroke="#888"
+      strokeWidth="1"
+      strokeDasharray="3,2"
+    />
+    <text x="30" y="24" textAnchor="middle" fontSize="9" fill="#ccc">
+      ?
+    </text>
   </svg>
 );
 
 // Whether a component type is the main board (already registered via boardType)
 function isBoardType(type: string): boolean {
-  return type.includes('arduino-uno') ||
-         type.includes('arduino-nano') ||
-         type.includes('arduino-mega') ||
-         type.includes('esp32-devkit') ||
-         type.includes('raspberry-pi-pico') ||
-         type.includes('nano-rp2040');
+  return (
+    type.includes('arduino-uno') ||
+    type.includes('arduino-nano') ||
+    type.includes('arduino-mega') ||
+    type.includes('esp32-devkit') ||
+    type.includes('raspberry-pi-pico') ||
+    type.includes('nano-rp2040')
+  );
 }
 
 // ── Main component ───────────────────────────────────────────────────────────
@@ -148,15 +162,19 @@ function resolveOverlaps(items: LayoutItem[], gap = 8): void {
       for (let j = i + 1; j < items.length; j++) {
         const a = items[i];
         const b = items[j];
-        const ax1 = a.x - gap, ax2 = a.x + a.def.w + gap;
-        const ay1 = a.y - gap, ay2 = a.y + a.def.h + gap;
-        const bx1 = b.x,        bx2 = b.x + b.def.w;
-        const by1 = b.y,        by2 = b.y + b.def.h;
+        const ax1 = a.x - gap,
+          ax2 = a.x + a.def.w + gap;
+        const ay1 = a.y - gap,
+          ay2 = a.y + a.def.h + gap;
+        const bx1 = b.x,
+          bx2 = b.x + b.def.w;
+        const by1 = b.y,
+          by2 = b.y + b.def.h;
         const overlapX = Math.min(ax2, bx2) - Math.max(ax1, bx1);
         const overlapY = Math.min(ay2, by2) - Math.max(ay1, by1);
         if (overlapX <= 0 || overlapY <= 0) continue;
         // Decide which one to move. Fixed (board) never moves; otherwise move `b`.
-        const target = a.fixed ? b : (b.fixed ? a : b);
+        const target = a.fixed ? b : b.fixed ? a : b;
         const anchor = target === a ? b : a;
         if (target.fixed) continue; // both fixed — nothing we can do
         // Shift along the axis of least displacement
@@ -178,7 +196,7 @@ function resolveOverlaps(items: LayoutItem[], gap = 8): void {
 
 export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
   example,
-  width  = 300,
+  width = 300,
   height = 180,
   background = '#1a1a1a',
   className,
@@ -198,20 +216,20 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
     // and board-def lookup entirely.
     const isAnalogOnly = (example as any).boardFilter === 'analog';
     const boardKind = example.boardType ?? (isAnalogOnly ? null : 'arduino-uno');
-    const boardDef  = boardKind ? BOARD_DEFS[boardKind] : undefined;
+    const boardDef = boardKind ? BOARD_DEFS[boardKind] : undefined;
 
     // Check if the board is explicitly listed in components[]
-    const boardInComponents = example.components.some(c => isBoardType(c.type));
+    const boardInComponents = example.components.some((c) => isBoardType(c.type));
 
     if (boardDef && !boardInComponents && !isAnalogOnly) {
       // Board is implicit (pico, esp32, nano examples) — inject at default position
       // Position it to the left of the other components
-      const minCompX = example.components.length > 0
-        ? Math.min(...example.components.map(c => c.x))
-        : 400;
-      const avgCompY = example.components.length > 0
-        ? example.components.reduce((s, c) => s + c.y, 0) / example.components.length
-        : 150;
+      const minCompX =
+        example.components.length > 0 ? Math.min(...example.components.map((c) => c.x)) : 400;
+      const avgCompY =
+        example.components.length > 0
+          ? example.components.reduce((s, c) => s + c.y, 0) / example.components.length
+          : 150;
       const boardX = Math.max(40, minCompX - boardDef.w - 60);
       const boardY = Math.max(40, avgCompY - boardDef.h / 2);
       items.push({ id: boardKind + '-board', x: boardX, y: boardY, def: boardDef, fixed: true });
@@ -220,9 +238,8 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
     // Add all components from the example
     example.components.forEach((c) => {
       // For board components that ARE in components[], use the board SVG def
-      const def = isBoardType(c.type) && boardDef
-        ? boardDef
-        : getCompDef(c.type, c.properties ?? {});
+      const def =
+        isBoardType(c.type) && boardDef ? boardDef : getCompDef(c.type, c.properties ?? {});
       const fixed = isBoardType(c.type);
       items.push({ id: c.id, x: c.x, y: c.y, def, fixed });
     });
@@ -238,13 +255,27 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
 
   if (items.length === 0) {
     return (
-      <div style={{ width, height, background, display: 'flex', alignItems: 'center', justifyContent: 'center', ...style }} className={className}>
+      <div
+        style={{
+          width,
+          height,
+          background,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          ...style,
+        }}
+        className={className}
+      >
         <span style={{ color: '#555', fontSize: 12 }}>No components</span>
       </div>
     );
   }
 
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
   items.forEach(({ x, y, def }) => {
     minX = Math.min(minX, x);
     minY = Math.min(minY, y);
@@ -255,17 +286,14 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
   const boxW = maxX - minX + PAD * 2;
   const boxH = maxY - minY + PAD * 2;
   const scale = Math.min(width / boxW, height / boxH, 1.5); // cap at 1.5× to avoid huge boards
-  const dx    = (width  - boxW * scale) / 2 - (minX - PAD) * scale;
-  const dy    = (height - boxH * scale) / 2 - (minY - PAD) * scale;
+  const dx = (width - boxW * scale) / 2 - (minX - PAD) * scale;
+  const dy = (height - boxH * scale) / 2 - (minY - PAD) * scale;
 
   // Centre of each item in rendered space (for wire routing)
   const centreMap: Record<string, [number, number]> = {};
-  const boardKindForCentre = (!example.boards && example.boardType) ? example.boardType : null;
+  const boardKindForCentre = !example.boards && example.boardType ? example.boardType : null;
   items.forEach(({ id, x, y, def }) => {
-    const centre: [number, number] = [
-      (x + def.w / 2) * scale + dx,
-      (y + def.h / 2) * scale + dy,
-    ];
+    const centre: [number, number] = [(x + def.w / 2) * scale + dx, (y + def.h / 2) * scale + dy];
     centreMap[id] = centre;
     // Also register implicit boards under their plain boardKind so that wires
     // using componentId: 'esp32' / 'raspberry-pi-pico' etc. resolve correctly.
@@ -295,9 +323,9 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
         const ph = def.h * scale;
         const wrapperStyle: React.CSSProperties = {
           position: 'absolute',
-          left:   px,
-          top:    py,
-          width:  pw,
+          left: px,
+          top: py,
+          width: pw,
           height: ph,
           imageRendering: 'auto',
           filter: 'drop-shadow(0 1px 2px rgba(0,0,0,0.5))',
@@ -311,16 +339,8 @@ export const CircuitPreview: React.FC<CircuitPreviewProps> = ({
           );
         }
         if (!def.svg) return null;
-        return (
-          <img
-            key={id}
-            src={`/component-svgs/${def.svg}`}
-            alt=""
-            style={wrapperStyle}
-          />
-        );
+        return <img key={id} src={`/component-svgs/${def.svg}`} alt="" style={wrapperStyle} />;
       })}
-
     </div>
   );
 };

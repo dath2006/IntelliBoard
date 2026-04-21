@@ -18,11 +18,11 @@ import { PartSimulationRegistry } from '../simulation/parts';
 import { isBoardComponent, boardPinToNumber } from '../utils/boardPinMapping';
 
 // Side-effect imports: register every web component we'll create at runtime.
-// `@wokwi/elements` covers the upstream catalog; `../wokwi-custom` adds the
-// velxio-local elements (e.g. <wokwi-capacitor>, <wokwi-inductor>) that we
-// can't push back to the upstream wokwi-elements repo.
+// `@wokwi/elements` covers the upstream catalog; `../velxio-elements` adds
+// the velxio-local elements (e.g. <velxio-capacitor-electrolytic>,
+// <velxio-instr-voltmeter>) that don't exist upstream.
 import '@wokwi/elements';
-import '../wokwi-custom';
+import '../velxio-elements';
 
 interface DynamicComponentProps {
   id: string;
@@ -69,10 +69,8 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
   // Track wires connected to this component so attachEvents re-runs when
   // wires are added or removed (e.g. disconnecting an LED cathode from GND).
   const wireFingerprint = useSimulatorStore((s) => {
-    const myWires = s.wires.filter(
-      w => w.start.componentId === id || w.end.componentId === id
-    );
-    return myWires.map(w => w.id).join(',');
+    const myWires = s.wires.filter((w) => w.start.componentId === id || w.end.componentId === id);
+    return myWires.map((w) => w.id).join(',');
   });
 
   // Check if component is interactive (has simulation logic with attachEvents)
@@ -144,7 +142,7 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
         onMouseDown(e);
       }
     },
-    [onMouseDown]
+    [onMouseDown],
   );
 
   const handleDoubleClick = useCallback(
@@ -154,7 +152,7 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
         onDoubleClick(e);
       }
     },
-    [onDoubleClick]
+    [onDoubleClick],
   );
 
   /**
@@ -226,14 +224,14 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
         // Tracing "through" means: if the caller arrived on pinA, continue
         // from pinB (and vice-versa).
         const PASSIVE_PIN_PAIRS: Record<string, [string, string]> = {
-          'resistor':               ['1', '2'],
-          'resistor-us':            ['1', '2'],
-          'capacitor':              ['1', '2'],
+          resistor: ['1', '2'],
+          'resistor-us': ['1', '2'],
+          capacitor: ['1', '2'],
           'capacitor-electrolytic': ['+', '−'],
-          'inductor':               ['1', '2'],
-          'analog-resistor':        ['A', 'B'],
-          'analog-capacitor':       ['A', 'B'],
-          'analog-inductor':        ['A', 'B'],
+          inductor: ['1', '2'],
+          'analog-resistor': ['A', 'B'],
+          'analog-capacitor': ['A', 'B'],
+          'analog-inductor': ['A', 'B'],
           // NTC and photoresistor breakouts are 3-pin active modules (VCC/GND
           // + analog output); not traceable as 2-terminal passives. Their
           // analog output is already an ADC-readable pin on its own.
@@ -243,20 +241,33 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
         // same way as their canonical sibling above. The list mirrors the
         // PASSIVE_PRESETS map in spice/componentToSpice.ts.
         const PRESET_TO_BASE: Record<string, string> = {
-          'resistor-220': 'resistor', 'resistor-330': 'resistor', 'resistor-470': 'resistor',
-          'resistor-1k':  'resistor', 'resistor-2k2': 'resistor', 'resistor-4k7': 'resistor',
-          'resistor-10k': 'resistor', 'resistor-22k': 'resistor', 'resistor-47k': 'resistor',
-          'resistor-100k': 'resistor', 'resistor-1m': 'resistor',
-          'cap-10p': 'capacitor', 'cap-22p': 'capacitor', 'cap-100p': 'capacitor',
-          'cap-1n':  'capacitor', 'cap-10n': 'capacitor', 'cap-100n': 'capacitor',
-          'cap-1u':  'capacitor',
-          'cap-elec-1u':    'capacitor-electrolytic',
-          'cap-elec-10u':   'capacitor-electrolytic',
-          'cap-elec-47u':   'capacitor-electrolytic',
-          'cap-elec-100u':  'capacitor-electrolytic',
-          'cap-elec-470u':  'capacitor-electrolytic',
+          'resistor-220': 'resistor',
+          'resistor-330': 'resistor',
+          'resistor-470': 'resistor',
+          'resistor-1k': 'resistor',
+          'resistor-2k2': 'resistor',
+          'resistor-4k7': 'resistor',
+          'resistor-10k': 'resistor',
+          'resistor-22k': 'resistor',
+          'resistor-47k': 'resistor',
+          'resistor-100k': 'resistor',
+          'resistor-1m': 'resistor',
+          'cap-10p': 'capacitor',
+          'cap-22p': 'capacitor',
+          'cap-100p': 'capacitor',
+          'cap-1n': 'capacitor',
+          'cap-10n': 'capacitor',
+          'cap-100n': 'capacitor',
+          'cap-1u': 'capacitor',
+          'cap-elec-1u': 'capacitor-electrolytic',
+          'cap-elec-10u': 'capacitor-electrolytic',
+          'cap-elec-47u': 'capacitor-electrolytic',
+          'cap-elec-100u': 'capacitor-electrolytic',
+          'cap-elec-470u': 'capacitor-electrolytic',
           'cap-elec-1000u': 'capacitor-electrolytic',
-          'ind-100u': 'inductor', 'ind-1m': 'inductor', 'ind-10m': 'inductor',
+          'ind-100u': 'inductor',
+          'ind-1m': 'inductor',
+          'ind-10m': 'inductor',
         };
         for (const [preset, base] of Object.entries(PRESET_TO_BASE)) {
           PASSIVE_PIN_PAIRS[preset] = PASSIVE_PIN_PAIRS[base];
@@ -268,23 +279,26 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
           if (depth > 6) return null;
 
           const wires = state.wires.filter(
-            w => (w.start.componentId === fromId && w.start.pinName === fromPin) ||
-              (w.end.componentId === fromId && w.end.pinName === fromPin)
+            (w) =>
+              (w.start.componentId === fromId && w.start.pinName === fromPin) ||
+              (w.end.componentId === fromId && w.end.pinName === fromPin),
           );
 
           for (const w of wires) {
-            const selfEp  = (w.start.componentId === fromId && w.start.pinName === fromPin) ? w.start : w.end;
+            const selfEp =
+              w.start.componentId === fromId && w.start.pinName === fromPin ? w.start : w.end;
             const otherEp = selfEp === w.start ? w.end : w.start;
 
             if (isBoardComponent(otherEp.componentId)) {
               // Direct board connection
-              const boardKind = state.boards.find((b) => b.id === otherEp.componentId)?.boardKind
-                ?? otherEp.componentId;
+              const boardKind =
+                state.boards.find((b) => b.id === otherEp.componentId)?.boardKind ??
+                otherEp.componentId;
               const pin = boardPinToNumber(boardKind, otherEp.pinName);
               if (pin !== null) return pin;
             } else {
               // Intermediate passive component — traverse through it
-              const comp = state.components.find(c => c.id === otherEp.componentId);
+              const comp = state.components.find((c) => c.id === otherEp.componentId);
               const pair = comp && PASSIVE_PIN_PAIRS[comp.metadataId];
               if (pair) {
                 const [p1, p2] = pair;
@@ -353,9 +367,7 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
           gap: '4px',
         }}
       >
-        {properties.pin !== undefined
-          ? `Pin ${properties.pin}`
-          : metadata.name}
+        {properties.pin !== undefined ? `Pin ${properties.pin}` : metadata.name}
         {properties.protocol && (
           <span
             style={{
@@ -383,7 +395,7 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
 export function createComponentFromMetadata(
   metadata: ComponentMetadata,
   x: number,
-  y: number
+  y: number,
 ): {
   id: string;
   metadataId: string;

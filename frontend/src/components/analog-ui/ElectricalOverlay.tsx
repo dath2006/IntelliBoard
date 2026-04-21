@@ -69,15 +69,17 @@ export function ElectricalOverlay() {
       boards: boardsForSpice,
     });
 
-    return wires.map((w) => {
-      const mx = (w.start.x + w.end.x) / 2;
-      const my = (w.start.y + w.end.y) / 2;
-      const netName = wireNetMap.get(w.id);
-      const samples = netName ? timeWaveforms?.nodes.get(netName) : undefined;
-      const ac = samples && samples.length > 0 && isAC(samples);
-      const displayV = ac ? rms(samples!) : (netName ? nodeVoltages[netName] : undefined);
-      return { id: w.id, x: mx, y: my, v: displayV, netName, ac };
-    }).filter((l) => l.v !== undefined && l.netName !== '0');
+    return wires
+      .map((w) => {
+        const mx = (w.start.x + w.end.x) / 2;
+        const my = (w.start.y + w.end.y) / 2;
+        const netName = wireNetMap.get(w.id);
+        const samples = netName ? timeWaveforms?.nodes.get(netName) : undefined;
+        const ac = samples && samples.length > 0 && isAC(samples);
+        const displayV = ac ? rms(samples!) : netName ? nodeVoltages[netName] : undefined;
+        return { id: w.id, x: mx, y: my, v: displayV, netName, ac };
+      })
+      .filter((l) => l.v !== undefined && l.netName !== '0');
   }, [wires, components, boards, nodeVoltages, timeWaveforms]);
 
   const modeBadge = analysisMode === 'tran' ? 'AC' : 'DC';
@@ -126,10 +128,24 @@ export function ElectricalOverlay() {
           opacity={0.2}
           stroke={badgeColor}
         />
-        <text x={15} y={16} fontSize={10} fill={badgeColor} fontFamily="monospace" textAnchor="middle" fontWeight="bold">
+        <text
+          x={15}
+          y={16}
+          fontSize={10}
+          fill={badgeColor}
+          fontFamily="monospace"
+          textAnchor="middle"
+          fontWeight="bold"
+        >
           {modeBadge}
         </text>
-        <text x={32} y={17} fontSize={11} fill={error ? '#ff9999' : '#ffa500'} fontFamily="monospace">
+        <text
+          x={32}
+          y={17}
+          fontSize={11}
+          fill={error ? '#ff9999' : '#ffa500'}
+          fontFamily="monospace"
+        >
           SPICE {summaryLines.join(' ')}
         </text>
       </g>

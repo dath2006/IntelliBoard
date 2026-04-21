@@ -115,11 +115,7 @@ export const ComponentPropertyDialog: React.FC<ComponentPropertyDialogProps> = (
       {/* Header */}
       <div className="component-property-header">
         <span className="component-property-title">{componentMetadata.name}</span>
-        <button
-          className="property-close-button"
-          onClick={onClose}
-          title="Close"
-        >
+        <button className="property-close-button" onClick={onClose} title="Close">
           ×
         </button>
       </div>
@@ -131,9 +127,7 @@ export const ComponentPropertyDialog: React.FC<ComponentPropertyDialogProps> = (
           {pinInfo.map((pin) => (
             <div key={pin.name} className="pin-role-item">
               <span className="pin-name">• {pin.name}</span>
-              {pin.description && (
-                <span className="pin-description"> ({pin.description})</span>
-              )}
+              {pin.description && <span className="pin-description"> ({pin.description})</span>}
             </div>
           ))}
         </div>
@@ -152,9 +146,7 @@ export const ComponentPropertyDialog: React.FC<ComponentPropertyDialogProps> = (
       )}
 
       {/* Editable Properties (select dropdowns + text/number inputs) */}
-      {componentMetadata.properties
-        .filter((p: any) => isEditable(p))
-        .length > 0 && (
+      {componentMetadata.properties.filter((p: any) => isEditable(p)).length > 0 && (
         <div className="property-edit-section">
           {componentMetadata.properties
             .filter((p: any) => isEditable(p))
@@ -163,15 +155,11 @@ export const ComponentPropertyDialog: React.FC<ComponentPropertyDialogProps> = (
               if (prop.control === 'select' && prop.options) {
                 return (
                   <div key={prop.name} className="property-edit-row">
-                    <label className="property-edit-label">
-                      {prop.description || prop.name}
-                    </label>
+                    <label className="property-edit-label">{prop.description || prop.name}</label>
                     <select
                       className="property-edit-select"
                       value={current}
-                      onChange={(e) =>
-                        onPropertyChange?.(componentId, prop.name, e.target.value)
-                      }
+                      onChange={(e) => onPropertyChange?.(componentId, prop.name, e.target.value)}
                     >
                       {prop.options.map((opt: string) => (
                         <option key={opt} value={opt}>
@@ -184,16 +172,12 @@ export const ComponentPropertyDialog: React.FC<ComponentPropertyDialogProps> = (
               }
               return (
                 <div key={prop.name} className="property-edit-row">
-                  <label className="property-edit-label">
-                    {prop.description || prop.name}
-                  </label>
+                  <label className="property-edit-label">{prop.description || prop.name}</label>
                   <input
                     type={prop.control === 'number' ? 'number' : 'text'}
                     className="property-edit-input"
                     value={current}
-                    onChange={(e) =>
-                      onPropertyChange?.(componentId, prop.name, e.target.value)
-                    }
+                    onChange={(e) => onPropertyChange?.(componentId, prop.name, e.target.value)}
                   />
                 </div>
               );

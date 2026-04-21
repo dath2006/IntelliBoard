@@ -2,7 +2,7 @@
  * RelayElements.ts — Custom Web Components for electromechanical relays.
  *
  * Tag defined:
- *   wokwi-relay — 5-pin SPDT relay (COIL+, COIL-, COM, NO, NC)
+ *   velxio-relay — 5-pin SPDT relay (COIL+, COIL-, COM, NO, NC)
  *
  * Pin layout (CSS pixels, 96 × 96):
  *   COIL+ (0,  16)   COIL- (0,  80)
@@ -10,20 +10,20 @@
  *   NO    (96, 16)   NC    (96, 80)
  */
 
-const FILL   = '#f8f4ee';
+const FILL = '#f8f4ee';
 const STROKE = '#2a2a2a';
-const LEAD   = '#555555';
+const LEAD = '#555555';
 const COIL_LINE = '#8a5a00';
-const LABEL  = '#333333';
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const LABEL = '#333333';
+const STYLE = ':host{display:inline-block;line-height:0}';
 
 class RelayElement extends HTMLElement {
   readonly pinInfo = [
-    { name: 'COIL+', x: 0,  y: 16, number: 1, signals: [] as string[] },
-    { name: 'COIL-', x: 0,  y: 80, number: 2, signals: [] as string[] },
-    { name: 'NO',    x: 96, y: 16, number: 3, signals: [] as string[] },
-    { name: 'COM',   x: 96, y: 48, number: 4, signals: [] as string[] },
-    { name: 'NC',    x: 96, y: 80, number: 5, signals: [] as string[] },
+    { name: 'COIL+', x: 0, y: 16, number: 1, signals: [] as string[] },
+    { name: 'COIL-', x: 0, y: 80, number: 2, signals: [] as string[] },
+    { name: 'NO', x: 96, y: 16, number: 3, signals: [] as string[] },
+    { name: 'COM', x: 96, y: 48, number: 4, signals: [] as string[] },
+    { name: 'NC', x: 96, y: 80, number: 5, signals: [] as string[] },
   ];
   constructor() {
     super();
@@ -64,7 +64,7 @@ class RelayElement extends HTMLElement {
   }
 }
 
-if (!customElements.get('wokwi-relay')) customElements.define('wokwi-relay', RelayElement);
+if (!customElements.get('velxio-relay')) customElements.define('velxio-relay', RelayElement);
 
 // ─── Optocouplers (DIP-4 package: LED + phototransistor) ─────────────────────
 
@@ -103,9 +103,9 @@ function optoSvg(label: string): string {
 function makeOptoClass(label: string) {
   return class extends HTMLElement {
     readonly pinInfo = [
-      { name: 'AN',   x: 0,  y: 16, number: 1, signals: [] as string[] },
-      { name: 'CAT',  x: 0,  y: 48, number: 2, signals: [] as string[] },
-      { name: 'COL',  x: 80, y: 16, number: 3, signals: [] as string[] },
+      { name: 'AN', x: 0, y: 16, number: 1, signals: [] as string[] },
+      { name: 'CAT', x: 0, y: 48, number: 2, signals: [] as string[] },
+      { name: 'COL', x: 80, y: 16, number: 3, signals: [] as string[] },
       { name: 'EMIT', x: 80, y: 48, number: 4, signals: [] as string[] },
     ];
     constructor() {
@@ -115,11 +115,11 @@ function makeOptoClass(label: string) {
   };
 }
 
-const Opto4N25  = makeOptoClass('4N25');
+const Opto4N25 = makeOptoClass('4N25');
 const OptoPC817 = makeOptoClass('PC817');
 
-if (!customElements.get('wokwi-opto-4n25'))  customElements.define('wokwi-opto-4n25',  Opto4N25);
-if (!customElements.get('wokwi-opto-pc817')) customElements.define('wokwi-opto-pc817', OptoPC817);
+if (!customElements.get('velxio-opto-4n25')) customElements.define('velxio-opto-4n25', Opto4N25);
+if (!customElements.get('velxio-opto-pc817')) customElements.define('velxio-opto-pc817', OptoPC817);
 
 // ─── L293D dual H-bridge motor driver (DIP-16) ──────────────────────────────
 
@@ -128,22 +128,22 @@ class L293DElement extends HTMLElement {
   //  1=EN1, 2=IN1, 3=OUT1, 4=GND, 5=GND, 6=OUT2, 7=IN2, 8=VCC2
   //  9=EN2, 10=IN3, 11=OUT3, 12=GND, 13=GND, 14=OUT4, 15=IN4, 16=VCC1
   readonly pinInfo = [
-    { name: 'EN1',   x: 0,   y: 12, number: 1,  signals: [] as string[] },
-    { name: 'IN1',   x: 0,   y: 20, number: 2,  signals: [] as string[] },
-    { name: 'OUT1',  x: 0,   y: 28, number: 3,  signals: [] as string[] },
-    { name: 'GND.1', x: 0,   y: 36, number: 4,  signals: [] as string[] },
-    { name: 'GND.2', x: 0,   y: 44, number: 5,  signals: [] as string[] },
-    { name: 'OUT2',  x: 0,   y: 52, number: 6,  signals: [] as string[] },
-    { name: 'IN2',   x: 0,   y: 60, number: 7,  signals: [] as string[] },
-    { name: 'VCC2',  x: 0,   y: 68, number: 8,  signals: [] as string[] },
-    { name: 'EN2',   x: 100, y: 68, number: 9,  signals: [] as string[] },
-    { name: 'IN3',   x: 100, y: 60, number: 10, signals: [] as string[] },
-    { name: 'OUT3',  x: 100, y: 52, number: 11, signals: [] as string[] },
+    { name: 'EN1', x: 0, y: 12, number: 1, signals: [] as string[] },
+    { name: 'IN1', x: 0, y: 20, number: 2, signals: [] as string[] },
+    { name: 'OUT1', x: 0, y: 28, number: 3, signals: [] as string[] },
+    { name: 'GND.1', x: 0, y: 36, number: 4, signals: [] as string[] },
+    { name: 'GND.2', x: 0, y: 44, number: 5, signals: [] as string[] },
+    { name: 'OUT2', x: 0, y: 52, number: 6, signals: [] as string[] },
+    { name: 'IN2', x: 0, y: 60, number: 7, signals: [] as string[] },
+    { name: 'VCC2', x: 0, y: 68, number: 8, signals: [] as string[] },
+    { name: 'EN2', x: 100, y: 68, number: 9, signals: [] as string[] },
+    { name: 'IN3', x: 100, y: 60, number: 10, signals: [] as string[] },
+    { name: 'OUT3', x: 100, y: 52, number: 11, signals: [] as string[] },
     { name: 'GND.3', x: 100, y: 44, number: 12, signals: [] as string[] },
     { name: 'GND.4', x: 100, y: 36, number: 13, signals: [] as string[] },
-    { name: 'OUT4',  x: 100, y: 28, number: 14, signals: [] as string[] },
-    { name: 'IN4',   x: 100, y: 20, number: 15, signals: [] as string[] },
-    { name: 'VCC1',  x: 100, y: 12, number: 16, signals: [] as string[] },
+    { name: 'OUT4', x: 100, y: 28, number: 14, signals: [] as string[] },
+    { name: 'IN4', x: 100, y: 20, number: 15, signals: [] as string[] },
+    { name: 'VCC1', x: 100, y: 12, number: 16, signals: [] as string[] },
   ];
   constructor() {
     super();
@@ -154,7 +154,7 @@ class L293DElement extends HTMLElement {
         <circle cx="18" cy="12" r="2" fill="#eef3fa"/>
         <!-- Pin ticks -->
         ${this.pinInfo
-          .map(p => {
+          .map((p) => {
             const isLeft = p.x === 0;
             const x2 = isLeft ? 10 : 90;
             const x1 = isLeft ? 0 : 100;
@@ -166,8 +166,8 @@ class L293DElement extends HTMLElement {
   }
 }
 
-if (!customElements.get('wokwi-motor-driver-l293d')) {
-  customElements.define('wokwi-motor-driver-l293d', L293DElement);
+if (!customElements.get('velxio-motor-driver-l293d')) {
+  customElements.define('velxio-motor-driver-l293d', L293DElement);
 }
 
 export {};

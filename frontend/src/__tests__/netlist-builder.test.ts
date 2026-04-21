@@ -55,9 +55,21 @@ describe('NetlistBuilder — simple cases', () => {
         { id: 'r2', metadataId: 'resistor', properties: { value: '2k' } },
       ],
       wires: [
-        { id: 'w1', start: { componentId: 'arduino', pinName: '5V' }, end: { componentId: 'r1', pinName: '1' } },
-        { id: 'w2', start: { componentId: 'r1', pinName: '2' }, end: { componentId: 'r2', pinName: '1' } },
-        { id: 'w3', start: { componentId: 'r2', pinName: '2' }, end: { componentId: 'arduino', pinName: 'GND' } },
+        {
+          id: 'w1',
+          start: { componentId: 'arduino', pinName: '5V' },
+          end: { componentId: 'r1', pinName: '1' },
+        },
+        {
+          id: 'w2',
+          start: { componentId: 'r1', pinName: '2' },
+          end: { componentId: 'r2', pinName: '1' },
+        },
+        {
+          id: 'w3',
+          start: { componentId: 'r2', pinName: '2' },
+          end: { componentId: 'arduino', pinName: 'GND' },
+        },
       ],
       boards: [
         {
@@ -85,39 +97,55 @@ describe('NetlistBuilder — simple cases', () => {
     expect(midV[0]).toBeCloseTo((5 * 2) / 3, 2);
   });
 
-  it('emits an LED + resistor from 5V rail and ngspice solves non-linear', { timeout: 30_000 }, async () => {
-    const { netlist } = buildNetlist({
-      components: [
-        { id: 'r1', metadataId: 'resistor', properties: { value: '220' } },
-        { id: 'led1', metadataId: 'led', properties: { color: 'red' } },
-      ],
-      wires: [
-        { id: 'w1', start: { componentId: 'board', pinName: 'VCC' }, end: { componentId: 'r1', pinName: '1' } },
-        { id: 'w2', start: { componentId: 'r1', pinName: '2' }, end: { componentId: 'led1', pinName: 'A' } },
-        { id: 'w3', start: { componentId: 'led1', pinName: 'C' }, end: { componentId: 'board', pinName: 'GND' } },
-      ],
-      boards: [
-        {
-          id: 'board',
-          vcc: 5,
-          pins: {},
-          groundPinNames: ['GND'],
-          vccPinNames: ['VCC'],
-        },
-      ],
-      analysis: { kind: 'op' },
-    });
-    expect(netlist).toMatch(/D_led1 \S+ 0 LED_RED/);
-    expect(netlist).toMatch(/\.model LED_RED D\(Is=1e-20 N=1\.7\)/);
+  it(
+    'emits an LED + resistor from 5V rail and ngspice solves non-linear',
+    { timeout: 30_000 },
+    async () => {
+      const { netlist } = buildNetlist({
+        components: [
+          { id: 'r1', metadataId: 'resistor', properties: { value: '220' } },
+          { id: 'led1', metadataId: 'led', properties: { color: 'red' } },
+        ],
+        wires: [
+          {
+            id: 'w1',
+            start: { componentId: 'board', pinName: 'VCC' },
+            end: { componentId: 'r1', pinName: '1' },
+          },
+          {
+            id: 'w2',
+            start: { componentId: 'r1', pinName: '2' },
+            end: { componentId: 'led1', pinName: 'A' },
+          },
+          {
+            id: 'w3',
+            start: { componentId: 'led1', pinName: 'C' },
+            end: { componentId: 'board', pinName: 'GND' },
+          },
+        ],
+        boards: [
+          {
+            id: 'board',
+            vcc: 5,
+            pins: {},
+            groundPinNames: ['GND'],
+            vccPinNames: ['VCC'],
+          },
+        ],
+        analysis: { kind: 'op' },
+      });
+      expect(netlist).toMatch(/D_led1 \S+ 0 LED_RED/);
+      expect(netlist).toMatch(/\.model LED_RED D\(Is=1e-20 N=1\.7\)/);
 
-    const result = await runNetlist(netlist);
-    // Forward voltage on the anode should be ≈ 2.0 V for a red LED
-    const anodeNet = netlist.match(/D_led1 (\S+) 0 LED_RED/)?.[1];
-    expect(anodeNet).toBeTruthy();
-    const Vf = (result.vec(`v(${anodeNet})`) as number[])[0];
-    expect(Vf).toBeGreaterThan(1.7);
-    expect(Vf).toBeLessThan(2.3);
-  });
+      const result = await runNetlist(netlist);
+      // Forward voltage on the anode should be ≈ 2.0 V for a red LED
+      const anodeNet = netlist.match(/D_led1 (\S+) 0 LED_RED/)?.[1];
+      expect(anodeNet).toBeTruthy();
+      const Vf = (result.vec(`v(${anodeNet})`) as number[])[0];
+      expect(Vf).toBeGreaterThan(1.7);
+      expect(Vf).toBeLessThan(2.3);
+    },
+  );
 
   it('NTC divider: T=25°C produces V(a0) ≈ 2.5V', { timeout: 30_000 }, async () => {
     const { netlist } = buildNetlist({
@@ -126,17 +154,31 @@ describe('NetlistBuilder — simple cases', () => {
         { id: 'ntc1', metadataId: 'ntc-temperature-sensor', properties: { temperature: 25 } },
       ],
       wires: [
-        { id: 'w1', start: { componentId: 'uno', pinName: '5V' }, end: { componentId: 'r1', pinName: '1' } },
-        { id: 'w2', start: { componentId: 'r1', pinName: '2' }, end: { componentId: 'ntc1', pinName: '1' } },
-        { id: 'w3', start: { componentId: 'ntc1', pinName: '2' }, end: { componentId: 'uno', pinName: 'GND' } },
+        {
+          id: 'w1',
+          start: { componentId: 'uno', pinName: '5V' },
+          end: { componentId: 'r1', pinName: '1' },
+        },
+        {
+          id: 'w2',
+          start: { componentId: 'r1', pinName: '2' },
+          end: { componentId: 'ntc1', pinName: '1' },
+        },
+        {
+          id: 'w3',
+          start: { componentId: 'ntc1', pinName: '2' },
+          end: { componentId: 'uno', pinName: 'GND' },
+        },
       ],
-      boards: [{
-        id: 'uno',
-        vcc: 5,
-        pins: {},
-        groundPinNames: ['GND'],
-        vccPinNames: ['5V'],
-      }],
+      boards: [
+        {
+          id: 'uno',
+          vcc: 5,
+          pins: {},
+          groundPinNames: ['GND'],
+          vccPinNames: ['5V'],
+        },
+      ],
       analysis: { kind: 'op' },
     });
     const result = await runNetlist(netlist);
@@ -155,9 +197,21 @@ describe('NetlistBuilder — simple cases', () => {
         { id: 'c2', metadataId: 'capacitor', properties: { value: '1u' } },
       ],
       wires: [
-        { id: 'w_share', start: { componentId: 'c1', pinName: '1' }, end: { componentId: 'c2', pinName: '1' } },
-        { id: 'w1',      start: { componentId: 'c1', pinName: '2' }, end: { componentId: 'board', pinName: 'GND' } },
-        { id: 'w2',      start: { componentId: 'c2', pinName: '2' }, end: { componentId: 'board', pinName: 'GND' } },
+        {
+          id: 'w_share',
+          start: { componentId: 'c1', pinName: '1' },
+          end: { componentId: 'c2', pinName: '1' },
+        },
+        {
+          id: 'w1',
+          start: { componentId: 'c1', pinName: '2' },
+          end: { componentId: 'board', pinName: 'GND' },
+        },
+        {
+          id: 'w2',
+          start: { componentId: 'c2', pinName: '2' },
+          end: { componentId: 'board', pinName: 'GND' },
+        },
       ],
       boards: [{ id: 'board', vcc: 5, pins: {}, groundPinNames: ['GND'] }],
       analysis: { kind: 'op' },
@@ -169,14 +223,20 @@ describe('NetlistBuilder — simple cases', () => {
     const { netlist } = buildNetlist({
       components: [],
       wires: [
-        { id: 'w1', start: { componentId: 'uno', pinName: 'D9' }, end: { componentId: 'uno', pinName: 'GND' } },
+        {
+          id: 'w1',
+          start: { componentId: 'uno', pinName: 'D9' },
+          end: { componentId: 'uno', pinName: 'GND' },
+        },
       ],
-      boards: [{
-        id: 'uno',
-        vcc: 5,
-        pins: { D9: { type: 'pwm', duty: 0.5 } },
-        groundPinNames: ['GND'],
-      }],
+      boards: [
+        {
+          id: 'uno',
+          vcc: 5,
+          pins: { D9: { type: 'pwm', duty: 0.5 } },
+          groundPinNames: ['GND'],
+        },
+      ],
       analysis: { kind: 'op' },
     });
     // D9 is wired directly to GND → same net as ground → no source emitted

@@ -17,16 +17,16 @@
  *   IN+  (0, 12)   IN-  (0, 52)   OUT  (80, 32)
  */
 
-const FILL   = '#eef3fa';
+const FILL = '#eef3fa';
 const STROKE = '#2a2a2a';
-const LEAD   = '#555555';
-const LABEL  = '#333333';
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const LEAD = '#555555';
+const LABEL = '#333333';
+const STYLE = ':host{display:inline-block;line-height:0}';
 
 function opampPinInfo() {
   return [
-    { name: 'IN+', x: 0,  y: 12, number: 1, signals: [] as string[] },
-    { name: 'IN-', x: 0,  y: 52, number: 2, signals: [] as string[] },
+    { name: 'IN+', x: 0, y: 12, number: 1, signals: [] as string[] },
+    { name: 'IN-', x: 0, y: 52, number: 2, signals: [] as string[] },
     { name: 'OUT', x: 80, y: 32, number: 3, signals: [] as string[] },
   ];
 }

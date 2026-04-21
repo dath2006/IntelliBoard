@@ -181,14 +181,14 @@ for (const [id, label, value] of CAPS_CERAMIC) {
   }));
 }
 newEntries.push(makeEntry({
-  id: 'capacitor-electrolytic', tagName: 'wokwi-capacitor-electrolytic',
+  id: 'capacitor-electrolytic', tagName: 'velxio-capacitor-electrolytic',
   name: 'Electrolytic Cap. (custom)',
   thumbnail: capacitorElectrolyticThumb('?µF'), defaultValue: '10u',
   tags: ['capacitor', 'electrolytic', 'polarized', 'custom'],
 }));
 for (const [id, label, value] of CAPS_ELEC) {
   newEntries.push(makeEntry({
-    id, tagName: 'wokwi-capacitor-electrolytic',
+    id, tagName: 'velxio-capacitor-electrolytic',
     name: `Electrolytic ${label}`,
     thumbnail: capacitorElectrolyticThumb(label), defaultValue: value,
     tags: ['capacitor', 'electrolytic', 'polarized', 'preset', label.toLowerCase().replace(/\s+/g, '')],

@@ -68,11 +68,7 @@ export function subtract(a: readonly number[], b: readonly number[]): number[] {
  * monotonically increasing. Clamps to the endpoints if `t` is outside range.
  * O(log n) via binary search — safe to call at >1 kHz rates.
  */
-export function interpolateAt(
-  ts: readonly number[],
-  vs: readonly number[],
-  t: number,
-): number {
+export function interpolateAt(ts: readonly number[], vs: readonly number[], t: number): number {
   if (ts.length === 0) return 0;
   if (t <= ts[0]) return vs[0];
   const lastIdx = ts.length - 1;
@@ -81,7 +77,8 @@ export function interpolateAt(
   let hi = lastIdx;
   while (lo + 1 < hi) {
     const mid = (lo + hi) >> 1;
-    if (ts[mid] <= t) lo = mid; else hi = mid;
+    if (ts[mid] <= t) lo = mid;
+    else hi = mid;
   }
   const t0 = ts[lo];
   const t1 = ts[hi];

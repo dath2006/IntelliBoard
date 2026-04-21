@@ -17,11 +17,31 @@ describe('Voltmeter (instr-voltmeter)', () => {
         { id: 'vm', metadataId: 'instr-voltmeter', properties: {} },
       ],
       wires: [
-        { id: 'w1', start: { componentId: 'uno', pinName: '5V' }, end: { componentId: 'r1', pinName: '1' } },
-        { id: 'w2', start: { componentId: 'r1', pinName: '2' }, end: { componentId: 'r2', pinName: '1' } },
-        { id: 'w3', start: { componentId: 'r2', pinName: '2' }, end: { componentId: 'uno', pinName: 'GND' } },
-        { id: 'w4', start: { componentId: 'vm', pinName: 'V+' }, end: { componentId: 'r1', pinName: '2' } },
-        { id: 'w5', start: { componentId: 'vm', pinName: 'V-' }, end: { componentId: 'uno', pinName: 'GND' } },
+        {
+          id: 'w1',
+          start: { componentId: 'uno', pinName: '5V' },
+          end: { componentId: 'r1', pinName: '1' },
+        },
+        {
+          id: 'w2',
+          start: { componentId: 'r1', pinName: '2' },
+          end: { componentId: 'r2', pinName: '1' },
+        },
+        {
+          id: 'w3',
+          start: { componentId: 'r2', pinName: '2' },
+          end: { componentId: 'uno', pinName: 'GND' },
+        },
+        {
+          id: 'w4',
+          start: { componentId: 'vm', pinName: 'V+' },
+          end: { componentId: 'r1', pinName: '2' },
+        },
+        {
+          id: 'w5',
+          start: { componentId: 'vm', pinName: 'V-' },
+          end: { componentId: 'uno', pinName: 'GND' },
+        },
       ],
       boards: [{ id: 'uno', vcc: 5, pins: {}, groundPinNames: ['GND'], vccPinNames: ['5V'] }],
       analysis: { kind: 'op' },
@@ -54,9 +74,21 @@ describe('Ammeter (instr-ammeter)', () => {
         { id: 'am', metadataId: 'instr-ammeter', properties: {} },
       ],
       wires: [
-        { id: 'w1', start: { componentId: 'uno', pinName: '5V' }, end: { componentId: 'r1', pinName: '1' } },
-        { id: 'w2', start: { componentId: 'r1', pinName: '2' }, end: { componentId: 'am', pinName: 'A+' } },
-        { id: 'w3', start: { componentId: 'am', pinName: 'A-' }, end: { componentId: 'uno', pinName: 'GND' } },
+        {
+          id: 'w1',
+          start: { componentId: 'uno', pinName: '5V' },
+          end: { componentId: 'r1', pinName: '1' },
+        },
+        {
+          id: 'w2',
+          start: { componentId: 'r1', pinName: '2' },
+          end: { componentId: 'am', pinName: 'A+' },
+        },
+        {
+          id: 'w3',
+          start: { componentId: 'am', pinName: 'A-' },
+          end: { componentId: 'uno', pinName: 'GND' },
+        },
       ],
       boards: [{ id: 'uno', vcc: 5, pins: {}, groundPinNames: ['GND'], vccPinNames: ['5V'] }],
       analysis: { kind: 'op' },

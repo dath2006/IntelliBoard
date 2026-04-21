@@ -5,13 +5,13 @@
  * These do NOT exist in wokwi-elements, so we define them here.
  *
  * Tags defined:
- *   wokwi-logic-and  — 2-input AND gate
- *   wokwi-logic-nand — 2-input NAND gate
- *   wokwi-logic-or   — 2-input OR gate
- *   wokwi-logic-nor  — 2-input NOR gate
- *   wokwi-logic-xor  — 2-input XOR gate
- *   wokwi-logic-xnor — 2-input XNOR gate
- *   wokwi-logic-not  — 1-input NOT (inverter)
+ *   velxio-logic-and  — 2-input AND gate
+ *   velxio-logic-nand — 2-input NAND gate
+ *   velxio-logic-or   — 2-input OR gate
+ *   velxio-logic-nor  — 2-input NOR gate
+ *   velxio-logic-xor  — 2-input XOR gate
+ *   velxio-logic-xnor — 2-input XNOR gate
+ *   velxio-logic-not  — 1-input NOT (inverter)
  *
  * Pin layout (in CSS pixels, used by PinOverlay):
  *   2-input gates (72 × 48 px): A(0,14)  B(0,34)  Y(72,24)
@@ -19,18 +19,18 @@
  */
 
 // ─── Shared colours ───────────────────────────────────────────────────────────
-const FILL   = '#e8f0fa';
+const FILL = '#e8f0fa';
 const STROKE = '#3360b0';
-const LEAD   = '#555555';
-const TEXT   = '#1a3060';
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const LEAD = '#555555';
+const TEXT = '#1a3060';
+const STYLE = ':host{display:inline-block;line-height:0}';
 
 // ─── 2-input gate base ───────────────────────────────────────────────────────
 
 function twoInputPinInfo() {
   return [
-    { name: 'A', x: 0,  y: 14, number: 1, signals: [] },
-    { name: 'B', x: 0,  y: 34, number: 2, signals: [] },
+    { name: 'A', x: 0, y: 14, number: 1, signals: [] },
+    { name: 'B', x: 0, y: 34, number: 2, signals: [] },
     { name: 'Y', x: 72, y: 24, number: 3, signals: [] },
   ];
 }
@@ -184,7 +184,7 @@ class XnorGateElement extends HTMLElement {
 
 class NotGateElement extends HTMLElement {
   readonly pinInfo = [
-    { name: 'A', x: 0,  y: 18, number: 1, signals: [] },
+    { name: 'A', x: 0, y: 18, number: 1, signals: [] },
     { name: 'Y', x: 56, y: 18, number: 2, signals: [] },
   ];
   constructor() {
@@ -204,13 +204,19 @@ class NotGateElement extends HTMLElement {
 
 // ─── Register custom elements ─────────────────────────────────────────────────
 
-if (!customElements.get('wokwi-logic-and'))  customElements.define('wokwi-logic-and',  AndGateElement);
-if (!customElements.get('wokwi-logic-nand')) customElements.define('wokwi-logic-nand', NandGateElement);
-if (!customElements.get('wokwi-logic-or'))   customElements.define('wokwi-logic-or',   OrGateElement);
-if (!customElements.get('wokwi-logic-nor'))  customElements.define('wokwi-logic-nor',  NorGateElement);
-if (!customElements.get('wokwi-logic-xor'))  customElements.define('wokwi-logic-xor',  XorGateElement);
-if (!customElements.get('wokwi-logic-xnor')) customElements.define('wokwi-logic-xnor', XnorGateElement);
-if (!customElements.get('wokwi-logic-not'))  customElements.define('wokwi-logic-not',  NotGateElement);
+if (!customElements.get('velxio-logic-and'))
+  customElements.define('velxio-logic-and', AndGateElement);
+if (!customElements.get('velxio-logic-nand'))
+  customElements.define('velxio-logic-nand', NandGateElement);
+if (!customElements.get('velxio-logic-or')) customElements.define('velxio-logic-or', OrGateElement);
+if (!customElements.get('velxio-logic-nor'))
+  customElements.define('velxio-logic-nor', NorGateElement);
+if (!customElements.get('velxio-logic-xor'))
+  customElements.define('velxio-logic-xor', XorGateElement);
+if (!customElements.get('velxio-logic-xnor'))
+  customElements.define('velxio-logic-xnor', XnorGateElement);
+if (!customElements.get('velxio-logic-not'))
+  customElements.define('velxio-logic-not', NotGateElement);
 
 // ─── 3/4-input gate elements ──────────────────────────────────────────────────
 // Generic N-input gates (96 × 72 for 3-in, 108 × 84 for 4-in). Inputs spaced
@@ -223,7 +229,13 @@ function nInputPinInfo(count: number, height: number, bodyRight: number) {
     const letter = String.fromCharCode(65 + i); // A, B, C, D
     pins.push({ name: letter, x: 0, y: Math.round((i + 1) * spacing), number: i + 1, signals: [] });
   }
-  pins.push({ name: 'Y', x: bodyRight + 14, y: Math.round(height / 2), number: count + 1, signals: [] });
+  pins.push({
+    name: 'Y',
+    x: bodyRight + 14,
+    y: Math.round(height / 2),
+    number: count + 1,
+    signals: [],
+  });
   return pins;
 }
 
@@ -298,23 +310,29 @@ function makeMultiInputGateClass(variant: 'and' | 'or' | 'nand' | 'nor', inputs:
   };
 }
 
-const And3Gate  = makeMultiInputGateClass('and',  3);
-const Or3Gate   = makeMultiInputGateClass('or',   3);
+const And3Gate = makeMultiInputGateClass('and', 3);
+const Or3Gate = makeMultiInputGateClass('or', 3);
 const Nand3Gate = makeMultiInputGateClass('nand', 3);
-const Nor3Gate  = makeMultiInputGateClass('nor',  3);
-const And4Gate  = makeMultiInputGateClass('and',  4);
-const Or4Gate   = makeMultiInputGateClass('or',   4);
+const Nor3Gate = makeMultiInputGateClass('nor', 3);
+const And4Gate = makeMultiInputGateClass('and', 4);
+const Or4Gate = makeMultiInputGateClass('or', 4);
 const Nand4Gate = makeMultiInputGateClass('nand', 4);
-const Nor4Gate  = makeMultiInputGateClass('nor',  4);
+const Nor4Gate = makeMultiInputGateClass('nor', 4);
 
-if (!customElements.get('wokwi-logic-and-3'))  customElements.define('wokwi-logic-and-3',  And3Gate);
-if (!customElements.get('wokwi-logic-or-3'))   customElements.define('wokwi-logic-or-3',   Or3Gate);
-if (!customElements.get('wokwi-logic-nand-3')) customElements.define('wokwi-logic-nand-3', Nand3Gate);
-if (!customElements.get('wokwi-logic-nor-3'))  customElements.define('wokwi-logic-nor-3',  Nor3Gate);
-if (!customElements.get('wokwi-logic-and-4'))  customElements.define('wokwi-logic-and-4',  And4Gate);
-if (!customElements.get('wokwi-logic-or-4'))   customElements.define('wokwi-logic-or-4',   Or4Gate);
-if (!customElements.get('wokwi-logic-nand-4')) customElements.define('wokwi-logic-nand-4', Nand4Gate);
-if (!customElements.get('wokwi-logic-nor-4'))  customElements.define('wokwi-logic-nor-4',  Nor4Gate);
+if (!customElements.get('velxio-logic-and-3'))
+  customElements.define('velxio-logic-and-3', And3Gate);
+if (!customElements.get('velxio-logic-or-3')) customElements.define('velxio-logic-or-3', Or3Gate);
+if (!customElements.get('velxio-logic-nand-3'))
+  customElements.define('velxio-logic-nand-3', Nand3Gate);
+if (!customElements.get('velxio-logic-nor-3'))
+  customElements.define('velxio-logic-nor-3', Nor3Gate);
+if (!customElements.get('velxio-logic-and-4'))
+  customElements.define('velxio-logic-and-4', And4Gate);
+if (!customElements.get('velxio-logic-or-4')) customElements.define('velxio-logic-or-4', Or4Gate);
+if (!customElements.get('velxio-logic-nand-4'))
+  customElements.define('velxio-logic-nand-4', Nand4Gate);
+if (!customElements.get('velxio-logic-nor-4'))
+  customElements.define('velxio-logic-nor-4', Nor4Gate);
 
 // Mark as a module (all symbols are internal — this file is imported for side effects only)
 export {};

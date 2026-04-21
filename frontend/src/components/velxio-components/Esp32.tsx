@@ -11,13 +11,13 @@ interface Esp32Props {
 declare global {
   namespace JSX {
     interface IntrinsicElements {
-      'wokwi-esp32': any;
+      'velxio-esp32': any;
     }
   }
 }
 
 export const Esp32 = ({ id = 'esp32', x = 0, y = 0, boardKind = 'esp32' }: Esp32Props) => (
-  <wokwi-esp32
+  <velxio-esp32
     id={id}
     board-kind={boardKind}
     style={{ position: 'absolute', left: `${x}px`, top: `${y}px` }}

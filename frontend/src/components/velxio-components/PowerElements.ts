@@ -12,13 +12,13 @@
  * SigGen     (80 × 64 px):  SIG(80, 32)  GND(80, 48)
  */
 
-const FILL   = '#eaefea';
+const FILL = '#eaefea';
 const STROKE = '#2a2a2a';
-const LEAD   = '#555555';
-const LABEL  = '#333333';
-const RED    = '#b03a2e';
-const BLACK  = '#1a1a1a';
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const LEAD = '#555555';
+const LABEL = '#333333';
+const RED = '#b03a2e';
+const BLACK = '#1a1a1a';
+const STYLE = ':host{display:inline-block;line-height:0}';
 
 // ─── Linear regulator (TO-220 style) ──────────────────────────────────────────
 
@@ -46,7 +46,7 @@ function regulatorSvg(label: string, middlePinLabel: string): string {
 function makeRegulatorClass(label: string, middlePinName: 'GND' | 'ADJ') {
   return class extends HTMLElement {
     readonly pinInfo = [
-      { name: 'VIN',  x: 0,  y: 24, number: 1, signals: [] as string[] },
+      { name: 'VIN', x: 0, y: 24, number: 1, signals: [] as string[] },
       { name: middlePinName, x: 36, y: 56, number: 2, signals: [] as string[] },
       { name: 'VOUT', x: 72, y: 24, number: 3, signals: [] as string[] },
     ];
@@ -57,9 +57,9 @@ function makeRegulatorClass(label: string, middlePinName: 'GND' | 'ADJ') {
   };
 }
 
-const Reg7805  = makeRegulatorClass('7805',  'GND');
-const Reg7812  = makeRegulatorClass('7812',  'GND');
-const Reg7905  = makeRegulatorClass('7905',  'GND');
+const Reg7805 = makeRegulatorClass('7805', 'GND');
+const Reg7812 = makeRegulatorClass('7812', 'GND');
+const Reg7905 = makeRegulatorClass('7905', 'GND');
 const RegLM317 = makeRegulatorClass('LM317', 'ADJ');
 
 // ─── Battery ──────────────────────────────────────────────────────────────────
@@ -87,7 +87,7 @@ function batterySvg(label: string, color: string): string {
 function makeBatteryClass(label: string, color: string) {
   return class extends HTMLElement {
     readonly pinInfo = [
-      { name: '+', x: 24, y: 0,  number: 1, signals: [] as string[] },
+      { name: '+', x: 24, y: 0, number: 1, signals: [] as string[] },
       { name: '−', x: 24, y: 72, number: 2, signals: [] as string[] },
     ];
     constructor() {
@@ -97,9 +97,9 @@ function makeBatteryClass(label: string, color: string) {
   };
 }
 
-const Battery9V   = makeBatteryClass('9V',   RED);
-const BatteryAA   = makeBatteryClass('AA',   '#336699');
-const BatteryCoin = makeBatteryClass('3V',   '#666');
+const Battery9V = makeBatteryClass('9V', RED);
+const BatteryAA = makeBatteryClass('AA', '#336699');
+const BatteryCoin = makeBatteryClass('3V', '#666');
 
 // ─── Signal generator (benchtop instrument) ───────────────────────────────────
 
@@ -136,13 +136,13 @@ function def(tag: string, cls: CustomElementConstructor) {
   if (!customElements.get(tag)) customElements.define(tag, cls);
 }
 
-def('wokwi-reg-7805',  Reg7805);
-def('wokwi-reg-7812',  Reg7812);
-def('wokwi-reg-7905',  Reg7905);
+def('wokwi-reg-7805', Reg7805);
+def('wokwi-reg-7812', Reg7812);
+def('wokwi-reg-7905', Reg7905);
 def('wokwi-reg-lm317', RegLM317);
-def('wokwi-battery-9v',         Battery9V);
-def('wokwi-battery-aa',         BatteryAA);
-def('wokwi-battery-coin-cell',  BatteryCoin);
-def('wokwi-signal-generator',   SignalGeneratorElement);
+def('wokwi-battery-9v', Battery9V);
+def('wokwi-battery-aa', BatteryAA);
+def('wokwi-battery-coin-cell', BatteryCoin);
+def('wokwi-signal-generator', SignalGeneratorElement);
 
 export {};

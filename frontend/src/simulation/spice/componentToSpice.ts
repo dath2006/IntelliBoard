@@ -29,32 +29,54 @@ export interface MapperContext {
   vcc: number;
 }
 
-type Mapper = (comp: ComponentForSpice, netLookup: NetLookup, ctx: MapperContext) => SpiceEmission | null;
+type Mapper = (
+  comp: ComponentForSpice,
+  netLookup: NetLookup,
+  ctx: MapperContext,
+) => SpiceEmission | null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function twoPin(comp: ComponentForSpice, netLookup: NetLookup, pinA: string, pinB: string): [string, string] | null {
+function twoPin(
+  comp: ComponentForSpice,
+  netLookup: NetLookup,
+  pinA: string,
+  pinB: string,
+): [string, string] | null {
   const a = netLookup(pinA);
   const b = netLookup(pinB);
   if (!a || !b) return null;
   return [a, b];
 }
 
-function emitResistor(comp: ComponentForSpice, pins: [string, string], value: number): SpiceEmission {
+function emitResistor(
+  comp: ComponentForSpice,
+  pins: [string, string],
+  value: number,
+): SpiceEmission {
   return {
     cards: [`R_${comp.id} ${pins[0]} ${pins[1]} ${value}`],
     modelsUsed: new Set(),
   };
 }
 
-function emitCapacitor(comp: ComponentForSpice, pins: [string, string], value: number, ic = 0): SpiceEmission {
+function emitCapacitor(
+  comp: ComponentForSpice,
+  pins: [string, string],
+  value: number,
+  ic = 0,
+): SpiceEmission {
   return {
     cards: [`C_${comp.id} ${pins[0]} ${pins[1]} ${value} IC=${ic}`],
     modelsUsed: new Set(),
   };
 }
 
-function emitInductor(comp: ComponentForSpice, pins: [string, string], value: number): SpiceEmission {
+function emitInductor(
+  comp: ComponentForSpice,
+  pins: [string, string],
+  value: number,
+): SpiceEmission {
   return {
     cards: [`L_${comp.id} ${pins[0]} ${pins[1]} ${value}`],
     modelsUsed: new Set(),
@@ -177,9 +199,7 @@ const MAPPERS: Record<string, Mapper> = {
     if (!pins) return null;
     return {
       cards: [`D_${comp.id} ${pins[0]} ${pins[1]} D1N4007`],
-      modelsUsed: new Set([
-        '.model D1N4007 D(Is=76.9n N=1.45 Rs=0.0342 Ikf=2.34 Bv=1000 Ibv=5u)',
-      ]),
+      modelsUsed: new Set(['.model D1N4007 D(Is=76.9n N=1.45 Rs=0.0342 Ikf=2.34 Bv=1000 Ibv=5u)']),
     };
   },
   'zener-1n4733': (comp, netLookup) => {
@@ -546,7 +566,7 @@ const MAPPERS: Record<string, Mapper> = {
   // Rotary potentiometer — 3-terminal divider. `value` lives in [min..max]
   // (defaults match the wokwi-potentiometer element: 0..1023). Total track
   // resistance defaults to 10 kΩ; callers can override via `properties.total`.
-  'potentiometer': (comp, netLookup) => {
+  potentiometer: (comp, netLookup) => {
     const top = netLookup('VCC');
     const wiper = netLookup('SIG');
     const bot = netLookup('GND');
@@ -607,10 +627,7 @@ const MAPPERS: Record<string, Mapper> = {
     }
     const Rpull = parseValueWithUnits(comp.properties.pullup, 10_000);
     return {
-      cards: [
-        `R_${comp.id}_ntc ${vcc} ${out} ${Rntc}`,
-        `R_${comp.id}_pull ${out} ${gnd} ${Rpull}`,
-      ],
+      cards: [`R_${comp.id}_ntc ${vcc} ${out} ${Rntc}`, `R_${comp.id}_pull ${out} ${gnd} ${Rpull}`],
       modelsUsed: new Set(),
     };
   },
@@ -627,10 +644,7 @@ const MAPPERS: Record<string, Mapper> = {
     const senseName = `v_${comp.id}_sense`;
     const midNet = `amm_${comp.id}_mid`;
     return {
-      cards: [
-        `V_${comp.id}_sense ${ap} ${midNet} DC 0`,
-        `R_${comp.id}_shunt ${midNet} ${am} 1m`,
-      ],
+      cards: [`V_${comp.id}_sense ${ap} ${midNet} DC 0`, `R_${comp.id}_shunt ${midNet} ${am} 1m`],
       modelsUsed: new Set([`* ammeter probe: read i(${senseName})`]),
     };
   },
@@ -652,7 +666,9 @@ const MAPPERS: Record<string, Mapper> = {
   // is ctx.vcc/2. A 1 MΩ load keeps the output node DC-connected so ngspice
   // doesn't see it as floating (otherwise .op returns matrix singular).
   'logic-gate-and': (comp, netLookup, ctx) => {
-    const a = netLookup('A'), b = netLookup('B'), y = netLookup('Y');
+    const a = netLookup('A'),
+      b = netLookup('B'),
+      y = netLookup('Y');
     if (!a || !b || !y) return null;
     const T = ctx.vcc / 2;
     return {
@@ -664,7 +680,9 @@ const MAPPERS: Record<string, Mapper> = {
     };
   },
   'logic-gate-or': (comp, netLookup, ctx) => {
-    const a = netLookup('A'), b = netLookup('B'), y = netLookup('Y');
+    const a = netLookup('A'),
+      b = netLookup('B'),
+      y = netLookup('Y');
     if (!a || !b || !y) return null;
     const T = ctx.vcc / 2;
     return {
@@ -676,7 +694,9 @@ const MAPPERS: Record<string, Mapper> = {
     };
   },
   'logic-gate-nand': (comp, netLookup, ctx) => {
-    const a = netLookup('A'), b = netLookup('B'), y = netLookup('Y');
+    const a = netLookup('A'),
+      b = netLookup('B'),
+      y = netLookup('Y');
     if (!a || !b || !y) return null;
     const T = ctx.vcc / 2;
     return {
@@ -688,7 +708,9 @@ const MAPPERS: Record<string, Mapper> = {
     };
   },
   'logic-gate-nor': (comp, netLookup, ctx) => {
-    const a = netLookup('A'), b = netLookup('B'), y = netLookup('Y');
+    const a = netLookup('A'),
+      b = netLookup('B'),
+      y = netLookup('Y');
     if (!a || !b || !y) return null;
     const T = ctx.vcc / 2;
     return {
@@ -700,7 +722,9 @@ const MAPPERS: Record<string, Mapper> = {
     };
   },
   'logic-gate-xor': (comp, netLookup, ctx) => {
-    const a = netLookup('A'), b = netLookup('B'), y = netLookup('Y');
+    const a = netLookup('A'),
+      b = netLookup('B'),
+      y = netLookup('Y');
     if (!a || !b || !y) return null;
     const T = ctx.vcc / 2;
     return {
@@ -712,7 +736,9 @@ const MAPPERS: Record<string, Mapper> = {
     };
   },
   'logic-gate-xnor': (comp, netLookup, ctx) => {
-    const a = netLookup('A'), b = netLookup('B'), y = netLookup('Y');
+    const a = netLookup('A'),
+      b = netLookup('B'),
+      y = netLookup('Y');
     if (!a || !b || !y) return null;
     const T = ctx.vcc / 2;
     return {
@@ -724,7 +750,8 @@ const MAPPERS: Record<string, Mapper> = {
     };
   },
   'logic-gate-not': (comp, netLookup, ctx) => {
-    const a = netLookup('A'), y = netLookup('Y');
+    const a = netLookup('A'),
+      y = netLookup('Y');
     if (!a || !y) return null;
     const T = ctx.vcc / 2;
     return {
@@ -749,9 +776,9 @@ const MAPPERS: Record<string, Mapper> = {
       build: (inputs: string[], T: number, vcc: number) => string,
     ): MultiMapper {
       return (comp, netLookup, ctx) => {
-        const inputs = inputNames.map(n => netLookup(n));
+        const inputs = inputNames.map((n) => netLookup(n));
         const y = netLookup('Y');
-        if (inputs.some(n => !n) || !y) return null;
+        if (inputs.some((n) => !n) || !y) return null;
         const T = ctx.vcc / 2;
         return {
           cards: [
@@ -763,22 +790,22 @@ const MAPPERS: Record<string, Mapper> = {
       };
     }
     const andExpr = (inputs: string[], T: number, vcc: number) =>
-      `${vcc} * ${inputs.map(n => `u(V(${n})-${T})`).join(' * ')}`;
+      `${vcc} * ${inputs.map((n) => `u(V(${n})-${T})`).join(' * ')}`;
     const orExpr = (inputs: string[], T: number, vcc: number) =>
-      `${vcc} * (1 - ${inputs.map(n => `(1-u(V(${n})-${T}))`).join(' * ')})`;
+      `${vcc} * (1 - ${inputs.map((n) => `(1-u(V(${n})-${T}))`).join(' * ')})`;
     const nandExpr = (inputs: string[], T: number, vcc: number) =>
-      `${vcc} * (1 - ${inputs.map(n => `u(V(${n})-${T})`).join(' * ')})`;
+      `${vcc} * (1 - ${inputs.map((n) => `u(V(${n})-${T})`).join(' * ')})`;
     const norExpr = (inputs: string[], T: number, vcc: number) =>
-      `${vcc} * ${inputs.map(n => `(1-u(V(${n})-${T}))`).join(' * ')}`;
+      `${vcc} * ${inputs.map((n) => `(1-u(V(${n})-${T}))`).join(' * ')}`;
     return {
-      'logic-gate-and-3':  multiGate(['A', 'B', 'C'],      andExpr),
-      'logic-gate-or-3':   multiGate(['A', 'B', 'C'],      orExpr),
-      'logic-gate-nand-3': multiGate(['A', 'B', 'C'],      nandExpr),
-      'logic-gate-nor-3':  multiGate(['A', 'B', 'C'],      norExpr),
-      'logic-gate-and-4':  multiGate(['A', 'B', 'C', 'D'], andExpr),
-      'logic-gate-or-4':   multiGate(['A', 'B', 'C', 'D'], orExpr),
+      'logic-gate-and-3': multiGate(['A', 'B', 'C'], andExpr),
+      'logic-gate-or-3': multiGate(['A', 'B', 'C'], orExpr),
+      'logic-gate-nand-3': multiGate(['A', 'B', 'C'], nandExpr),
+      'logic-gate-nor-3': multiGate(['A', 'B', 'C'], norExpr),
+      'logic-gate-and-4': multiGate(['A', 'B', 'C', 'D'], andExpr),
+      'logic-gate-or-4': multiGate(['A', 'B', 'C', 'D'], orExpr),
       'logic-gate-nand-4': multiGate(['A', 'B', 'C', 'D'], nandExpr),
-      'logic-gate-nor-4':  multiGate(['A', 'B', 'C', 'D'], norExpr),
+      'logic-gate-nor-4': multiGate(['A', 'B', 'C', 'D'], norExpr),
     };
   })(),
 
@@ -876,23 +903,26 @@ const MAPPERS: Record<string, Mapper> = {
 
     return {
       // 74HC00 — quad 2-input NAND
-      'ic-74hc00': ic2InputQuad((a, b, _y, T, vcc) =>
-        `${vcc} * (1 - u(V(${a})-${T}) * u(V(${b})-${T}))`),
+      'ic-74hc00': ic2InputQuad(
+        (a, b, _y, T, vcc) => `${vcc} * (1 - u(V(${a})-${T}) * u(V(${b})-${T}))`,
+      ),
       // 74HC08 — quad 2-input AND
-      'ic-74hc08': ic2InputQuad((a, b, _y, T, vcc) =>
-        `${vcc} * u(V(${a})-${T}) * u(V(${b})-${T})`),
+      'ic-74hc08': ic2InputQuad((a, b, _y, T, vcc) => `${vcc} * u(V(${a})-${T}) * u(V(${b})-${T})`),
       // 74HC32 — quad 2-input OR
-      'ic-74hc32': ic2InputQuad((a, b, _y, T, vcc) =>
-        `${vcc} * (1 - (1-u(V(${a})-${T})) * (1-u(V(${b})-${T})))`),
+      'ic-74hc32': ic2InputQuad(
+        (a, b, _y, T, vcc) => `${vcc} * (1 - (1-u(V(${a})-${T})) * (1-u(V(${b})-${T})))`,
+      ),
       // 74HC02 — quad 2-input NOR
-      'ic-74hc02': ic2InputQuad((a, b, _y, T, vcc) =>
-        `${vcc} * (1-u(V(${a})-${T})) * (1-u(V(${b})-${T}))`),
+      'ic-74hc02': ic2InputQuad(
+        (a, b, _y, T, vcc) => `${vcc} * (1-u(V(${a})-${T})) * (1-u(V(${b})-${T}))`,
+      ),
       // 74HC86 — quad 2-input XOR
-      'ic-74hc86': ic2InputQuad((a, b, _y, T, vcc) =>
-        `${vcc} * (u(V(${a})-${T}) + u(V(${b})-${T}) - 2*u(V(${a})-${T})*u(V(${b})-${T}))`),
+      'ic-74hc86': ic2InputQuad(
+        (a, b, _y, T, vcc) =>
+          `${vcc} * (u(V(${a})-${T}) + u(V(${b})-${T}) - 2*u(V(${a})-${T})*u(V(${b})-${T}))`,
+      ),
       // 74HC04 — hex inverter
-      'ic-74hc04': ic1InputHex((a, _y, T, vcc) =>
-        `${vcc} * (1 - u(V(${a})-${T}))`),
+      'ic-74hc04': ic1InputHex((a, _y, T, vcc) => `${vcc} * (1 - u(V(${a})-${T}))`),
       // 74HC14 — hex Schmitt-trigger inverter. Threshold moves based on
       // current output state: high output → lower trip (0.4·Vcc), low output
       // → higher trip (0.6·Vcc). This is the hysteresis band.
@@ -1005,9 +1035,7 @@ const MAPPERS: Record<string, Mapper> = {
     if (!pins) return null;
     return {
       cards: [`D_${comp.id} ${pins[0]} ${pins[1]} D1N5817`],
-      modelsUsed: new Set([
-        '.model D1N5817 D(Is=3.3u N=1 Rs=0.025 Bv=20 Ibv=10m Cjo=120p)',
-      ]),
+      modelsUsed: new Set(['.model D1N5817 D(Is=3.3u N=1 Rs=0.025 Bv=20 Ibv=10m Cjo=120p)']),
     };
   },
   'diode-1n5819': (comp, netLookup) => {
@@ -1015,9 +1043,7 @@ const MAPPERS: Record<string, Mapper> = {
     if (!pins) return null;
     return {
       cards: [`D_${comp.id} ${pins[0]} ${pins[1]} D1N5819`],
-      modelsUsed: new Set([
-        '.model D1N5819 D(Is=3u N=1 Rs=0.027 Bv=40 Ibv=10m Cjo=150p)',
-      ]),
+      modelsUsed: new Set(['.model D1N5819 D(Is=3u N=1 Rs=0.027 Bv=40 Ibv=10m Cjo=150p)']),
     };
   },
 
@@ -1035,9 +1061,7 @@ const MAPPERS: Record<string, Mapper> = {
         `D_${comp.id} ${pins[0]} ${pins[1]} DPHOTO`,
         `I_${comp.id}_ph ${pins[1]} ${pins[0]} DC ${iph}`,
       ],
-      modelsUsed: new Set([
-        '.model DPHOTO D(Is=10p N=1.1 Rs=10)',
-      ]),
+      modelsUsed: new Set(['.model DPHOTO D(Is=10p N=1.1 Rs=10)']),
     };
   },
 
@@ -1050,23 +1074,19 @@ const MAPPERS: Record<string, Mapper> = {
     const lux = Number(comp.properties.lux ?? 500);
     const Rdark = parseValueWithUnits(comp.properties.dark, 1_000_000);
     const k = Number(comp.properties.k ?? 5);
-    const Rldr = Rdark / (1 + k * lux / 1000);
+    const Rldr = Rdark / (1 + (k * lux) / 1000);
     const vcc = netLookup('VCC');
     const gnd = netLookup('GND');
     const ao = netLookup('AO');
     if (vcc && gnd && ao) {
       const Rpull = parseValueWithUnits(comp.properties.pullup, 10_000);
       return {
-        cards: [
-          `R_${comp.id}_ldr ${vcc} ${ao} ${Rldr}`,
-          `R_${comp.id}_pull ${ao} ${gnd} ${Rpull}`,
-        ],
+        cards: [`R_${comp.id}_ldr ${vcc} ${ao} ${Rldr}`, `R_${comp.id}_pull ${ao} ${gnd} ${Rpull}`],
         modelsUsed: new Set(),
       };
     }
     // Legacy / discrete LDR fallbacks: emit bare 2-terminal resistor.
-    const pins = twoPin(comp, netLookup, 'LDR1', 'LDR2')
-      ?? twoPin(comp, netLookup, '1', '2');
+    const pins = twoPin(comp, netLookup, 'LDR1', 'LDR2') ?? twoPin(comp, netLookup, '1', '2');
     if (!pins) return null;
     return emitResistor(comp, pins, Rldr);
   },
@@ -1082,38 +1102,40 @@ const MAPPERS: Record<string, Mapper> = {
  * Exported so storeAdapter and DynamicComponent can keep their meta-id
  * tables in sync without restating the list.
  */
-export const PASSIVE_PRESETS: Readonly<Record<string, 'resistor' | 'capacitor' | 'capacitor-electrolytic' | 'inductor'>> = {
+export const PASSIVE_PRESETS: Readonly<
+  Record<string, 'resistor' | 'capacitor' | 'capacitor-electrolytic' | 'inductor'>
+> = {
   // Resistors — E12 series subset covering the common Arduino-bench picks
-  'resistor-220':   'resistor',
-  'resistor-330':   'resistor',
-  'resistor-470':   'resistor',
-  'resistor-1k':    'resistor',
-  'resistor-2k2':   'resistor',
-  'resistor-4k7':   'resistor',
-  'resistor-10k':   'resistor',
-  'resistor-22k':   'resistor',
-  'resistor-47k':   'resistor',
-  'resistor-100k':  'resistor',
-  'resistor-1m':    'resistor',
+  'resistor-220': 'resistor',
+  'resistor-330': 'resistor',
+  'resistor-470': 'resistor',
+  'resistor-1k': 'resistor',
+  'resistor-2k2': 'resistor',
+  'resistor-4k7': 'resistor',
+  'resistor-10k': 'resistor',
+  'resistor-22k': 'resistor',
+  'resistor-47k': 'resistor',
+  'resistor-100k': 'resistor',
+  'resistor-1m': 'resistor',
   // Ceramic caps (non-polarized, smaller end of the range)
-  'cap-10p':   'capacitor',
-  'cap-22p':   'capacitor',
-  'cap-100p':  'capacitor',
-  'cap-1n':    'capacitor',
-  'cap-10n':   'capacitor',
-  'cap-100n':  'capacitor',
-  'cap-1u':    'capacitor',
+  'cap-10p': 'capacitor',
+  'cap-22p': 'capacitor',
+  'cap-100p': 'capacitor',
+  'cap-1n': 'capacitor',
+  'cap-10n': 'capacitor',
+  'cap-100n': 'capacitor',
+  'cap-1u': 'capacitor',
   // Electrolytic caps (polarized, larger values)
-  'cap-elec-1u':    'capacitor-electrolytic',
-  'cap-elec-10u':   'capacitor-electrolytic',
-  'cap-elec-47u':   'capacitor-electrolytic',
-  'cap-elec-100u':  'capacitor-electrolytic',
-  'cap-elec-470u':  'capacitor-electrolytic',
+  'cap-elec-1u': 'capacitor-electrolytic',
+  'cap-elec-10u': 'capacitor-electrolytic',
+  'cap-elec-47u': 'capacitor-electrolytic',
+  'cap-elec-100u': 'capacitor-electrolytic',
+  'cap-elec-470u': 'capacitor-electrolytic',
   'cap-elec-1000u': 'capacitor-electrolytic',
   // Inductors
-  'ind-100u':  'inductor',
-  'ind-1m':    'inductor',
-  'ind-10m':   'inductor',
+  'ind-100u': 'inductor',
+  'ind-1m': 'inductor',
+  'ind-10m': 'inductor',
 };
 
 // Wire each preset to its base mapper.

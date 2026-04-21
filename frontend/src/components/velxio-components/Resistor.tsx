@@ -8,12 +8,7 @@ interface ResistorProps {
   y?: number;
 }
 
-export const Resistor = ({
-  id,
-  value = 1000,
-  x = 0,
-  y = 0,
-}: ResistorProps) => {
+export const Resistor = ({ id, value = 1000, x = 0, y = 0 }: ResistorProps) => {
   const resistorRef = useRef<HTMLElement>(null);
 
   useEffect(() => {

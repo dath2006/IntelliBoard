@@ -37,59 +37,67 @@ Rntc a0 0 ${p.Rntc}
     }
   });
 
-  it('AVR PWM (pot→PWM program) drives ngspice RC filter; settled DC matches duty × 5V', { timeout: 60_000 }, async () => {
-    const voltages = [1.0, 2.5, 4.0];
-    for (const vin of voltages) {
-      const avr = new AVRTestHarness();
-      avr.loadProgram(potToPwmProgram());
-      avr.setAnalogVoltage(0, vin);
-      avr.runCycles(200_000);
-      const duty = avr.getPWMDuty(6);
-      expect(duty).not.toBeNull();
-      expect(duty!).toBeGreaterThan(vin / 5 - 0.05);
-      expect(duty!).toBeLessThan(vin / 5 + 0.05);
+  it(
+    'AVR PWM (pot→PWM program) drives ngspice RC filter; settled DC matches duty × 5V',
+    { timeout: 60_000 },
+    async () => {
+      const voltages = [1.0, 2.5, 4.0];
+      for (const vin of voltages) {
+        const avr = new AVRTestHarness();
+        avr.loadProgram(potToPwmProgram());
+        avr.setAnalogVoltage(0, vin);
+        avr.runCycles(200_000);
+        const duty = avr.getPWMDuty(6);
+        expect(duty).not.toBeNull();
+        expect(duty!).toBeGreaterThan(vin / 5 - 0.05);
+        expect(duty!).toBeLessThan(vin / 5 + 0.05);
 
-      const Vdc = duty! * 5;
-      const { dcValue } = await runNetlist(`PWM DC-equivalent to RC
+        const Vdc = duty! * 5;
+        const { dcValue } = await runNetlist(`PWM DC-equivalent to RC
 Vpwm pwm 0 DC ${Vdc}
 R1 pwm out 10k
 Rload out 0 10Meg
 .op
 .end`);
-      const filtered = dcValue('v(out)');
-      expect(filtered).toBeGreaterThan(Vdc - 0.1);
-      expect(filtered).toBeLessThan(Vdc + 0.1);
-    }
-  });
+        const filtered = dcValue('v(out)');
+        expect(filtered).toBeGreaterThan(Vdc - 0.1);
+        expect(filtered).toBeLessThan(Vdc + 0.1);
+      }
+    },
+  );
 
-  it('co-sim loop: multiple ngspice .tran slices feed AVR ADC, pot movement is observable', { timeout: 60_000 }, async () => {
-    const avr = new AVRTestHarness();
-    avr.loadProgram(adcReadProgram());
+  it(
+    'co-sim loop: multiple ngspice .tran slices feed AVR ADC, pot movement is observable',
+    { timeout: 60_000 },
+    async () => {
+      const avr = new AVRTestHarness();
+      avr.loadProgram(adcReadProgram());
 
-    async function stepBridge(wiperPos: number, sliceCount: number) {
-      for (let s = 0; s < sliceCount; s++) {
-        avr.runCycles(16_000); // 1 ms at 16 MHz
-        const Rtop = Math.max(1, (1 - wiperPos) * 10_000);
-        const Rbot = Math.max(1, wiperPos * 10_000);
-        const result = await runNetlist(`Pot divider
+      async function stepBridge(wiperPos: number, sliceCount: number) {
+        for (let s = 0; s < sliceCount; s++) {
+          avr.runCycles(16_000); // 1 ms at 16 MHz
+          const Rtop = Math.max(1, (1 - wiperPos) * 10_000);
+          const Rbot = Math.max(1, wiperPos * 10_000);
+          const result = await runNetlist(`Pot divider
 Vcc vcc 0 DC 5
 Rtop vcc a0 ${Rtop}
 Rbot a0 0 ${Rbot}
 .tran 10u 1m
 .end`);
-        const vEnd = (result.vec('v(a0)') as number[]).at(-1) ?? 0;
-        avr.setAnalogVoltage(0, vEnd);
+          const vEnd = (result.vec('v(a0)') as number[]).at(-1) ?? 0;
+          avr.setAnalogVoltage(0, vEnd);
+        }
       }
-    }
 
-    await stepBridge(0.25, 5);
-    const raw1 = (avr.reg(0x79) << 2) | (avr.reg(0x78) >> 6);
+      await stepBridge(0.25, 5);
+      const raw1 = (avr.reg(0x79) << 2) | (avr.reg(0x78) >> 6);
 
-    await stepBridge(0.75, 5);
-    const raw2 = (avr.reg(0x79) << 2) | (avr.reg(0x78) >> 6);
+      await stepBridge(0.75, 5);
+      const raw2 = (avr.reg(0x79) << 2) | (avr.reg(0x78) >> 6);
 
-    expect(raw2).toBeGreaterThan(raw1);
-    expect(Math.abs(raw1 - 256)).toBeLessThan(30); // 0.25·1023
-    expect(Math.abs(raw2 - 767)).toBeLessThan(30); // 0.75·1023
-  });
+      expect(raw2).toBeGreaterThan(raw1);
+      expect(Math.abs(raw1 - 256)).toBeLessThan(30); // 0.25·1023
+      expect(Math.abs(raw2 - 767)).toBeLessThan(30); // 0.75·1023
+    },
+  );
 });

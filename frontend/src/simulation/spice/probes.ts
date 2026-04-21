@@ -148,7 +148,13 @@ export function readVoltmeter(
   const plusNet = netLookup(comp.id, 'V+');
   const minusNet = netLookup(comp.id, 'V-');
   if (!plusNet || !minusNet) {
-    return { kind: 'voltmeter', value: 0, unit: '—', display: '— probe not connected', stale: true };
+    return {
+      kind: 'voltmeter',
+      value: 0,
+      unit: '—',
+      display: '— probe not connected',
+      stale: true,
+    };
   }
   const vp = solve.nodeVoltages[plusNet] ?? 0;
   const vm = solve.nodeVoltages[minusNet] ?? 0;
@@ -167,8 +173,8 @@ export function readVoltmeter(
         plusArr.length === 0
           ? minusArr.map((v) => -v)
           : minusArr.length === 0
-          ? [...plusArr]
-          : subtract(plusArr, minusArr);
+            ? [...plusArr]
+            : subtract(plusArr, minusArr);
       if (diffSamples.length > 0 && isAC(diffSamples)) {
         ac = buildAcStatsV(diffSamples);
       }

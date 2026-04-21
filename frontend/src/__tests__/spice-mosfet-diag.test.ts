@@ -13,19 +13,47 @@ import type { BuildNetlistInput } from '../simulation/spice/types';
 function buildInput(gateDuty: number): BuildNetlistInput {
   return {
     components: [
-      { id: 'rl',   metadataId: 'resistor',       properties: { value: '220' } },
-      { id: 'led1', metadataId: 'led',            properties: { color: 'white' } },
-      { id: 'q1',   metadataId: 'mosfet-2n7000',  properties: {} },
-      { id: 'rg',   metadataId: 'resistor',       properties: { value: '100000' } },
+      { id: 'rl', metadataId: 'resistor', properties: { value: '220' } },
+      { id: 'led1', metadataId: 'led', properties: { color: 'white' } },
+      { id: 'q1', metadataId: 'mosfet-2n7000', properties: {} },
+      { id: 'rg', metadataId: 'resistor', properties: { value: '100000' } },
     ],
     wires: [
-      { id: 'w1', start: { componentId: 'arduino-uno', pinName: '5V' }, end: { componentId: 'rl',   pinName: '1' } },
-      { id: 'w2', start: { componentId: 'rl',  pinName: '2' }, end: { componentId: 'led1', pinName: 'A' } },
-      { id: 'w3', start: { componentId: 'led1', pinName: 'C' }, end: { componentId: 'q1', pinName: 'D' } },
-      { id: 'w4', start: { componentId: 'q1',  pinName: 'S' }, end: { componentId: 'arduino-uno', pinName: 'GND' } },
-      { id: 'w5', start: { componentId: 'arduino-uno', pinName: '9' }, end: { componentId: 'q1', pinName: 'G' } },
-      { id: 'w6', start: { componentId: 'q1',  pinName: 'G' }, end: { componentId: 'rg', pinName: '1' } },
-      { id: 'w7', start: { componentId: 'rg',  pinName: '2' }, end: { componentId: 'arduino-uno', pinName: 'GND' } },
+      {
+        id: 'w1',
+        start: { componentId: 'arduino-uno', pinName: '5V' },
+        end: { componentId: 'rl', pinName: '1' },
+      },
+      {
+        id: 'w2',
+        start: { componentId: 'rl', pinName: '2' },
+        end: { componentId: 'led1', pinName: 'A' },
+      },
+      {
+        id: 'w3',
+        start: { componentId: 'led1', pinName: 'C' },
+        end: { componentId: 'q1', pinName: 'D' },
+      },
+      {
+        id: 'w4',
+        start: { componentId: 'q1', pinName: 'S' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
+      {
+        id: 'w5',
+        start: { componentId: 'arduino-uno', pinName: '9' },
+        end: { componentId: 'q1', pinName: 'G' },
+      },
+      {
+        id: 'w6',
+        start: { componentId: 'q1', pinName: 'G' },
+        end: { componentId: 'rg', pinName: '1' },
+      },
+      {
+        id: 'w7',
+        start: { componentId: 'rg', pinName: '2' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
     ],
     boards: [
       {
@@ -33,8 +61,8 @@ function buildInput(gateDuty: number): BuildNetlistInput {
         vcc: 5,
         pins: {
           '5V': { type: 'digital', v: 5 },
-          GND:  { type: 'digital', v: 0 },
-          '9':  { type: 'pwm', duty: gateDuty },
+          GND: { type: 'digital', v: 0 },
+          '9': { type: 'pwm', duty: gateDuty },
         },
         groundPinNames: ['GND'],
         vccPinNames: ['5V'],
@@ -50,11 +78,11 @@ describe('MOSFET PWM LED — scheduler key diagnostic', () => {
     { timeout: 30_000 },
     async () => {
       const { netlist } = buildNetlist(buildInput(1.0)); // 100% duty = full on
-      // eslint-disable-next-line no-console
+       
       console.log('\n=== NETLIST ===\n' + netlist + '\n==============');
 
       const cooked = await runNetlist(netlist);
-      // eslint-disable-next-line no-console
+       
       console.log('RAW variableNames:', cooked.variableNames);
 
       // Mirror CircuitScheduler.drain() exactly
@@ -66,9 +94,9 @@ describe('MOSFET PWM LED — scheduler key diagnostic', () => {
           if (Number.isFinite(i)) branchCurrents[src] = i;
         }
       }
-      // eslint-disable-next-line no-console
+       
       console.log('branchCurrents keys (scheduler-filtered):', Object.keys(branchCurrents));
-      // eslint-disable-next-line no-console
+       
       console.log('v_led1_sense:', branchCurrents['v_led1_sense']);
 
       expect(Object.keys(branchCurrents)).toContain('v_led1_sense');

@@ -109,11 +109,7 @@ describe('end-to-end — RC charging produces exponential trace', () => {
         wires: [],
         boards: [],
         // Step source: 0V for the first 0 s, then 5V (rise 1µs)
-        extraCards: [
-          'V1 vin 0 PULSE(0 5 0 1u 1u 10 20)',
-          'R1 vin vcap 10k',
-          'C1 vcap 0 10u IC=0',
-        ],
+        extraCards: ['V1 vin 0 PULSE(0 5 0 1u 1u 10 20)', 'R1 vin vcap 10k', 'C1 vcap 0 10u IC=0'],
         analysis: { kind: 'tran', step: '1e-3', stop: '5e-1' },
       });
 
@@ -128,7 +124,7 @@ describe('end-to-end — RC charging produces exponential trace', () => {
       // Find the sample closest to t = τ = 0.1 s
       let idxTau = 0;
       let bestTau = Infinity;
-      let idxSettle = t.length - 1;
+      const idxSettle = t.length - 1;
       for (let i = 0; i < t.length; i++) {
         const dTau = Math.abs(t[i] - 0.1);
         if (dTau < bestTau) {

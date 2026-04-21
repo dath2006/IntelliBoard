@@ -16,12 +16,7 @@
  */
 import { UnionFind } from './unionFind';
 import { componentToSpice } from './componentToSpice';
-import type {
-  BuildNetlistInput,
-  ComponentForSpice,
-  BoardForSpice,
-  WireForSpice,
-} from './types';
+import type { BuildNetlistInput, ComponentForSpice, BoardForSpice, WireForSpice } from './types';
 
 const GROUND_PIN_RE = /^(gnd|vss|vee|ground|gnd\.\d+)$/i;
 // Deliberately excludes "V+" / "V-" (which are probe terminals) and
@@ -388,7 +383,7 @@ export function buildBoardPinNetMap(
       ...(board.groundPinNames ?? []),
       ...(board.vccPinNames ?? []),
       ...Object.keys(board.pins ?? {}),
-      ...wireReferencedPins,   // ← the pins that actually exist in the UF
+      ...wireReferencedPins, // ← the pins that actually exist in the UF
     ]);
     for (const pName of allPins) {
       const k = pin(board.id, pName);

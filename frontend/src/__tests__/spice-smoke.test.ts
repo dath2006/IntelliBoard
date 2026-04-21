@@ -9,20 +9,24 @@ import { describe, it, expect } from 'vitest';
 import { runNetlist } from '../simulation/spice/SpiceEngine';
 
 describe('SpiceEngine — smoke test', () => {
-  it('boots ngspice and solves a voltage divider (9V across 1k + 2k → 6V)', { timeout: 60_000 }, async () => {
-    const netlist = `Voltage divider
+  it(
+    'boots ngspice and solves a voltage divider (9V across 1k + 2k → 6V)',
+    { timeout: 60_000 },
+    async () => {
+      const netlist = `Voltage divider
 V1 vcc 0 DC 9
 R1 vcc out 1k
 R2 out 0 2k
 .op
 .end`;
 
-    const result = await runNetlist(netlist);
-    expect(result.variableNames.length).toBeGreaterThan(0);
-    expect(result.variableNames).toContain('v(vcc)');
-    expect(result.variableNames).toContain('v(out)');
-    expect(result.dcValue('v(out)')).toBeCloseTo(6, 3);
-  });
+      const result = await runNetlist(netlist);
+      expect(result.variableNames.length).toBeGreaterThan(0);
+      expect(result.variableNames).toContain('v(vcc)');
+      expect(result.variableNames).toContain('v(out)');
+      expect(result.dcValue('v(out)')).toBeCloseTo(6, 3);
+    },
+  );
 
   it('findVar resolves both "v(node)" and "node"', { timeout: 30_000 }, async () => {
     const result = await runNetlist(`Equal divider

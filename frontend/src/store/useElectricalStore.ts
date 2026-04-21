@@ -13,7 +13,11 @@
  * changes. See [`main.tsx`] or `EditorPage.tsx`.
  */
 import { create } from 'zustand';
-import type { BuildNetlistInput, ElectricalSolveResult, TimeWaveforms } from '../simulation/spice/types';
+import type {
+  BuildNetlistInput,
+  ElectricalSolveResult,
+  TimeWaveforms,
+} from '../simulation/spice/types';
 import { circuitScheduler } from '../simulation/spice/CircuitScheduler';
 
 interface ElectricalState {

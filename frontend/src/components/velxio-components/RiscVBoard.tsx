@@ -15,8 +15,8 @@ interface RiscVBoardProps {
   ledBuiltIn?: boolean;
 }
 
-const W  = 200;
-const H  = 140;
+const W = 200;
+const H = 140;
 const BX = 40;
 const BY = 10;
 const BW = 120;
@@ -29,9 +29,9 @@ const PINS_PER_SIDE = 10;
 const PIN_Y = Array.from({ length: PINS_PER_SIDE }, (_, i) => BY + 5 + i * PIN_SPACING);
 
 // Left-side labels (top → bottom): PA0-PA7, PC0, PC1
-const LEFT_LABELS  = ['PA0','PA1','PA2','PA3','PA4','PA5','PA6','PA7','PC0','PC1'];
+const LEFT_LABELS = ['PA0', 'PA1', 'PA2', 'PA3', 'PA4', 'PA5', 'PA6', 'PA7', 'PC0', 'PC1'];
 // Right-side labels (top → bottom): PC2-PC7, PD0-PD5
-const RIGHT_LABELS = ['PC2','PC3','PC4','PC5','PC6','PC7','PD0','PD1','PD2','PD3'];
+const RIGHT_LABELS = ['PC2', 'PC3', 'PC4', 'PC5', 'PC6', 'PC7', 'PD0', 'PD1', 'PD2', 'PD3'];
 
 export const RiscVBoard = ({
   id = 'riscv-generic',
@@ -51,8 +51,10 @@ export const RiscVBoard = ({
       {PIN_Y.map((py, i) => (
         <line
           key={`lp-${i}`}
-          x1={BX} y1={py}
-          x2={BX - PIN_LEN} y2={py}
+          x1={BX}
+          y1={py}
+          x2={BX - PIN_LEN}
+          y2={py}
           stroke="#5a9a5a"
           strokeWidth="2.5"
           strokeLinecap="round"
@@ -63,8 +65,10 @@ export const RiscVBoard = ({
       {PIN_Y.map((py, i) => (
         <line
           key={`rp-${i}`}
-          x1={BX + BW} y1={py}
-          x2={BX + BW + PIN_LEN} y2={py}
+          x1={BX + BW}
+          y1={py}
+          x2={BX + BW + PIN_LEN}
+          y2={py}
           stroke="#5a9a5a"
           strokeWidth="2.5"
           strokeLinecap="round"
@@ -73,9 +77,12 @@ export const RiscVBoard = ({
 
       {/* IC body */}
       <rect
-        x={BX} y={BY}
-        width={BW} height={BH}
-        rx={5} ry={5}
+        x={BX}
+        y={BY}
+        width={BW}
+        height={BH}
+        rx={5}
+        ry={5}
         fill="#0d1f0d"
         stroke="#2d6a2d"
         strokeWidth="1.5"

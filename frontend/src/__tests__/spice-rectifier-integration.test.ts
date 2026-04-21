@@ -24,20 +24,42 @@ function rectifierSnapshot() {
         properties: { waveform: 'sine', frequency: 50, amplitude: 5, offset: 0 },
       },
       { id: 'd1', metadataId: 'diode-1n4007', properties: {} },
-      { id: 'rl', metadataId: 'resistor',     properties: { value: '1000' } },
+      { id: 'rl', metadataId: 'resistor', properties: { value: '1000' } },
     ],
     wires: [
-      { id: 'w1', start: { componentId: 'sg1', pinName: 'SIG' }, end: { componentId: 'd1', pinName: 'A' } },
-      { id: 'w2', start: { componentId: 'd1',  pinName: 'C' },   end: { componentId: 'rl', pinName: '1' } },
-      { id: 'w3', start: { componentId: 'rl',  pinName: '2' },   end: { componentId: 'arduino-uno', pinName: 'GND' } },
-      { id: 'w4', start: { componentId: 'sg1', pinName: 'GND' }, end: { componentId: 'arduino-uno', pinName: 'GND' } },
-      { id: 'w5', start: { componentId: 'd1',  pinName: 'C' },   end: { componentId: 'arduino-uno', pinName: 'A0' } },
+      {
+        id: 'w1',
+        start: { componentId: 'sg1', pinName: 'SIG' },
+        end: { componentId: 'd1', pinName: 'A' },
+      },
+      {
+        id: 'w2',
+        start: { componentId: 'd1', pinName: 'C' },
+        end: { componentId: 'rl', pinName: '1' },
+      },
+      {
+        id: 'w3',
+        start: { componentId: 'rl', pinName: '2' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
+      {
+        id: 'w4',
+        start: { componentId: 'sg1', pinName: 'GND' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
+      {
+        id: 'w5',
+        start: { componentId: 'd1', pinName: 'C' },
+        end: { componentId: 'arduino-uno', pinName: 'A0' },
+      },
     ],
-    boards: [{
-      id: 'arduino-uno',
-      boardKind: 'arduino-uno' as const,
-      pinStates: {},
-    }],
+    boards: [
+      {
+        id: 'arduino-uno',
+        boardKind: 'arduino-uno' as const,
+        pinStates: {},
+      },
+    ],
   };
 }
 
@@ -97,19 +119,33 @@ describe('half-wave rectifier — end-to-end pipeline', () => {
   it('all-DC circuit → .op, no timeWaveforms (regression guard for the >20 DC examples)', async () => {
     const input = buildInputFromStore({
       components: [
-        { id: 'r1',  metadataId: 'resistor', properties: { value: '1000' } },
-        { id: 'led', metadataId: 'led',      properties: { color: 'red' } },
+        { id: 'r1', metadataId: 'resistor', properties: { value: '1000' } },
+        { id: 'led', metadataId: 'led', properties: { color: 'red' } },
       ],
       wires: [
-        { id: 'w1', start: { componentId: 'arduino-uno', pinName: '13' }, end: { componentId: 'r1', pinName: '1' } },
-        { id: 'w2', start: { componentId: 'r1', pinName: '2' },            end: { componentId: 'led', pinName: 'A' } },
-        { id: 'w3', start: { componentId: 'led', pinName: 'C' },           end: { componentId: 'arduino-uno', pinName: 'GND' } },
+        {
+          id: 'w1',
+          start: { componentId: 'arduino-uno', pinName: '13' },
+          end: { componentId: 'r1', pinName: '1' },
+        },
+        {
+          id: 'w2',
+          start: { componentId: 'r1', pinName: '2' },
+          end: { componentId: 'led', pinName: 'A' },
+        },
+        {
+          id: 'w3',
+          start: { componentId: 'led', pinName: 'C' },
+          end: { componentId: 'arduino-uno', pinName: 'GND' },
+        },
       ],
-      boards: [{
-        id: 'arduino-uno',
-        boardKind: 'arduino-uno' as const,
-        pinStates: { '13': { type: 'digital', v: 5 } },
-      }],
+      boards: [
+        {
+          id: 'arduino-uno',
+          boardKind: 'arduino-uno' as const,
+          pinStates: { '13': { type: 'digital', v: 5 } },
+        },
+      ],
     });
 
     expect(input.analysis.kind).toBe('op');

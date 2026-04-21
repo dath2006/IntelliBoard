@@ -29,8 +29,12 @@ export function createSerialBatcher(flush: BatchFlush): SerialBatcher {
 
   const raf: (cb: () => void) => void =
     typeof requestAnimationFrame === 'function'
-      ? (cb) => { requestAnimationFrame(cb); }
-      : (cb) => { setTimeout(cb, 0); };
+      ? (cb) => {
+          requestAnimationFrame(cb);
+        }
+      : (cb) => {
+          setTimeout(cb, 0);
+        };
 
   const doFlush = () => {
     scheduled = false;

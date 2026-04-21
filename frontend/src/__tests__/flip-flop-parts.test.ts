@@ -49,11 +49,7 @@ const pinMap =
 /**
  * Drive the callback for the pin registered at `onPinChange.mock.calls[callIndex]`.
  */
-function firePin(
-  sim: ReturnType<typeof makeSimulator>,
-  callIndex: number,
-  state: boolean,
-) {
+function firePin(sim: ReturnType<typeof makeSimulator>, callIndex: number, state: boolean) {
   const [pin, cb] = sim.pinManager.onPinChange.mock.calls[callIndex];
   (cb as (p: number, s: boolean) => void)(pin as number, state);
 }
@@ -70,12 +66,7 @@ describe('flip-flop-d', () => {
   it('initial state: Q = 0, Qbar = 1', () => {
     const sim = makeSimulator();
     const logic = PartSimulationRegistry.get('flip-flop-d')!;
-    logic.attachEvents!(
-      makeElement(),
-      sim as any,
-      pinMap({ CLK: 1, D: 2, Q: 3, Qbar: 4 }),
-      'ff1',
-    );
+    logic.attachEvents!(makeElement(), sim as any, pinMap({ CLK: 1, D: 2, Q: 3, Qbar: 4 }), 'ff1');
     expect(sim.setPinState).toHaveBeenCalledWith(3, false);
     expect(sim.setPinState).toHaveBeenCalledWith(4, true);
   });
@@ -83,12 +74,7 @@ describe('flip-flop-d', () => {
   it('Q samples D on rising CLK edge (D=1 → Q=1)', () => {
     const sim = makeSimulator();
     const logic = PartSimulationRegistry.get('flip-flop-d')!;
-    logic.attachEvents!(
-      makeElement(),
-      sim as any,
-      pinMap({ CLK: 1, D: 2, Q: 3, Qbar: 4 }),
-      'ff1',
-    );
+    logic.attachEvents!(makeElement(), sim as any, pinMap({ CLK: 1, D: 2, Q: 3, Qbar: 4 }), 'ff1');
     // onPinChange calls: 0=CLK, 1=D
     firePin(sim, 1, true); // D goes HIGH (no clock edge yet)
     // Q should not have changed — only setPinState calls are initial ones
@@ -102,14 +88,9 @@ describe('flip-flop-d', () => {
   it('ignores falling CLK edge', () => {
     const sim = makeSimulator();
     const logic = PartSimulationRegistry.get('flip-flop-d')!;
-    logic.attachEvents!(
-      makeElement(),
-      sim as any,
-      pinMap({ CLK: 1, D: 2, Q: 3, Qbar: 4 }),
-      'ff1',
-    );
-    firePin(sim, 0, true);  // CLK rises (initial rising edge)
-    firePin(sim, 1, true);  // D goes HIGH after rising
+    logic.attachEvents!(makeElement(), sim as any, pinMap({ CLK: 1, D: 2, Q: 3, Qbar: 4 }), 'ff1');
+    firePin(sim, 0, true); // CLK rises (initial rising edge)
+    firePin(sim, 1, true); // D goes HIGH after rising
     const callCountAfterRise = sim.setPinState.mock.calls.length;
     firePin(sim, 0, false); // CLK falls — must NOT latch
     expect(sim.setPinState.mock.calls.length).toBe(callCountAfterRise);
@@ -120,29 +101,19 @@ describe('flip-flop-t', () => {
   it('toggles Q on rising CLK when T=1', () => {
     const sim = makeSimulator();
     const logic = PartSimulationRegistry.get('flip-flop-t')!;
-    logic.attachEvents!(
-      makeElement(),
-      sim as any,
-      pinMap({ CLK: 1, T: 2, Q: 3, Qbar: 4 }),
-      'ff1',
-    );
+    logic.attachEvents!(makeElement(), sim as any, pinMap({ CLK: 1, T: 2, Q: 3, Qbar: 4 }), 'ff1');
     firePin(sim, 1, true); // T = HIGH
     firePin(sim, 0, true); // Rising CLK → Q toggles to 1
     expect(sim.setPinState).toHaveBeenCalledWith(3, true);
     firePin(sim, 0, false); // Falling — ignored
-    firePin(sim, 0, true);  // Next rising CLK → Q toggles to 0
+    firePin(sim, 0, true); // Next rising CLK → Q toggles to 0
     expect(sim.setPinState).toHaveBeenLastCalledWith(4, true); // Qbar = 1
   });
 
   it('holds Q on rising CLK when T=0', () => {
     const sim = makeSimulator();
     const logic = PartSimulationRegistry.get('flip-flop-t')!;
-    logic.attachEvents!(
-      makeElement(),
-      sim as any,
-      pinMap({ CLK: 1, T: 2, Q: 3, Qbar: 4 }),
-      'ff1',
-    );
+    logic.attachEvents!(makeElement(), sim as any, pinMap({ CLK: 1, T: 2, Q: 3, Qbar: 4 }), 'ff1');
     // T defaults false
     firePin(sim, 0, true); // Rising CLK
     // Q should still be false (no toggle)
@@ -161,8 +132,8 @@ describe('flip-flop-jk', () => {
       'ff1',
     );
     // onPinChange calls: 0=CLK, 1=J, 2=K
-    firePin(sim, 1, true);  // J=1
-    firePin(sim, 0, true);  // Rising CLK
+    firePin(sim, 1, true); // J=1
+    firePin(sim, 0, true); // Rising CLK
     expect(sim.setPinState).toHaveBeenCalledWith(4, true);
   });
 

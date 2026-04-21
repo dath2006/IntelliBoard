@@ -16,14 +16,14 @@
  */
 
 const STROKE = '#2a2a2a';
-const LEAD   = '#555555';
-const FILL   = '#f4f0e8';
-const LABEL  = '#333333';
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const LEAD = '#555555';
+const FILL = '#f4f0e8';
+const LABEL = '#333333';
+const STYLE = ':host{display:inline-block;line-height:0}';
 
 function diodePinInfo() {
   return [
-    { name: 'A', x: 0,  y: 16, number: 1, signals: [] as string[] },
+    { name: 'A', x: 0, y: 16, number: 1, signals: [] as string[] },
     { name: 'C', x: 72, y: 16, number: 2, signals: [] as string[] },
   ];
 }
@@ -91,29 +91,33 @@ function makeDiodeClass(label: string, shape: 'normal' | 'zener' | 'schottky', l
     readonly pinInfo = diodePinInfo();
     constructor() {
       super();
-      this.attachShadow({ mode: 'open' }).innerHTML = diodeSvg({ cathodeShape: shape, showLightArrows: light, label });
+      this.attachShadow({ mode: 'open' }).innerHTML = diodeSvg({
+        cathodeShape: shape,
+        showLightArrows: light,
+        label,
+      });
     }
   };
 }
 
-const Diode       = makeDiodeClass('D',      'normal');
+const Diode = makeDiodeClass('D', 'normal');
 const Diode1N4148 = makeDiodeClass('1N4148', 'normal');
 const Diode1N4007 = makeDiodeClass('1N4007', 'normal');
 const Zener1N4733 = makeDiodeClass('1N4733', 'zener');
 const Diode1N5817 = makeDiodeClass('1N5817', 'schottky');
 const Diode1N5819 = makeDiodeClass('1N5819', 'schottky');
-const Photodiode  = makeDiodeClass('PHOTO',  'normal', true);
+const Photodiode = makeDiodeClass('PHOTO', 'normal', true);
 
 function def(tag: string, cls: CustomElementConstructor) {
   if (!customElements.get(tag)) customElements.define(tag, cls);
 }
 
-def('wokwi-diode',         Diode);
-def('wokwi-diode-1n4148',  Diode1N4148);
-def('wokwi-diode-1n4007',  Diode1N4007);
-def('wokwi-zener-1n4733',  Zener1N4733);
-def('wokwi-diode-1n5817',  Diode1N5817);
-def('wokwi-diode-1n5819',  Diode1N5819);
-def('wokwi-photodiode',    Photodiode);
+def('wokwi-diode', Diode);
+def('wokwi-diode-1n4148', Diode1N4148);
+def('wokwi-diode-1n4007', Diode1N4007);
+def('wokwi-zener-1n4733', Zener1N4733);
+def('wokwi-diode-1n5817', Diode1N5817);
+def('wokwi-diode-1n5819', Diode1N5819);
+def('wokwi-photodiode', Photodiode);
 
 export {};

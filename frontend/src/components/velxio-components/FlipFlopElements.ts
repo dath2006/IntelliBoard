@@ -5,9 +5,9 @@
  * time-domain `ddt()` which doesn't work in `.op`).
  *
  * Tags defined:
- *   wokwi-flip-flop-d   — D-type (Q ← D on rising CLK)
- *   wokwi-flip-flop-t   — T-type (Q toggles when T=1 on rising CLK)
- *   wokwi-flip-flop-jk  — JK (hold/set/reset/toggle on rising CLK)
+ *   velxio-flip-flop-d   — D-type (Q ← D on rising CLK)
+ *   velxio-flip-flop-t   — T-type (Q toggles when T=1 on rising CLK)
+ *   velxio-flip-flop-jk  — JK (hold/set/reset/toggle on rising CLK)
  *
  * Pin layouts (80 × 64 px):
  *   D-FF:   D  (0, 16)  CLK (0, 48)  Q (80, 16)  Qbar (80, 48)
@@ -15,23 +15,32 @@
  *   JK-FF:  J  (0, 12)  K   (0, 36)  CLK (0, 56)  Q (80, 16)  Qbar (80, 48)
  */
 
-const FILL   = '#eef3fa';
+const FILL = '#eef3fa';
 const STROKE = '#2a2a2a';
-const LEAD   = '#555555';
-const LABEL  = '#333333';
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const LEAD = '#555555';
+const LABEL = '#333333';
+const STYLE = ':host{display:inline-block;line-height:0}';
 const W = 80;
 const H = 64;
 
-function ffSvg(inputLabels: Array<{ label: string; y: number; isClk?: boolean }>, partLabel: string): string {
-  const inputLeads = inputLabels.map(inp => `
+function ffSvg(
+  inputLabels: Array<{ label: string; y: number; isClk?: boolean }>,
+  partLabel: string,
+): string {
+  const inputLeads = inputLabels
+    .map(
+      (inp) => `
     <line x1="0" y1="${inp.y}" x2="14" y2="${inp.y}" stroke="${LEAD}" stroke-width="2"/>
-    ${inp.isClk
-      ? `<!-- Clock triangle (inverter-like marker) -->
+    ${
+      inp.isClk
+        ? `<!-- Clock triangle (inverter-like marker) -->
          <polygon points="14,${inp.y - 4} 20,${inp.y} 14,${inp.y + 4}" fill="none" stroke="${STROKE}" stroke-width="1"/>`
-      : ''}
+        : ''
+    }
     <text x="2" y="${inp.y - 2}" font-family="sans-serif" font-size="6" fill="${LABEL}">${inp.label}</text>
-  `).join('');
+  `,
+    )
+    .join('');
 
   return `
     <style>${STYLE}</style>
@@ -51,15 +60,18 @@ function ffSvg(inputLabels: Array<{ label: string; y: number; isClk?: boolean }>
 
 class DFlipFlopElement extends HTMLElement {
   readonly pinInfo = [
-    { name: 'D',    x: 0,  y: 16, number: 1, signals: [] as string[] },
-    { name: 'CLK',  x: 0,  y: 48, number: 2, signals: [] as string[] },
-    { name: 'Q',    x: W,  y: 16, number: 3, signals: [] as string[] },
-    { name: 'Qbar', x: W,  y: 48, number: 4, signals: [] as string[] },
+    { name: 'D', x: 0, y: 16, number: 1, signals: [] as string[] },
+    { name: 'CLK', x: 0, y: 48, number: 2, signals: [] as string[] },
+    { name: 'Q', x: W, y: 16, number: 3, signals: [] as string[] },
+    { name: 'Qbar', x: W, y: 48, number: 4, signals: [] as string[] },
   ];
   constructor() {
     super();
     this.attachShadow({ mode: 'open' }).innerHTML = ffSvg(
-      [{ label: 'D', y: 16 }, { label: 'CLK', y: 48, isClk: true }],
+      [
+        { label: 'D', y: 16 },
+        { label: 'CLK', y: 48, isClk: true },
+      ],
       'D-FF',
     );
   }
@@ -67,15 +79,18 @@ class DFlipFlopElement extends HTMLElement {
 
 class TFlipFlopElement extends HTMLElement {
   readonly pinInfo = [
-    { name: 'T',    x: 0,  y: 16, number: 1, signals: [] as string[] },
-    { name: 'CLK',  x: 0,  y: 48, number: 2, signals: [] as string[] },
-    { name: 'Q',    x: W,  y: 16, number: 3, signals: [] as string[] },
-    { name: 'Qbar', x: W,  y: 48, number: 4, signals: [] as string[] },
+    { name: 'T', x: 0, y: 16, number: 1, signals: [] as string[] },
+    { name: 'CLK', x: 0, y: 48, number: 2, signals: [] as string[] },
+    { name: 'Q', x: W, y: 16, number: 3, signals: [] as string[] },
+    { name: 'Qbar', x: W, y: 48, number: 4, signals: [] as string[] },
   ];
   constructor() {
     super();
     this.attachShadow({ mode: 'open' }).innerHTML = ffSvg(
-      [{ label: 'T', y: 16 }, { label: 'CLK', y: 48, isClk: true }],
+      [
+        { label: 'T', y: 16 },
+        { label: 'CLK', y: 48, isClk: true },
+      ],
       'T-FF',
     );
   }
@@ -83,23 +98,30 @@ class TFlipFlopElement extends HTMLElement {
 
 class JKFlipFlopElement extends HTMLElement {
   readonly pinInfo = [
-    { name: 'J',    x: 0,  y: 12, number: 1, signals: [] as string[] },
-    { name: 'K',    x: 0,  y: 36, number: 2, signals: [] as string[] },
-    { name: 'CLK',  x: 0,  y: 56, number: 3, signals: [] as string[] },
-    { name: 'Q',    x: W,  y: 16, number: 4, signals: [] as string[] },
-    { name: 'Qbar', x: W,  y: 48, number: 5, signals: [] as string[] },
+    { name: 'J', x: 0, y: 12, number: 1, signals: [] as string[] },
+    { name: 'K', x: 0, y: 36, number: 2, signals: [] as string[] },
+    { name: 'CLK', x: 0, y: 56, number: 3, signals: [] as string[] },
+    { name: 'Q', x: W, y: 16, number: 4, signals: [] as string[] },
+    { name: 'Qbar', x: W, y: 48, number: 5, signals: [] as string[] },
   ];
   constructor() {
     super();
     this.attachShadow({ mode: 'open' }).innerHTML = ffSvg(
-      [{ label: 'J', y: 12 }, { label: 'K', y: 36 }, { label: 'CLK', y: 56, isClk: true }],
+      [
+        { label: 'J', y: 12 },
+        { label: 'K', y: 36 },
+        { label: 'CLK', y: 56, isClk: true },
+      ],
       'JK-FF',
     );
   }
 }
 
-if (!customElements.get('wokwi-flip-flop-d'))  customElements.define('wokwi-flip-flop-d',  DFlipFlopElement);
-if (!customElements.get('wokwi-flip-flop-t'))  customElements.define('wokwi-flip-flop-t',  TFlipFlopElement);
-if (!customElements.get('wokwi-flip-flop-jk')) customElements.define('wokwi-flip-flop-jk', JKFlipFlopElement);
+if (!customElements.get('velxio-flip-flop-d'))
+  customElements.define('velxio-flip-flop-d', DFlipFlopElement);
+if (!customElements.get('velxio-flip-flop-t'))
+  customElements.define('velxio-flip-flop-t', TFlipFlopElement);
+if (!customElements.get('velxio-flip-flop-jk'))
+  customElements.define('velxio-flip-flop-jk', JKFlipFlopElement);
 
 export {};

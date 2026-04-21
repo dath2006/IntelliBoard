@@ -13,7 +13,7 @@ D1 a 0 DMOD
     const { dcValue } = await runNetlist(netlist);
     const Va = dcValue('v(a)');
     expect(Va).toBeGreaterThan(0.55);
-    expect(Va).toBeLessThan(0.80);
+    expect(Va).toBeLessThan(0.8);
   });
 
   it('full-wave bridge rectifier outputs ~|Vin| − 2·Vf', { timeout: 30_000 }, async () => {
@@ -46,8 +46,11 @@ R1 p n 1k
 });
 
 describe('ngspice — BJT', () => {
-  it('common-emitter amplifier inverts and amplifies a small signal', { timeout: 30_000 }, async () => {
-    const netlist = `Common-emitter
+  it(
+    'common-emitter amplifier inverts and amplifies a small signal',
+    { timeout: 30_000 },
+    async () => {
+      const netlist = `Common-emitter
 Vcc vcc 0 DC 12
 Vin in 0 SIN(0 0.01 1k)
 Cin in b 1u
@@ -62,22 +65,23 @@ Rout out 0 100k
 .model Q2N2222 NPN(Is=1e-14 Bf=200 Vaf=75)
 .tran 10u 6m
 .end`;
-    const { vec } = await runNetlist(netlist);
-    const t = vec('time') as number[];
-    const vin = vec('v(in)') as number[];
-    const vout = vec('v(out)') as number[];
-    let maxIn = 0;
-    let maxOut = 0;
-    let minOut = Infinity;
-    for (let i = 0; i < t.length; i++) {
-      if (t[i] < 3e-3) continue;
-      if (Math.abs(vin[i]) > maxIn) maxIn = Math.abs(vin[i]);
-      if (vout[i] > maxOut) maxOut = vout[i];
-      if (vout[i] < minOut) minOut = vout[i];
-    }
-    const gain = (maxOut - minOut) / (2 * maxIn);
-    expect(gain).toBeGreaterThan(30);
-  });
+      const { vec } = await runNetlist(netlist);
+      const t = vec('time') as number[];
+      const vin = vec('v(in)') as number[];
+      const vout = vec('v(out)') as number[];
+      let maxIn = 0;
+      let maxOut = 0;
+      let minOut = Infinity;
+      for (let i = 0; i < t.length; i++) {
+        if (t[i] < 3e-3) continue;
+        if (Math.abs(vin[i]) > maxIn) maxIn = Math.abs(vin[i]);
+        if (vout[i] > maxOut) maxOut = vout[i];
+        if (vout[i] < minOut) minOut = vout[i];
+      }
+      const gain = (maxOut - minOut) / (2 * maxIn);
+      expect(gain).toBeGreaterThan(30);
+    },
+  );
 });
 
 describe('ngspice — MOSFET', () => {

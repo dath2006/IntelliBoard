@@ -23,9 +23,7 @@ function emptyArduino(): StoreSnapshot['boards'][number] {
 describe('storeAdapter — AC source detection', () => {
   it('all-DC circuit → .op analysis', () => {
     const input = buildInputFromStore({
-      components: [
-        { id: 'r1', metadataId: 'resistor', properties: { value: '1k' } },
-      ],
+      components: [{ id: 'r1', metadataId: 'resistor', properties: { value: '1k' } }],
       wires: [],
       boards: [emptyArduino()],
     });
@@ -72,8 +70,16 @@ describe('storeAdapter — AC source detection', () => {
   it('multiple AC sources → step resolves the highest freq, stop covers the lowest', () => {
     const input = buildInputFromStore({
       components: [
-        { id: 'sgA', metadataId: 'signal-generator', properties: { waveform: 'sine', frequency: 50 } },
-        { id: 'sgB', metadataId: 'signal-generator', properties: { waveform: 'square', frequency: 1000 } },
+        {
+          id: 'sgA',
+          metadataId: 'signal-generator',
+          properties: { waveform: 'sine', frequency: 50 },
+        },
+        {
+          id: 'sgB',
+          metadataId: 'signal-generator',
+          properties: { waveform: 'square', frequency: 1000 },
+        },
       ],
       wires: [],
       boards: [emptyArduino()],
@@ -147,8 +153,16 @@ describe('end-to-end — half-wave rectifier produces valid sine + rectified out
         { id: 'r1', metadataId: 'resistor', properties: { value: '1k' } },
       ],
       wires: [
-        { id: 'w1', start: { componentId: 'sg1', pinName: 'SIG' }, end: { componentId: 'r1', pinName: '1' } },
-        { id: 'w2', start: { componentId: 'r1', pinName: '2' },   end: { componentId: 'sg1', pinName: 'GND' } },
+        {
+          id: 'w1',
+          start: { componentId: 'sg1', pinName: 'SIG' },
+          end: { componentId: 'r1', pinName: '1' },
+        },
+        {
+          id: 'w2',
+          start: { componentId: 'r1', pinName: '2' },
+          end: { componentId: 'sg1', pinName: 'GND' },
+        },
       ],
       boards: [],
       analysis: { kind: 'tran', step: '1e-3', stop: '8e-2' },
@@ -159,9 +173,7 @@ describe('end-to-end — half-wave rectifier produces valid sine + rectified out
     expect(tranResult.timeWaveforms!.time.length).toBeGreaterThanOrEqual(40);
 
     const opResult = await circuitScheduler.solveNow({
-      components: [
-        { id: 'r1', metadataId: 'resistor', properties: { value: '1k' } },
-      ],
+      components: [{ id: 'r1', metadataId: 'resistor', properties: { value: '1k' } }],
       wires: [],
       boards: [],
       analysis: { kind: 'op' },
@@ -180,10 +192,7 @@ describe('end-to-end — half-wave rectifier produces valid sine + rectified out
       components: [],
       wires: [],
       boards: [],
-      extraCards: [
-        'V1 probe 0 DC 5',
-        'R1 probe 0 1k',
-      ],
+      extraCards: ['V1 probe 0 DC 5', 'R1 probe 0 1k'],
       analysis: { kind: 'tran', step: '1e-4', stop: '1e-3' },
     });
 

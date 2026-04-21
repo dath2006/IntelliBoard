@@ -19,20 +19,20 @@ class RaspberryPi3Element extends HTMLElement {
 
     // 40-pin header (2 rows of 20)
     for (let i = 0; i < 20; i++) {
-        // Row 1 (odd pins 1, 3, 5...)
-        pins.push({
-            name: `${i * 2 + 1}`,
-            x: startX + i * pinSpacing,
-            y: startY,
-            signals: []
-        });
-        // Row 2 (even pins 2, 4, 6...)
-        pins.push({
-            name: `${i * 2 + 2}`,
-            x: startX + i * pinSpacing,
-            y: startY + pinSpacing,
-            signals: []
-        });
+      // Row 1 (odd pins 1, 3, 5...)
+      pins.push({
+        name: `${i * 2 + 1}`,
+        x: startX + i * pinSpacing,
+        y: startY,
+        signals: [],
+      });
+      // Row 2 (even pins 2, 4, 6...)
+      pins.push({
+        name: `${i * 2 + 2}`,
+        x: startX + i * pinSpacing,
+        y: startY + pinSpacing,
+        signals: [],
+      });
     }
     return pins;
   }
@@ -40,7 +40,7 @@ class RaspberryPi3Element extends HTMLElement {
   render() {
     let pinsSvg = '';
     const pins = this.pinInfo;
-    pins.forEach(pin => {
+    pins.forEach((pin) => {
       // Pin gold plating
       pinsSvg += `<rect x="${pin.x - 3}" y="${pin.y - 3}" width="6" height="6" fill="#D4AF37" />`;
       // Pin hole
@@ -86,7 +86,7 @@ class RaspberryPi3Element extends HTMLElement {
       </style>
       <svg viewBox="0 0 ${PI_WIDTH} ${PI_HEIGHT}">
         <!-- PCB -->
-        <rect class="board" x="2" y="2" width="${PI_WIDTH-4}" height="${PI_HEIGHT-4}" />
+        <rect class="board" x="2" y="2" width="${PI_WIDTH - 4}" height="${PI_HEIGHT - 4}" />
         
         <!-- CPU / Broadcom SoC -->
         <rect class="cpu" x="100" y="60" width="40" height="40" />
@@ -112,8 +112,8 @@ class RaspberryPi3Element extends HTMLElement {
   }
 }
 
-if (!customElements.get('wokwi-raspberry-pi-3')) {
-  customElements.define('wokwi-raspberry-pi-3', RaspberryPi3Element);
+if (!customElements.get('velxio-raspberry-pi-3')) {
+  customElements.define('velxio-raspberry-pi-3', RaspberryPi3Element);
 }
 
 export {};

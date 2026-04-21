@@ -33,7 +33,9 @@ describe('circuitExamples integration', () => {
       expect(e.id, `missing id: ${JSON.stringify(e)}`).toBeTypeOf('string');
       expect(e.title).toBeTypeOf('string');
       expect(e.description).toBeTypeOf('string');
-      expect(e.category).toMatch(/^(basics|sensors|displays|communication|games|robotics|circuits)$/);
+      expect(e.category).toMatch(
+        /^(basics|sensors|displays|communication|games|robotics|circuits)$/,
+      );
       expect(e.difficulty).toMatch(/^(beginner|intermediate|advanced)$/);
       expect(e.code).toBeTypeOf('string');
       expect(Array.isArray(e.components)).toBe(true);

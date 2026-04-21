@@ -62,8 +62,14 @@ export async function loadExample(
   }
 
   const {
-    setComponents, setWires, setBoardType,
-    activeBoardId, boards, addBoard, removeBoard, setActiveBoardId,
+    setComponents,
+    setWires,
+    setBoardType,
+    activeBoardId,
+    boards,
+    addBoard,
+    removeBoard,
+    setActiveBoardId,
     recalculateAllWirePositions,
   } = useSimulatorStore.getState();
 
@@ -123,7 +129,7 @@ export async function loadExample(
     setComponents(
       componentsWithoutBoard.map((comp) => ({
         id: comp.id,
-        metadataId: comp.type.replace('wokwi-', ''),
+        metadataId: comp.type.replace(/^(wokwi|velxio)-/, ''),
         x: comp.x,
         y: comp.y,
         properties: comp.properties,
@@ -164,7 +170,7 @@ export async function loadExample(
     setComponents(
       componentsWithoutBoard.map((comp) => ({
         id: comp.id,
-        metadataId: comp.type.replace('wokwi-', ''),
+        metadataId: comp.type.replace(/^(wokwi|velxio)-/, ''),
         x: comp.x,
         y: comp.y,
         properties: comp.properties,
@@ -183,8 +189,18 @@ export async function loadExample(
     setWires(
       example.wires.map((wire) => ({
         id: wire.id,
-        start: { componentId: remapBoardId(wire.start.componentId), pinName: wire.start.pinName, x: 0, y: 0 },
-        end: { componentId: remapBoardId(wire.end.componentId), pinName: wire.end.pinName, x: 0, y: 0 },
+        start: {
+          componentId: remapBoardId(wire.start.componentId),
+          pinName: wire.start.pinName,
+          x: 0,
+          y: 0,
+        },
+        end: {
+          componentId: remapBoardId(wire.end.componentId),
+          pinName: wire.end.pinName,
+          x: 0,
+          y: 0,
+        },
         color: wire.color,
         waypoints: [],
       })),

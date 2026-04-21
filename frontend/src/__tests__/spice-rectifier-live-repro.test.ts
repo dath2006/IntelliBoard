@@ -51,17 +51,39 @@ function rectifierSnapshot() {
       { id: 'rl', metadataId: 'resistor', properties: { value: '1000' } },
     ],
     wires: [
-      { id: 'w1', start: { componentId: 'sg1', pinName: 'SIG' }, end: { componentId: 'd1', pinName: 'A' } },
-      { id: 'w2', start: { componentId: 'd1', pinName: 'C' }, end: { componentId: 'rl', pinName: '1' } },
-      { id: 'w3', start: { componentId: 'rl', pinName: '2' }, end: { componentId: 'arduino-uno', pinName: 'GND' } },
-      { id: 'w4', start: { componentId: 'sg1', pinName: 'GND' }, end: { componentId: 'arduino-uno', pinName: 'GND' } },
-      { id: 'w5', start: { componentId: 'd1', pinName: 'C' }, end: { componentId: 'arduino-uno', pinName: 'A0' } },
+      {
+        id: 'w1',
+        start: { componentId: 'sg1', pinName: 'SIG' },
+        end: { componentId: 'd1', pinName: 'A' },
+      },
+      {
+        id: 'w2',
+        start: { componentId: 'd1', pinName: 'C' },
+        end: { componentId: 'rl', pinName: '1' },
+      },
+      {
+        id: 'w3',
+        start: { componentId: 'rl', pinName: '2' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
+      {
+        id: 'w4',
+        start: { componentId: 'sg1', pinName: 'GND' },
+        end: { componentId: 'arduino-uno', pinName: 'GND' },
+      },
+      {
+        id: 'w5',
+        start: { componentId: 'd1', pinName: 'C' },
+        end: { componentId: 'arduino-uno', pinName: 'A0' },
+      },
     ],
-    boards: [{
-      id: 'arduino-uno',
-      boardKind: 'arduino-uno' as const,
-      pinStates: {}, // Arduino is just observing A0 — no driven pins
-    }],
+    boards: [
+      {
+        id: 'arduino-uno',
+        boardKind: 'arduino-uno' as const,
+        pinStates: {}, // Arduino is just observing A0 — no driven pins
+      },
+    ],
   };
 }
 
@@ -70,12 +92,15 @@ function interpolateAt(ts: number[], vs: number[], t: number): number {
   if (t <= ts[0]) return vs[0];
   const last = ts.length - 1;
   if (t >= ts[last]) return vs[last];
-  let lo = 0, hi = last;
+  let lo = 0,
+    hi = last;
   while (lo + 1 < hi) {
     const mid = (lo + hi) >> 1;
-    if (ts[mid] <= t) lo = mid; else hi = mid;
+    if (ts[mid] <= t) lo = mid;
+    else hi = mid;
   }
-  const t0 = ts[lo], t1 = ts[hi];
+  const t0 = ts[lo],
+    t1 = ts[hi];
   if (t1 === t0) return vs[lo];
   const a = (t - t0) / (t1 - t0);
   return vs[lo] * (1 - a) + vs[hi] * a;
@@ -88,8 +113,17 @@ describe('Half-Wave Rectifier — layer-by-layer reproduction', () => {
     const input = buildInputFromStore(snap);
     console.log('\n=== L1 buildInputFromStore ===');
     console.log('analysis:', input.analysis);
-    console.log('components:', input.components.map((c) => ({ id: c.id, meta: c.metadataId })));
-    console.log('boards[0]:', { id: input.boards[0].id, vcc: input.boards[0].vcc, pins: input.boards[0].pins, gnd: input.boards[0].groundPinNames, vccPins: input.boards[0].vccPinNames });
+    console.log(
+      'components:',
+      input.components.map((c) => ({ id: c.id, meta: c.metadataId })),
+    );
+    console.log('boards[0]:', {
+      id: input.boards[0].id,
+      vcc: input.boards[0].vcc,
+      pins: input.boards[0].pins,
+      gnd: input.boards[0].groundPinNames,
+      vccPins: input.boards[0].vccPinNames,
+    });
     expect(input.analysis.kind).toBe('tran');
     expect(input.components.some((c) => c.metadataId === 'signal-generator')).toBe(true);
 
@@ -114,8 +148,13 @@ describe('Half-Wave Rectifier — layer-by-layer reproduction', () => {
     const wfName = `v(${a0Net})`;
     expect(cooked.variableNames.map((n) => n.toLowerCase())).toContain(wfName.toLowerCase());
     const wf = cooked.vec(wfName) as number[];
-    console.log(`${wfName} samples: peak=${Math.max(...wf).toFixed(3)} V  min=${Math.min(...wf).toFixed(3)} V  mean=${(wf.reduce((a,b)=>a+b,0)/wf.length).toFixed(3)} V`);
-    console.log(`${wfName} first 12 samples:`, wf.slice(0, 12).map((v) => v.toFixed(3)));
+    console.log(
+      `${wfName} samples: peak=${Math.max(...wf).toFixed(3)} V  min=${Math.min(...wf).toFixed(3)} V  mean=${(wf.reduce((a, b) => a + b, 0) / wf.length).toFixed(3)} V`,
+    );
+    console.log(
+      `${wfName} first 12 samples:`,
+      wf.slice(0, 12).map((v) => v.toFixed(3)),
+    );
     const peak = Math.max(...wf);
     expect(peak).toBeGreaterThan(3.0);
 
@@ -159,14 +198,26 @@ describe('Half-Wave Rectifier — layer-by-layer reproduction', () => {
     console.log('\n=== L6 setAdcVoltage → AVRADC ===');
     const avr = new AVRTestHarness();
     avr.loadProgram(adcReadProgram());
-    const mockSim = { getADC: () => avr.adc, getCurrentCycles: () => avr.cpu.cycles } as unknown as Parameters<typeof setAdcVoltage>[0];
+    const mockSim = {
+      getADC: () => avr.adc,
+      getCurrentCycles: () => avr.cpu.cycles,
+    } as unknown as Parameters<typeof setAdcVoltage>[0];
     const ok25 = setAdcVoltage(mockSim, 14, 2.5);
-    console.log('setAdcVoltage(mockSim, 14, 2.5) returned', ok25, 'channelValues[0]=', avr.adc.channelValues[0]);
+    console.log(
+      'setAdcVoltage(mockSim, 14, 2.5) returned',
+      ok25,
+      'channelValues[0]=',
+      avr.adc.channelValues[0],
+    );
     expect(ok25).toBe(true);
     expect(avr.adc.channelValues[0]).toBeCloseTo(2.5, 3);
     avr.runCycles(80_000);
     const adch25 = avr.reg(0x79);
-    console.log('ADCH after AVR run with 2.5 V on ch0:', adch25, '(expected ~128 for ADLAR left-shift of 512/1024 ≈ 0.5)');
+    console.log(
+      'ADCH after AVR run with 2.5 V on ch0:',
+      adch25,
+      '(expected ~128 for ADLAR left-shift of 512/1024 ≈ 0.5)',
+    );
     expect(adch25).toBeGreaterThan(0);
 
     // ── L7 ────────────────────────────────────────────────────────────────
@@ -176,10 +227,13 @@ describe('Half-Wave Rectifier — layer-by-layer reproduction', () => {
     console.log('\n=== L7 full replay loop over 80 ms of AVR time ===');
     const freshAvr = new AVRTestHarness();
     freshAvr.loadProgram(adcReadProgram());
-    const freshMock = { getADC: () => freshAvr.adc, getCurrentCycles: () => freshAvr.cpu.cycles } as unknown as Parameters<typeof setAdcVoltage>[0];
+    const freshMock = {
+      getADC: () => freshAvr.adc,
+      getCurrentCycles: () => freshAvr.cpu.cycles,
+    } as unknown as Parameters<typeof setAdcVoltage>[0];
     const CPU_HZ = 16_000_000;
-    const STEP_CYCLES = 16_000;          // 1 ms of AVR
-    const STEPS = 200;                   // → 200 ms total
+    const STEP_CYCLES = 16_000; // 1 ms of AVR
+    const STEPS = 200; // → 200 ms total
     const adcSeries: number[] = [];
     const adchSeries: number[] = [];
     for (let i = 0; i < STEPS; i++) {
@@ -194,7 +248,10 @@ describe('Half-Wave Rectifier — layer-by-layer reproduction', () => {
     const hi = adcSeries.filter((v) => v > 1.5).length;
     const lo = adcSeries.filter((v) => v < 0.2).length;
     console.log(`channelValues[0] over ${STEPS} ms: highs(>1.5V)=${hi}, lows(<0.2V)=${lo}`);
-    console.log('first 30 ADC voltages:', adcSeries.slice(0, 30).map((v) => v.toFixed(2)));
+    console.log(
+      'first 30 ADC voltages:',
+      adcSeries.slice(0, 30).map((v) => v.toFixed(2)),
+    );
     console.log('first 30 ADCH reads:', adchSeries.slice(0, 30));
     const maxAdch = Math.max(...adchSeries);
     console.log('max ADCH seen by AVR:', maxAdch);

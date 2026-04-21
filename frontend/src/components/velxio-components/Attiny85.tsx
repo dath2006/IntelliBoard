@@ -17,27 +17,22 @@ interface Attiny85Props {
 }
 
 // DIP-8 dimensions
-const W = 160;   // total SVG width
-const H = 100;   // total SVG height
-const BX = 30;   // chip body left
-const BY = 10;   // chip body top
-const BW = 100;  // chip body width
-const BH = 80;   // chip body height
+const W = 160; // total SVG width
+const H = 100; // total SVG height
+const BX = 30; // chip body left
+const BY = 10; // chip body top
+const BW = 100; // chip body width
+const BH = 80; // chip body height
 const PIN_W = 28; // pin stub length (horizontal)
 const PIN_SPACING = 20; // vertical spacing between pins
 
 // 4 pins on each side, centred vertically in the body
 const PIN_STARTS_Y = [BY + 10, BY + 30, BY + 50, BY + 70];
 
-const PIN_LABELS_LEFT  = ['PB5/RST', 'PB3', 'PB4', 'GND'];
+const PIN_LABELS_LEFT = ['PB5/RST', 'PB3', 'PB4', 'GND'];
 const PIN_LABELS_RIGHT = ['VCC', 'PB2', 'PB1', 'PB0'];
 
-export const Attiny85 = ({
-  id = 'attiny85',
-  x = 0,
-  y = 0,
-  led1 = false,
-}: Attiny85Props) => {
+export const Attiny85 = ({ id = 'attiny85', x = 0, y = 0, led1 = false }: Attiny85Props) => {
   return (
     <svg
       id={id}
@@ -50,8 +45,10 @@ export const Attiny85 = ({
       {PIN_STARTS_Y.map((py, i) => (
         <line
           key={`lpin-${i}`}
-          x1={BX} y1={py}
-          x2={BX - PIN_W} y2={py}
+          x1={BX}
+          y1={py}
+          x2={BX - PIN_W}
+          y2={py}
           stroke="#aaa"
           strokeWidth="3"
           strokeLinecap="round"
@@ -62,8 +59,10 @@ export const Attiny85 = ({
       {PIN_STARTS_Y.map((py, i) => (
         <line
           key={`rpin-${i}`}
-          x1={BX + BW} y1={py}
-          x2={BX + BW + PIN_W} y2={py}
+          x1={BX + BW}
+          y1={py}
+          x2={BX + BW + PIN_W}
+          y2={py}
           stroke="#aaa"
           strokeWidth="3"
           strokeLinecap="round"
@@ -72,9 +71,12 @@ export const Attiny85 = ({
 
       {/* IC body */}
       <rect
-        x={BX} y={BY}
-        width={BW} height={BH}
-        rx={4} ry={4}
+        x={BX}
+        y={BY}
+        width={BW}
+        height={BH}
+        rx={4}
+        ry={4}
         fill="#1a1a2e"
         stroke="#4a4a7a"
         strokeWidth="1.5"

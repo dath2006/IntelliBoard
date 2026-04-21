@@ -25,14 +25,14 @@
 // ─── Shared colours ───────────────────────────────────────────────────────────
 // Tuned for the dark (#1a1a1a) simulator canvas — symbols must read as
 // light schematic strokes, not dark-on-dark.
-const STROKE = '#e6e6e6';   // primary symbol strokes (base bar, channel)
-const LEAD   = '#b8b8b8';   // pin leads
-const LABEL  = '#d0d0d0';   // pin letters / part number
-const BODY   = '#7a7a7a';   // optional body-circle outline
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const STROKE = '#e6e6e6'; // primary symbol strokes (base bar, channel)
+const LEAD = '#b8b8b8'; // pin leads
+const LABEL = '#d0d0d0'; // pin letters / part number
+const BODY = '#7a7a7a'; // optional body-circle outline
+const STYLE = ':host{display:inline-block;line-height:0}';
 
 function threePinInfo(pins: Array<{ name: string; x: number; y: number; number: number }>) {
-  return pins.map(p => ({ ...p, signals: [] as string[] }));
+  return pins.map((p) => ({ ...p, signals: [] as string[] }));
 }
 
 // ─── BJT symbol (NPN / PNP) ───────────────────────────────────────────────────
@@ -82,8 +82,8 @@ function bjtSvg(arrowDir: 'npn' | 'pnp', text: string): string {
 function makeBjtClass(label: string, polarity: 'npn' | 'pnp') {
   return class extends HTMLElement {
     readonly pinInfo = threePinInfo([
-      { name: 'C', x: 60, y: 0,  number: 1 },
-      { name: 'B', x: 0,  y: 36, number: 2 },
+      { name: 'C', x: 60, y: 0, number: 1 },
+      { name: 'B', x: 0, y: 36, number: 2 },
       { name: 'E', x: 60, y: 72, number: 3 },
     ]);
     constructor() {
@@ -106,9 +106,10 @@ function mosfetSvg(polarity: 'nmos' | 'pmos', text: string): string {
   // Symmetric arrowhead between gate plate and channel.
   // NMOS: arrow points INTO the channel (rightward).
   // PMOS: arrow points AWAY from channel (leftward).
-  const arrow = polarity === 'nmos'
-    ? `<polygon points="24,36 18,32 18,40" fill="${STROKE}"/>`
-    : `<polygon points="18,36 24,32 24,40" fill="${STROKE}"/>`;
+  const arrow =
+    polarity === 'nmos'
+      ? `<polygon points="24,36 18,32 18,40" fill="${STROKE}"/>`
+      : `<polygon points="18,36 24,32 24,40" fill="${STROKE}"/>`;
 
   return `
     <style>${STYLE}</style>
@@ -145,8 +146,8 @@ function mosfetSvg(polarity: 'nmos' | 'pmos', text: string): string {
 function makeMosfetClass(label: string, polarity: 'nmos' | 'pmos') {
   return class extends HTMLElement {
     readonly pinInfo = threePinInfo([
-      { name: 'D', x: 60, y: 0,  number: 1 },
-      { name: 'G', x: 0,  y: 36, number: 2 },
+      { name: 'D', x: 60, y: 0, number: 1 },
+      { name: 'G', x: 0, y: 36, number: 2 },
       { name: 'S', x: 60, y: 72, number: 3 },
     ]);
     constructor() {
@@ -157,15 +158,15 @@ function makeMosfetClass(label: string, polarity: 'nmos' | 'pmos') {
 }
 
 // ─── Concrete classes per part number ─────────────────────────────────────────
-const Bjt2N2222  = makeBjtClass('2N2222',  'npn');
-const BjtBC547   = makeBjtClass('BC547',   'npn');
-const Bjt2N3055  = makeBjtClass('2N3055',  'npn');
-const Bjt2N3906  = makeBjtClass('2N3906',  'pnp');
-const BjtBC557   = makeBjtClass('BC557',   'pnp');
+const Bjt2N2222 = makeBjtClass('2N2222', 'npn');
+const BjtBC547 = makeBjtClass('BC547', 'npn');
+const Bjt2N3055 = makeBjtClass('2N3055', 'npn');
+const Bjt2N3906 = makeBjtClass('2N3906', 'pnp');
+const BjtBC557 = makeBjtClass('BC557', 'pnp');
 
-const Mosfet2N7000   = makeMosfetClass('2N7000',   'nmos');
-const MosfetIRF540   = makeMosfetClass('IRF540',   'nmos');
-const MosfetIRF9540  = makeMosfetClass('IRF9540',  'pmos');
+const Mosfet2N7000 = makeMosfetClass('2N7000', 'nmos');
+const MosfetIRF540 = makeMosfetClass('IRF540', 'nmos');
+const MosfetIRF9540 = makeMosfetClass('IRF9540', 'pmos');
 const MosfetFQP27P06 = makeMosfetClass('FQP27P06', 'pmos');
 
 // ─── Register custom elements ─────────────────────────────────────────────────
@@ -173,15 +174,15 @@ function def(tag: string, cls: CustomElementConstructor) {
   if (!customElements.get(tag)) customElements.define(tag, cls);
 }
 
-def('wokwi-bjt-2n2222',  Bjt2N2222);
-def('wokwi-bjt-bc547',   BjtBC547);
-def('wokwi-bjt-2n3055',  Bjt2N3055);
-def('wokwi-bjt-2n3906',  Bjt2N3906);
-def('wokwi-bjt-bc557',   BjtBC557);
+def('wokwi-bjt-2n2222', Bjt2N2222);
+def('wokwi-bjt-bc547', BjtBC547);
+def('wokwi-bjt-2n3055', Bjt2N3055);
+def('wokwi-bjt-2n3906', Bjt2N3906);
+def('wokwi-bjt-bc557', BjtBC557);
 
-def('wokwi-mosfet-2n7000',   Mosfet2N7000);
-def('wokwi-mosfet-irf540',   MosfetIRF540);
-def('wokwi-mosfet-irf9540',  MosfetIRF9540);
+def('wokwi-mosfet-2n7000', Mosfet2N7000);
+def('wokwi-mosfet-irf540', MosfetIRF540);
+def('wokwi-mosfet-irf9540', MosfetIRF9540);
 def('wokwi-mosfet-fqp27p06', MosfetFQP27P06);
 
 // Mark as a module (side-effect import)

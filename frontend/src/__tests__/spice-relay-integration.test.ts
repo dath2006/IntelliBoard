@@ -19,35 +19,73 @@ import type { BuildNetlistInput, PinSourceState } from '../simulation/spice/type
 
 function relayWires() {
   return [
-    { id: 'w1', start: { componentId: 'arduino-uno', pinName: '9' }, end: { componentId: 'rb', pinName: '1' } },
-    { id: 'w2', start: { componentId: 'rb', pinName: '2' },           end: { componentId: 'q1', pinName: 'B' } },
-    { id: 'w3', start: { componentId: 'arduino-uno', pinName: '5V' }, end: { componentId: 'rly', pinName: 'COIL+' } },
-    { id: 'w4', start: { componentId: 'rly', pinName: 'COIL-' },       end: { componentId: 'q1',  pinName: 'C' } },
-    { id: 'w5', start: { componentId: 'q1', pinName: 'E' },            end: { componentId: 'arduino-uno', pinName: 'GND' } },
-    { id: 'w6', start: { componentId: 'arduino-uno', pinName: '5V' },  end: { componentId: 'rly', pinName: 'NO' } },
-    { id: 'w7', start: { componentId: 'rly', pinName: 'COM' },         end: { componentId: 'rl',  pinName: '1' } },
-    { id: 'w8', start: { componentId: 'rl',  pinName: '2' },           end: { componentId: 'led1', pinName: 'A' } },
-    { id: 'w9', start: { componentId: 'led1', pinName: 'C' },          end: { componentId: 'arduino-uno', pinName: 'GND' } },
+    {
+      id: 'w1',
+      start: { componentId: 'arduino-uno', pinName: '9' },
+      end: { componentId: 'rb', pinName: '1' },
+    },
+    {
+      id: 'w2',
+      start: { componentId: 'rb', pinName: '2' },
+      end: { componentId: 'q1', pinName: 'B' },
+    },
+    {
+      id: 'w3',
+      start: { componentId: 'arduino-uno', pinName: '5V' },
+      end: { componentId: 'rly', pinName: 'COIL+' },
+    },
+    {
+      id: 'w4',
+      start: { componentId: 'rly', pinName: 'COIL-' },
+      end: { componentId: 'q1', pinName: 'C' },
+    },
+    {
+      id: 'w5',
+      start: { componentId: 'q1', pinName: 'E' },
+      end: { componentId: 'arduino-uno', pinName: 'GND' },
+    },
+    {
+      id: 'w6',
+      start: { componentId: 'arduino-uno', pinName: '5V' },
+      end: { componentId: 'rly', pinName: 'NO' },
+    },
+    {
+      id: 'w7',
+      start: { componentId: 'rly', pinName: 'COM' },
+      end: { componentId: 'rl', pinName: '1' },
+    },
+    {
+      id: 'w8',
+      start: { componentId: 'rl', pinName: '2' },
+      end: { componentId: 'led1', pinName: 'A' },
+    },
+    {
+      id: 'w9',
+      start: { componentId: 'led1', pinName: 'C' },
+      end: { componentId: 'arduino-uno', pinName: 'GND' },
+    },
   ];
 }
 
 function relayInput(pinStates: Record<string, PinSourceState>): BuildNetlistInput {
   return {
     components: [
-      { id: 'rb',   metadataId: 'resistor',    properties: { value: '1000' } },
-      { id: 'q1',   metadataId: 'bjt-2n2222',  properties: {} },
-      { id: 'rly',  metadataId: 'relay',       properties: { coil_voltage: 5 } },
-      { id: 'rl',   metadataId: 'resistor',    properties: { value: '220' } },
-      { id: 'led1', metadataId: 'led',         properties: { color: 'red' } },
+      { id: 'rb', metadataId: 'resistor', properties: { value: '1000' } },
+      { id: 'q1', metadataId: 'bjt-2n2222', properties: {} },
+      { id: 'rly', metadataId: 'relay', properties: { coil_voltage: 5 } },
+      { id: 'rl', metadataId: 'resistor', properties: { value: '220' } },
+      { id: 'led1', metadataId: 'led', properties: { color: 'red' } },
     ],
     wires: relayWires(),
-    boards: [{
-      id: 'arduino-uno',
-      vcc: 5,
-      pins: pinStates,
-      groundPinNames: ['GND'],
-      vccPinNames: ['5V'],
-    }],
+    boards: [
+      {
+        id: 'arduino-uno',
+        vcc: 5,
+        pins: pinStates,
+        groundPinNames: ['GND'],
+        vccPinNames: ['5V'],
+      },
+    ],
     analysis: { kind: 'op' },
   };
 }

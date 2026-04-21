@@ -48,7 +48,7 @@ async function bootEngine(): Promise<Simulation> {
     await sim.start();
     singleton = sim;
     const dt = performance.now() - t0;
-    // eslint-disable-next-line no-console
+     
     console.log(`[SpiceEngine] boot in ${dt.toFixed(0)}ms`);
     return sim;
   })();
@@ -82,7 +82,7 @@ export async function runNetlist(netlist: string): Promise<SpiceResult> {
 
   const dt = performance.now() - t0;
   if (dt > 200) {
-    // eslint-disable-next-line no-console
+     
     console.log(`[SpiceEngine] slow solve: ${dt.toFixed(0)}ms`);
   }
 
@@ -154,7 +154,14 @@ export const NL = {
   },
 
   /** `Vname plus minus SIN(offset amp freq)` */
-  sin(name: string, plus: string, minus: string, offset: number, amp: number, freq: number): string {
+  sin(
+    name: string,
+    plus: string,
+    minus: string,
+    offset: number,
+    amp: number,
+    freq: number,
+  ): string {
     return `${name} ${plus} ${minus} SIN(${offset} ${amp} ${freq})`;
   },
 

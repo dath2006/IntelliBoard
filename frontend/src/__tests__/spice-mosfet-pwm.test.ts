@@ -22,23 +22,51 @@ import type { BuildNetlistInput } from '../simulation/spice/types';
 function mosfetPwmLedNetlist(gateVolts: number) {
   const input: BuildNetlistInput = {
     components: [
-      { id: 'rl',   metadataId: 'resistor',       properties: { value: '220' } },
-      { id: 'led1', metadataId: 'led',            properties: { color: 'white' } },
-      { id: 'q1',   metadataId: 'mosfet-2n7000',  properties: {} },
-      { id: 'rg',   metadataId: 'resistor',       properties: { value: '100000' } },
+      { id: 'rl', metadataId: 'resistor', properties: { value: '220' } },
+      { id: 'led1', metadataId: 'led', properties: { color: 'white' } },
+      { id: 'q1', metadataId: 'mosfet-2n7000', properties: {} },
+      { id: 'rg', metadataId: 'resistor', properties: { value: '100000' } },
     ],
     wires: [
       // 5V → R → LED anode
-      { id: 'w1', start: { componentId: 'uno', pinName: '5V' }, end: { componentId: 'rl',   pinName: '1' } },
-      { id: 'w2', start: { componentId: 'rl',  pinName: '2' }, end: { componentId: 'led1', pinName: 'A' } },
+      {
+        id: 'w1',
+        start: { componentId: 'uno', pinName: '5V' },
+        end: { componentId: 'rl', pinName: '1' },
+      },
+      {
+        id: 'w2',
+        start: { componentId: 'rl', pinName: '2' },
+        end: { componentId: 'led1', pinName: 'A' },
+      },
       // LED cathode → MOSFET drain
-      { id: 'w3', start: { componentId: 'led1', pinName: 'C' }, end: { componentId: 'q1', pinName: 'D' } },
+      {
+        id: 'w3',
+        start: { componentId: 'led1', pinName: 'C' },
+        end: { componentId: 'q1', pinName: 'D' },
+      },
       // Source to GND (low-side)
-      { id: 'w4', start: { componentId: 'q1',  pinName: 'S' }, end: { componentId: 'uno', pinName: 'GND' } },
+      {
+        id: 'w4',
+        start: { componentId: 'q1', pinName: 'S' },
+        end: { componentId: 'uno', pinName: 'GND' },
+      },
       // Gate driven from GPIO 9, plus pull-down to GND
-      { id: 'w5', start: { componentId: 'uno', pinName: '9' }, end: { componentId: 'q1', pinName: 'G' } },
-      { id: 'w6', start: { componentId: 'q1',  pinName: 'G' }, end: { componentId: 'rg', pinName: '1' } },
-      { id: 'w7', start: { componentId: 'rg',  pinName: '2' }, end: { componentId: 'uno', pinName: 'GND' } },
+      {
+        id: 'w5',
+        start: { componentId: 'uno', pinName: '9' },
+        end: { componentId: 'q1', pinName: 'G' },
+      },
+      {
+        id: 'w6',
+        start: { componentId: 'q1', pinName: 'G' },
+        end: { componentId: 'rg', pinName: '1' },
+      },
+      {
+        id: 'w7',
+        start: { componentId: 'rg', pinName: '2' },
+        end: { componentId: 'uno', pinName: 'GND' },
+      },
     ],
     boards: [
       {
@@ -46,8 +74,8 @@ function mosfetPwmLedNetlist(gateVolts: number) {
         vcc: 5,
         pins: {
           '5V': { type: 'digital', v: 5 },
-          GND:  { type: 'digital', v: 0 },
-          '9':  { type: 'digital', v: gateVolts },
+          GND: { type: 'digital', v: 0 },
+          '9': { type: 'digital', v: gateVolts },
         },
         groundPinNames: ['GND'],
         vccPinNames: ['5V'],
@@ -59,45 +87,33 @@ function mosfetPwmLedNetlist(gateVolts: number) {
 }
 
 describe('MOSFET PWM LED dimmer (mosfet-pwm-led example)', () => {
-  it(
-    'emits V-sense card so ngspice exposes i(v_led1_sense)',
-    { timeout: 30_000 },
-    async () => {
-      const netlist = mosfetPwmLedNetlist(5);
-      expect(netlist).toMatch(/V_led1_sense /);
-      expect(netlist).toMatch(/D_led1 led1_sense_mid /);
+  it('emits V-sense card so ngspice exposes i(v_led1_sense)', { timeout: 30_000 }, async () => {
+    const netlist = mosfetPwmLedNetlist(5);
+    expect(netlist).toMatch(/V_led1_sense /);
+    expect(netlist).toMatch(/D_led1 led1_sense_mid /);
 
-      const { variableNames } = await runNetlist(netlist);
-      const lowered = variableNames.map((n) => n.toLowerCase());
-      expect(lowered).toContain('i(v_led1_sense)');
-    },
-  );
+    const { variableNames } = await runNetlist(netlist);
+    const lowered = variableNames.map((n) => n.toLowerCase());
+    expect(lowered).toContain('i(v_led1_sense)');
+  });
 
-  it(
-    'gate LOW → LED current is ~0 (MOSFET off)',
-    { timeout: 30_000 },
-    async () => {
-      const netlist = mosfetPwmLedNetlist(0);
-      const { dcValue } = await runNetlist(netlist);
-      // Convention inside the builder: V-sense sources are oriented from
-      // anode → mid-net, so conducting current is *negative* (flows into
-      // the V+ terminal). Compare magnitudes.
-      const i = Math.abs(dcValue('i(v_led1_sense)'));
-      expect(i).toBeLessThan(1e-6); // sub-µA leakage is fine
-    },
-  );
+  it('gate LOW → LED current is ~0 (MOSFET off)', { timeout: 30_000 }, async () => {
+    const netlist = mosfetPwmLedNetlist(0);
+    const { dcValue } = await runNetlist(netlist);
+    // Convention inside the builder: V-sense sources are oriented from
+    // anode → mid-net, so conducting current is *negative* (flows into
+    // the V+ terminal). Compare magnitudes.
+    const i = Math.abs(dcValue('i(v_led1_sense)'));
+    expect(i).toBeLessThan(1e-6); // sub-µA leakage is fine
+  });
 
-  it(
-    'gate HIGH → LED conducts a realistic current (2–20 mA)',
-    { timeout: 30_000 },
-    async () => {
-      const netlist = mosfetPwmLedNetlist(5);
-      const { dcValue } = await runNetlist(netlist);
-      const i = Math.abs(dcValue('i(v_led1_sense)'));
-      expect(i).toBeGreaterThan(2e-3);
-      expect(i).toBeLessThan(20e-3);
-    },
-  );
+  it('gate HIGH → LED conducts a realistic current (2–20 mA)', { timeout: 30_000 }, async () => {
+    const netlist = mosfetPwmLedNetlist(5);
+    const { dcValue } = await runNetlist(netlist);
+    const i = Math.abs(dcValue('i(v_led1_sense)'));
+    expect(i).toBeGreaterThan(2e-3);
+    expect(i).toBeLessThan(20e-3);
+  });
 
   it(
     'LED current increases monotonically as the gate voltage ramps 0 → 5V',

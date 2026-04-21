@@ -20,13 +20,33 @@ type AllBoardKinds = BoardKind | 'default';
 export const BOARD_PIN_GROUPS: Record<AllBoardKinds, BoardPinGroup> = {
   default: { vcc: 5, gnd: ['GND', 'GND.1', 'GND.2'], vcc_pins: ['5V', 'VCC'] },
 
-  'arduino-uno': { vcc: 5, gnd: ['GND.1', 'GND.2', 'GND.3', 'GND'], vcc_pins: ['5V', 'VCC', '3.3V', 'AREF'] },
-  'arduino-nano': { vcc: 5, gnd: ['GND.1', 'GND.2', 'GND'], vcc_pins: ['5V', 'VCC', '3V3', 'AREF'] },
-  'arduino-mega': { vcc: 5, gnd: ['GND.1', 'GND.2', 'GND.3', 'GND.4', 'GND'], vcc_pins: ['5V', 'VCC', '3.3V', 'AREF'] },
+  'arduino-uno': {
+    vcc: 5,
+    gnd: ['GND.1', 'GND.2', 'GND.3', 'GND'],
+    vcc_pins: ['5V', 'VCC', '3.3V', 'AREF'],
+  },
+  'arduino-nano': {
+    vcc: 5,
+    gnd: ['GND.1', 'GND.2', 'GND'],
+    vcc_pins: ['5V', 'VCC', '3V3', 'AREF'],
+  },
+  'arduino-mega': {
+    vcc: 5,
+    gnd: ['GND.1', 'GND.2', 'GND.3', 'GND.4', 'GND'],
+    vcc_pins: ['5V', 'VCC', '3.3V', 'AREF'],
+  },
   attiny85: { vcc: 5, gnd: ['GND'], vcc_pins: ['VCC'] },
 
-  'raspberry-pi-pico': { vcc: 3.3, gnd: ['GND.1', 'GND.2', 'GND.3', 'GND'], vcc_pins: ['3V3', 'VBUS', 'VSYS'] },
-  'pi-pico-w': { vcc: 3.3, gnd: ['GND.1', 'GND.2', 'GND.3', 'GND'], vcc_pins: ['3V3', 'VBUS', 'VSYS'] },
+  'raspberry-pi-pico': {
+    vcc: 3.3,
+    gnd: ['GND.1', 'GND.2', 'GND.3', 'GND'],
+    vcc_pins: ['3V3', 'VBUS', 'VSYS'],
+  },
+  'pi-pico-w': {
+    vcc: 3.3,
+    gnd: ['GND.1', 'GND.2', 'GND.3', 'GND'],
+    vcc_pins: ['3V3', 'VBUS', 'VSYS'],
+  },
   'raspberry-pi-3': { vcc: 5, gnd: ['GND'], vcc_pins: ['5V', '3V3'] },
 
   esp32: { vcc: 3.3, gnd: ['GND', 'GND.1', 'GND.2'], vcc_pins: ['3V3', 'VIN', '5V'] },

@@ -39,7 +39,7 @@ describe('analogExamples — representative ngspice solves', () => {
         wires: ex!.wires.map((w) => ({
           id: w.id,
           start: { componentId: w.start.componentId, pinName: w.start.pinName },
-          end:   { componentId: w.end.componentId,   pinName: w.end.pinName },
+          end: { componentId: w.end.componentId, pinName: w.end.pinName },
         })),
         boards: [],
         analysis: { kind: 'op' },

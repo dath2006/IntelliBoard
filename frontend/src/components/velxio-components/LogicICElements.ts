@@ -15,11 +15,11 @@
  *   wokwi-ic-74hc86  — quad 2-input XOR
  */
 
-const FILL   = '#1f2937';
+const FILL = '#1f2937';
 const ACCENT = '#eef3fa';
-const LEAD   = '#bbbbbb';
-const LABEL  = '#e5e7eb';
-const STYLE  = ':host{display:inline-block;line-height:0}';
+const LEAD = '#bbbbbb';
+const LABEL = '#e5e7eb';
+const STYLE = ':host{display:inline-block;line-height:0}';
 
 // DIP-14 layout: 7 pins per side, 8 px vertical spacing, pin 1 at top-left
 // Width 80, height 8·7 + 16 = 72
@@ -82,12 +82,40 @@ function dip14Svg(label: string, pinLabels: string[]): string {
 }
 
 // Quad 2-input gate pinout: 1A 1B 1Y 2A 2B 2Y GND | 3Y 3A 3B 4Y 4A 4B VCC
-const QUAD_2IN_PINS = ['1A', '1B', '1Y', '2A', '2B', '2Y', 'GND',
-                        '3Y', '3A', '3B', '4Y', '4A', '4B', 'VCC'];
+const QUAD_2IN_PINS = [
+  '1A',
+  '1B',
+  '1Y',
+  '2A',
+  '2B',
+  '2Y',
+  'GND',
+  '3Y',
+  '3A',
+  '3B',
+  '4Y',
+  '4A',
+  '4B',
+  'VCC',
+];
 
 // Hex inverter pinout: 1A 1Y 2A 2Y 3A 3Y GND | 4Y 4A 5Y 5A 6Y 6A VCC
-const HEX_INV_PINS  = ['1A', '1Y', '2A', '2Y', '3A', '3Y', 'GND',
-                        '4Y', '4A', '5Y', '5A', '6Y', '6A', 'VCC'];
+const HEX_INV_PINS = [
+  '1A',
+  '1Y',
+  '2A',
+  '2Y',
+  '3A',
+  '3Y',
+  'GND',
+  '4Y',
+  '4A',
+  '5Y',
+  '5A',
+  '6Y',
+  '6A',
+  'VCC',
+];
 
 function makeIcClass(label: string, pinNames: string[]) {
   return class extends HTMLElement {

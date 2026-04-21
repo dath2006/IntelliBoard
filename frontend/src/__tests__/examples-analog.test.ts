@@ -20,7 +20,7 @@ import { mappedMetadataIds } from '../simulation/spice/componentToSpice';
 function toSpiceComponents(example: (typeof analogExamples)[number]) {
   return example.components.map((c) => ({
     id: c.id,
-    metadataId: c.type.replace(/^wokwi-/, ''),
+    metadataId: c.type.replace(/^(wokwi|velxio)-/, ''),
     properties: c.properties ?? {},
   }));
 }
@@ -29,7 +29,7 @@ function toSpiceWires(example: (typeof analogExamples)[number]) {
   return example.wires.map((w) => ({
     id: w.id,
     start: { componentId: w.start.componentId, pinName: w.start.pinName },
-    end:   { componentId: w.end.componentId,   pinName: w.end.pinName },
+    end: { componentId: w.end.componentId, pinName: w.end.pinName },
   }));
 }
 
@@ -46,12 +46,21 @@ describe('analogExamples — shape', () => {
   });
 
   it('no example lists a board in its components[]', () => {
-    const BOARD_PREFIXES = ['wokwi-arduino-', 'wokwi-esp32', 'wokwi-raspberry-', 'wokwi-nano-rp'];
+    const BOARD_PREFIXES = [
+      'wokwi-arduino-',
+      'wokwi-esp32',
+      'wokwi-raspberry-',
+      'wokwi-nano-rp',
+      'velxio-esp32',
+      'velxio-raspberry-',
+      'velxio-pi-pico-w',
+    ];
     for (const ex of analogExamples) {
-      const boards = ex.components.filter((c) =>
-        BOARD_PREFIXES.some((p) => c.type.startsWith(p)),
-      );
-      expect(boards.map((b) => b.id), `${ex.id}`).toEqual([]);
+      const boards = ex.components.filter((c) => BOARD_PREFIXES.some((p) => c.type.startsWith(p)));
+      expect(
+        boards.map((b) => b.id),
+        `${ex.id}`,
+      ).toEqual([]);
     }
   });
 
@@ -66,7 +75,7 @@ describe('analogExamples — shape', () => {
     const unmapped = new Set<string>();
     for (const ex of analogExamples) {
       for (const c of ex.components) {
-        const id = c.type.replace(/^wokwi-/, '');
+        const id = c.type.replace(/^(wokwi|velxio)-/, '');
         if (!mapped.has(id)) unmapped.add(`${ex.id}:${c.id}(${id})`);
       }
     }
@@ -77,8 +86,10 @@ describe('analogExamples — shape', () => {
     for (const ex of analogExamples) {
       const ids = new Set(ex.components.map((c) => c.id));
       for (const w of ex.wires) {
-        expect(ids.has(w.start.componentId), `${ex.id}:${w.id}.start(${w.start.componentId})`).toBe(true);
-        expect(ids.has(w.end.componentId),   `${ex.id}:${w.id}.end(${w.end.componentId})`).toBe(true);
+        expect(ids.has(w.start.componentId), `${ex.id}:${w.id}.start(${w.start.componentId})`).toBe(
+          true,
+        );
+        expect(ids.has(w.end.componentId), `${ex.id}:${w.id}.end(${w.end.componentId})`).toBe(true);
       }
     }
   });

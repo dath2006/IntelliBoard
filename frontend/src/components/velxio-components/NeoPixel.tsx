@@ -15,7 +15,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 
-export interface NeoPixelPixel { r: number; g: number; b: number }
+export interface NeoPixelPixel {
+  r: number;
+  g: number;
+  b: number;
+}
 
 interface NeoPixelProps {
   id?: string;
@@ -29,7 +33,7 @@ interface NeoPixelProps {
 }
 
 const LED_SIZE = 16;
-const LED_GAP  = 4;
+const LED_GAP = 4;
 
 function drawPixels(
   canvas: HTMLCanvasElement,
@@ -43,12 +47,8 @@ function drawPixels(
 
   for (let i = 0; i < numLeds; i++) {
     const px = pixels[i] ?? { r: 20, g: 20, b: 20 };
-    const cx = direction === 'horizontal'
-      ? LED_SIZE / 2 + i * (LED_SIZE + LED_GAP)
-      : LED_SIZE / 2;
-    const cy = direction === 'vertical'
-      ? LED_SIZE / 2 + i * (LED_SIZE + LED_GAP)
-      : LED_SIZE / 2;
+    const cx = direction === 'horizontal' ? LED_SIZE / 2 + i * (LED_SIZE + LED_GAP) : LED_SIZE / 2;
+    const cy = direction === 'vertical' ? LED_SIZE / 2 + i * (LED_SIZE + LED_GAP) : LED_SIZE / 2;
 
     const r = LED_SIZE / 2;
     const gradient = ctx.createRadialGradient(cx, cy, 1, cx, cy, r);
@@ -98,12 +98,8 @@ export const NeoPixel = ({
     return () => canvas.removeEventListener('ws2812-pixels', handler);
   }, [id]);
 
-  const w = direction === 'horizontal'
-    ? numLeds * (LED_SIZE + LED_GAP) - LED_GAP
-    : LED_SIZE;
-  const h = direction === 'vertical'
-    ? numLeds * (LED_SIZE + LED_GAP) - LED_GAP
-    : LED_SIZE;
+  const w = direction === 'horizontal' ? numLeds * (LED_SIZE + LED_GAP) - LED_GAP : LED_SIZE;
+  const h = direction === 'vertical' ? numLeds * (LED_SIZE + LED_GAP) - LED_GAP : LED_SIZE;
 
   return (
     <canvas

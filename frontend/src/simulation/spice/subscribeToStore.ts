@@ -7,7 +7,11 @@
  * Called once at app startup (typically from EditorPage or main.tsx).
  * Returns an `unsubscribe()` for cleanup.
  */
-import { useSimulatorStore, getBoardSimulator, getBoardPinManager } from '../../store/useSimulatorStore';
+import {
+  useSimulatorStore,
+  getBoardSimulator,
+  getBoardPinManager,
+} from '../../store/useSimulatorStore';
 import { useElectricalStore } from '../../store/useElectricalStore';
 import { buildInputFromStore } from './storeAdapter';
 import { setAdcVoltage } from '../parts/partUtils';
@@ -25,43 +29,47 @@ function adcRange(prefix: string, start: number, count: number) {
   }));
 }
 
-const ADC_6CH = adcRange('A', 0, 6);  // A0..A5
-const ADC_8CH = adcRange('A', 0, 8);  // A0..A7
+const ADC_6CH = adcRange('A', 0, 6); // A0..A5
+const ADC_8CH = adcRange('A', 0, 8); // A0..A7
 const ADC_16CH = adcRange('A', 0, 16); // A0..A15
 
 const ADC_PIN_MAP: Partial<Record<BoardKind, Array<{ pinName: string; channel: number }>>> = {
   // AVR boards
-  'arduino-uno':  ADC_6CH,
+  'arduino-uno': ADC_6CH,
   'arduino-nano': ADC_8CH,
   'arduino-mega': ADC_16CH,
-  'attiny85':     adcRange('A', 0, 4), // A0..A3 (PB2-PB5)
+  attiny85: adcRange('A', 0, 4), // A0..A3 (PB2-PB5)
 
   // RP2040 boards — 4 ADC channels (GP26-GP29)
   'raspberry-pi-pico': [
-    { pinName: 'GP26', channel: 0 }, { pinName: 'GP27', channel: 1 },
-    { pinName: 'GP28', channel: 2 }, { pinName: 'GP29', channel: 3 },
+    { pinName: 'GP26', channel: 0 },
+    { pinName: 'GP27', channel: 1 },
+    { pinName: 'GP28', channel: 2 },
+    { pinName: 'GP29', channel: 3 },
   ],
   'pi-pico-w': [
-    { pinName: 'GP26', channel: 0 }, { pinName: 'GP27', channel: 1 },
-    { pinName: 'GP28', channel: 2 }, { pinName: 'GP29', channel: 3 },
+    { pinName: 'GP26', channel: 0 },
+    { pinName: 'GP27', channel: 1 },
+    { pinName: 'GP28', channel: 2 },
+    { pinName: 'GP29', channel: 3 },
   ],
 
   // ESP32 variants — most GPIOs can be ADC but the common ones are:
   // ADC1: GPIO 32-39 (channels 0-7), ADC2: GPIO 0,2,4,12-15,25-27
   // Simplified to the 8 most-used pins (GPIO 32-39 = ADC1)
-  'esp32':              adcRange('GPIO', 32, 8),
-  'esp32-devkit-c-v4':  adcRange('GPIO', 32, 8),
-  'esp32-cam':          adcRange('GPIO', 32, 8),
+  esp32: adcRange('GPIO', 32, 8),
+  'esp32-devkit-c-v4': adcRange('GPIO', 32, 8),
+  'esp32-cam': adcRange('GPIO', 32, 8),
   'wemos-lolin32-lite': adcRange('GPIO', 32, 8),
 
   // ESP32-S3 — ADC1 channels on GPIO 1-10, ADC2 on GPIO 11-20
-  'esp32-s3':           adcRange('GPIO', 1, 10),
-  'xiao-esp32-s3':      adcRange('GPIO', 1, 10),
+  'esp32-s3': adcRange('GPIO', 1, 10),
+  'xiao-esp32-s3': adcRange('GPIO', 1, 10),
   'arduino-nano-esp32': adcRange('A', 0, 8),
 
   // ESP32-C3 — ADC1 channels on GPIO 0-4, ADC2 on GPIO 5
-  'esp32-c3':                      adcRange('GPIO', 0, 6),
-  'xiao-esp32-c3':                 adcRange('GPIO', 0, 6),
+  'esp32-c3': adcRange('GPIO', 0, 6),
+  'xiao-esp32-c3': adcRange('GPIO', 0, 6),
   'aitewinrobot-esp32c3-supermini': adcRange('GPIO', 0, 6),
 };
 
@@ -73,7 +81,9 @@ const ADC_PIN_MAP: Partial<Record<BoardKind, Array<{ pinName: string; channel: n
  *   RP2040: GP26→26, GP27→27, ... (GPIO number directly)
  *   ESP32:  GPIO32→32, ... or A0→channel-dependent (GPIO number)
  */
-function avrPinFromName(_name: string, channel: number): number { return 14 + channel; }
+function avrPinFromName(_name: string, channel: number): number {
+  return 14 + channel;
+}
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 function gpioPinFromName(name: string, _channel: number): number {
   const m = name.match(/(\d+)$/);
@@ -81,23 +91,23 @@ function gpioPinFromName(name: string, _channel: number): number {
 }
 
 const ADC_PIN_TO_GPIO: Partial<Record<BoardKind, (pinName: string, channel: number) => number>> = {
-  'arduino-uno':  avrPinFromName,
+  'arduino-uno': avrPinFromName,
   'arduino-nano': avrPinFromName,
   'arduino-mega': avrPinFromName,
-  'attiny85':     avrPinFromName,
+  attiny85: avrPinFromName,
 
   'raspberry-pi-pico': gpioPinFromName,
-  'pi-pico-w':         gpioPinFromName,
+  'pi-pico-w': gpioPinFromName,
 
-  'esp32':              gpioPinFromName,
-  'esp32-devkit-c-v4':  gpioPinFromName,
-  'esp32-cam':          gpioPinFromName,
+  esp32: gpioPinFromName,
+  'esp32-devkit-c-v4': gpioPinFromName,
+  'esp32-cam': gpioPinFromName,
   'wemos-lolin32-lite': gpioPinFromName,
-  'esp32-s3':           gpioPinFromName,
-  'xiao-esp32-s3':      gpioPinFromName,
-  'arduino-nano-esp32': avrPinFromName,  // uses A0-A7 naming
-  'esp32-c3':                      gpioPinFromName,
-  'xiao-esp32-c3':                 gpioPinFromName,
+  'esp32-s3': gpioPinFromName,
+  'xiao-esp32-s3': gpioPinFromName,
+  'arduino-nano-esp32': avrPinFromName, // uses A0-A7 naming
+  'esp32-c3': gpioPinFromName,
+  'xiao-esp32-c3': gpioPinFromName,
   'aitewinrobot-esp32c3-supermini': gpioPinFromName,
 };
 
@@ -139,7 +149,10 @@ function pinNameToArduinoPin(pinName: string, boardKind: BoardKind): number {
 function collectPinStates(
   boardId: string,
   boardKind: BoardKind,
-  wires: Array<{ start: { componentId: string; pinName: string }; end: { componentId: string; pinName: string } }>,
+  wires: Array<{
+    start: { componentId: string; pinName: string };
+    end: { componentId: string; pinName: string };
+  }>,
 ): Record<string, PinSourceState> {
   const pm = getBoardPinManager(boardId);
   if (!pm) return {};
@@ -169,7 +182,9 @@ function collectPinStates(
 }
 
 const SPICE_DEBUG = true;
-const spiceLog = (...a: unknown[]) => { if (SPICE_DEBUG) console.log('[spice]', ...a); };
+const spiceLog = (...a: unknown[]) => {
+  if (SPICE_DEBUG) console.log('[spice]', ...a);
+};
 
 export function wireElectricalSolver(): () => void {
   spiceLog('wireElectricalSolver mounted');
@@ -389,8 +404,14 @@ export function wireElectricalSolver(): () => void {
         sampleCycles: number;
         cpu: { addClockEvent: (fn: () => void, cycles: number) => void };
         completeADCRead: (value: number) => void;
-        onADCRead: (input: { type: number; channel?: number; voltage?: number;
-          positiveChannel?: number; negativeChannel?: number; gain?: number }) => void;
+        onADCRead: (input: {
+          type: number;
+          channel?: number;
+          voltage?: number;
+          positiveChannel?: number;
+          negativeChannel?: number;
+          gain?: number;
+        }) => void;
       };
       self.onADCRead = function (input) {
         if (channelToNet.size === 0) refreshChannelMap();
@@ -414,8 +435,10 @@ export function wireElectricalSolver(): () => void {
             const pos = input.positiveChannel ?? 0;
             const neg = input.negativeChannel ?? 0;
             const gain = input.gain ?? 1;
-            const vPos = sampleWaveformAtNow(channelToNet.get(pos) ?? '') ?? self.channelValues[pos] ?? 0;
-            const vNeg = sampleWaveformAtNow(channelToNet.get(neg) ?? '') ?? self.channelValues[neg] ?? 0;
+            const vPos =
+              sampleWaveformAtNow(channelToNet.get(pos) ?? '') ?? self.channelValues[pos] ?? 0;
+            const vNeg =
+              sampleWaveformAtNow(channelToNet.get(neg) ?? '') ?? self.channelValues[neg] ?? 0;
             voltage = gain * (vPos - vNeg);
             break;
           }
@@ -501,8 +524,13 @@ export function wireElectricalSolver(): () => void {
     // and what channelValues look like for each running board.
     for (const b of ss.boards) {
       const sim = getBoardSimulator(b.id);
-      if (!sim) { console.log(`[spice] board ${b.id}: no simulator`); continue; }
-      const adc = (sim as unknown as { getADC?: () => { channelValues?: ArrayLike<number> } | null }).getADC?.();
+      if (!sim) {
+        console.log(`[spice] board ${b.id}: no simulator`);
+        continue;
+      }
+      const adc = (
+        sim as unknown as { getADC?: () => { channelValues?: ArrayLike<number> } | null }
+      ).getADC?.();
       const cycles = (sim as unknown as { getCurrentCycles?: () => number }).getCurrentCycles?.();
       const values = adc?.channelValues ? Array.from(adc.channelValues).slice(0, 6) : null;
       const valuesStr = values

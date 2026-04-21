@@ -50,9 +50,7 @@ export const LED = ({
 
       if (pinInfo) {
         pinInfo.forEach((pin: any) => {
-          const pinElement = element.shadowRoot?.querySelector(
-            `[data-pin="${pin.name}"]`
-          );
+          const pinElement = element.shadowRoot?.querySelector(`[data-pin="${pin.name}"]`);
           if (pinElement) {
             pinElement.addEventListener('click', () => onPinClick(pin.name));
           }

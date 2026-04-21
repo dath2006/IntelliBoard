@@ -6,7 +6,14 @@
  * Callers construct a `BuildNetlistInput` by calling
  *   `buildInputFromStore(storeSnapshot)`
  */
-import type { BuildNetlistInput, BoardForSpice, ComponentForSpice, WireForSpice, PinSourceState, AnalysisMode } from './types';
+import type {
+  BuildNetlistInput,
+  BoardForSpice,
+  ComponentForSpice,
+  WireForSpice,
+  PinSourceState,
+  AnalysisMode,
+} from './types';
 import type { Wire } from '../../types/wire';
 import type { BoardKind } from '../../types/board';
 import { BOARD_PIN_GROUPS } from './boardPinGroups';
@@ -46,11 +53,7 @@ const CAPACITOR_META = new Set([
   ...presetsOf('capacitor'),
   ...presetsOf('capacitor-electrolytic'),
 ]);
-const INDUCTOR_META = new Set([
-  'inductor',
-  'analog-inductor',
-  ...presetsOf('inductor'),
-]);
+const INDUCTOR_META = new Set(['inductor', 'analog-inductor', ...presetsOf('inductor')]);
 const RESISTOR_META = new Set([
   'resistor',
   'resistor-us',
@@ -189,7 +192,9 @@ export function buildInputFromStore(snap: StoreSnapshot): BuildNetlistInput {
     };
   });
 
-  const analysis: AnalysisMode = pickDynamicAnalysis(snap.components, snap.boards) ?? { kind: 'op' };
+  const analysis: AnalysisMode = pickDynamicAnalysis(snap.components, snap.boards) ?? {
+    kind: 'op',
+  };
 
   return {
     components,

@@ -1,5 +1,5 @@
 /**
- * wokwi-74hc595 — 8-bit Serial-to-Parallel Shift Register (SN74HC595)
+ * velxio-74hc595 — 8-bit Serial-to-Parallel Shift Register (SN74HC595)
  *
  * DIP-16 package custom element for use in Velxio/Wokwi simulations.
  */
@@ -13,23 +13,23 @@ class IC74HC595Element extends HTMLElement {
   // Bottom row (y=51): pins 1→8, left to right
   readonly pinInfo = [
     // Bottom row: pins 1-8 (Q1–Q7, GND)
-    { name: 'Q1',   number: 1,  x: 8.1,  y: 51.3, signals: [] },
-    { name: 'Q2',   number: 2,  x: 17.7, y: 51.3, signals: [] },
-    { name: 'Q3',   number: 3,  x: 27.3, y: 51.3, signals: [] },
-    { name: 'Q4',   number: 4,  x: 36.9, y: 51.3, signals: [] },
-    { name: 'Q5',   number: 5,  x: 46.5, y: 51.3, signals: [] },
-    { name: 'Q6',   number: 6,  x: 56.1, y: 51.3, signals: [] },
-    { name: 'Q7',   number: 7,  x: 65.7, y: 51.3, signals: [] },
-    { name: 'GND',  number: 8,  x: 75.3, y: 51.3, signals: [] },
+    { name: 'Q1', number: 1, x: 8.1, y: 51.3, signals: [] },
+    { name: 'Q2', number: 2, x: 17.7, y: 51.3, signals: [] },
+    { name: 'Q3', number: 3, x: 27.3, y: 51.3, signals: [] },
+    { name: 'Q4', number: 4, x: 36.9, y: 51.3, signals: [] },
+    { name: 'Q5', number: 5, x: 46.5, y: 51.3, signals: [] },
+    { name: 'Q6', number: 6, x: 56.1, y: 51.3, signals: [] },
+    { name: 'Q7', number: 7, x: 65.7, y: 51.3, signals: [] },
+    { name: 'GND', number: 8, x: 75.3, y: 51.3, signals: [] },
     // Top row: pins 9-16 (Q7S, MR, SHCP, STCP, OE, DS, Q0, VCC) right to left
-    { name: 'Q7S',  number: 9,  x: 75.3, y: 3,    signals: [] },
-    { name: 'MR',   number: 10, x: 65.7, y: 3,    signals: [] },
-    { name: 'SHCP', number: 11, x: 56.1, y: 3,    signals: [] },
-    { name: 'STCP', number: 12, x: 46.5, y: 3,    signals: [] },
-    { name: 'OE',   number: 13, x: 36.9, y: 3,    signals: [] },
-    { name: 'DS',   number: 14, x: 27.3, y: 3,    signals: [] },
-    { name: 'Q0',   number: 15, x: 17.7, y: 3,    signals: [] },
-    { name: 'VCC',  number: 16, x: 8.1,  y: 3,    signals: [] },
+    { name: 'Q7S', number: 9, x: 75.3, y: 3, signals: [] },
+    { name: 'MR', number: 10, x: 65.7, y: 3, signals: [] },
+    { name: 'SHCP', number: 11, x: 56.1, y: 3, signals: [] },
+    { name: 'STCP', number: 12, x: 46.5, y: 3, signals: [] },
+    { name: 'OE', number: 13, x: 36.9, y: 3, signals: [] },
+    { name: 'DS', number: 14, x: 27.3, y: 3, signals: [] },
+    { name: 'Q0', number: 15, x: 17.7, y: 3, signals: [] },
+    { name: 'VCC', number: 16, x: 8.1, y: 3, signals: [] },
   ];
 
   constructor() {
@@ -57,24 +57,32 @@ class IC74HC595Element extends HTMLElement {
     const topLabels = ['VCC', 'Q0', 'DS', 'OE', 'SCP', 'HCP', 'MR', 'Q7S'];
     const botLabels = ['Q1', 'Q2', 'Q3', 'Q4', 'Q5', 'Q6', 'Q7', 'GND'];
 
-    const pinLines = PIN_X.map((x) => `
+    const pinLines = PIN_X.map(
+      (x) => `
       <line x1="${x}" y1="${TOP_Y}" x2="${x}" y2="${CHIP_Y1}" stroke="#aaa" stroke-width="1.5"/>
       <circle cx="${x}" cy="${TOP_Y}" r="2" fill="#aaa"/>
       <line x1="${x}" y1="${BOT_Y}" x2="${x}" y2="${CHIP_Y1 + CHIP_H}" stroke="#aaa" stroke-width="1.5"/>
       <circle cx="${x}" cy="${BOT_Y}" r="2" fill="#aaa"/>
-    `).join('');
+    `,
+    ).join('');
 
-    const topText = PIN_X.map((x, i) => `
+    const topText = PIN_X.map(
+      (x, i) => `
       <text x="${x}" y="${CHIP_Y1 + 7}" text-anchor="middle" font-size="3.5" fill="#0ff">${topLabels[i]}</text>
-    `).join('');
+    `,
+    ).join('');
 
-    const botText = PIN_X.map((x, i) => `
+    const botText = PIN_X.map(
+      (x, i) => `
       <text x="${x}" y="${CHIP_Y1 + CHIP_H - 3}" text-anchor="middle" font-size="3.5" fill="#0ff">${botLabels[i]}</text>
-    `).join('');
+    `,
+    ).join('');
 
-    const outputDots = PIN_X.map((x, i) => `
+    const outputDots = PIN_X.map(
+      (x, i) => `
       <circle id="dot-q${i + 1}" cx="${x}" cy="${BOT_Y - 6}" r="2" fill="#333" opacity="0.6"/>
-    `).join('');
+    `,
+    ).join('');
 
     this._shadow.innerHTML = `
       <style>
@@ -120,8 +128,8 @@ class IC74HC595Element extends HTMLElement {
   }
 }
 
-if (!customElements.get('wokwi-74hc595')) {
-  customElements.define('wokwi-74hc595', IC74HC595Element);
+if (!customElements.get('velxio-74hc595')) {
+  customElements.define('velxio-74hc595', IC74HC595Element);
 }
 
 export { IC74HC595Element };

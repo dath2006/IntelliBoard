@@ -9,13 +9,7 @@ interface PotentiometerProps {
   onChange?: (value: number) => void;
 }
 
-export const Potentiometer = ({
-  id,
-  value = 50,
-  x = 0,
-  y = 0,
-  onChange,
-}: PotentiometerProps) => {
+export const Potentiometer = ({ id, value = 50, x = 0, y = 0, onChange }: PotentiometerProps) => {
   const potRef = useRef<HTMLElement>(null);
 
   useEffect(() => {

@@ -12,8 +12,11 @@ R2 out 0 2k
     expect(dcValue('v(out)')).toBeCloseTo(6, 3);
   });
 
-  it('three 3k in parallel + 1k series → V(p) = 1.5V from 3V source', { timeout: 30_000 }, async () => {
-    const { dcValue } = await runNetlist(`Parallel resistors
+  it(
+    'three 3k in parallel + 1k series → V(p) = 1.5V from 3V source',
+    { timeout: 30_000 },
+    async () => {
+      const { dcValue } = await runNetlist(`Parallel resistors
 V1 a 0 DC 3
 Rs a p 1k
 R1 p 0 3k
@@ -21,8 +24,9 @@ R2 p 0 3k
 R3 p 0 3k
 .op
 .end`);
-    expect(dcValue('v(p)')).toBeCloseTo(1.5, 3);
-  });
+      expect(dcValue('v(p)')).toBeCloseTo(1.5, 3);
+    },
+  );
 
   it('current source into resistor: I=1mA · R=2.2k → V = 2.2V', { timeout: 30_000 }, async () => {
     const { dcValue } = await runNetlist(`Current source
