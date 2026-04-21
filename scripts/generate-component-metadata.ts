@@ -144,9 +144,10 @@ class MetadataGenerator {
       return a.name.localeCompare(b.name);
     });
 
+    // Note: no `generatedAt` timestamp — it would change on every run and
+    // break the CI drift check (git diff --quiet on the committed JSON).
     const output = {
       version: '1.0.0',
-      generatedAt: new Date().toISOString(),
       components,
     };
 

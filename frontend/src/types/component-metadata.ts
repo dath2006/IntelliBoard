@@ -45,6 +45,6 @@ export interface ComponentMetadata {
 
 export interface ComponentMetadataCollection {
   version: string;
-  generatedAt: string;
+  generatedAt?: string;
   components: ComponentMetadata[];
 }
