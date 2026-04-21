@@ -271,6 +271,7 @@ export const INLINE_SVGS: Record<string, InlineEntry> = {
   'wokwi-zener-1n4733':   { component: DiodeZener,  w: 72, h: 40 },
   // Passives
   'wokwi-capacitor': { component: Capacitor, w: 56, h: 36 },
+  'wokwi-capacitor-electrolytic': { component: Capacitor, w: 36, h: 56 },
   'wokwi-inductor':  { component: Capacitor, w: 56, h: 36 },
   // Electromechanical
   'wokwi-relay': { component: Relay, w: 96, h: 96 },

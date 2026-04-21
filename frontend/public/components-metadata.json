@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-04-21T13:02:40.071Z",
+  "generatedAt": "2026-04-21T18:09:56.254Z",
   "components": [
     {
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DIODE-1N4007\n      </text>\n    </svg>",
@@ -2854,11 +2854,38 @@
       ]
     },
     {
-      "id": "capacitor",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">1 nF</text></svg>",
+      "tags": [
+        "capacitor",
+        "ceramic",
+        "preset",
+        "1nf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1n",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1n"
+      },
+      "pinCount": 0,
+      "id": "cap-1n",
       "tagName": "wokwi-capacitor",
-      "name": "Capacitor",
-      "category": "passive",
-      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        CAPACITOR\n      </text>\n    </svg>",
+      "name": "Cap. 1 nF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">1 µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "ceramic",
+        "preset",
+        "1µf"
+      ],
       "properties": [
         {
           "name": "value",
@@ -2871,10 +2898,340 @@
         "value": "1u"
       },
       "pinCount": 0,
+      "id": "cap-1u",
+      "tagName": "wokwi-capacitor",
+      "name": "Cap. 1 µF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">10 nF</text></svg>",
       "tags": [
         "capacitor",
-        ""
-      ]
+        "ceramic",
+        "preset",
+        "10nf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "10n",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "10n"
+      },
+      "pinCount": 0,
+      "id": "cap-10n",
+      "tagName": "wokwi-capacitor",
+      "name": "Cap. 10 nF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">10 pF</text></svg>",
+      "tags": [
+        "capacitor",
+        "ceramic",
+        "preset",
+        "10pf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "10p",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "10p"
+      },
+      "pinCount": 0,
+      "id": "cap-10p",
+      "tagName": "wokwi-capacitor",
+      "name": "Cap. 10 pF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">100 nF</text></svg>",
+      "tags": [
+        "capacitor",
+        "ceramic",
+        "preset",
+        "100nf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "100n",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "100n"
+      },
+      "pinCount": 0,
+      "id": "cap-100n",
+      "tagName": "wokwi-capacitor",
+      "name": "Cap. 100 nF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">100 pF</text></svg>",
+      "tags": [
+        "capacitor",
+        "ceramic",
+        "preset",
+        "100pf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "100p",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "100p"
+      },
+      "pinCount": 0,
+      "id": "cap-100p",
+      "tagName": "wokwi-capacitor",
+      "name": "Cap. 100 pF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">22 pF</text></svg>",
+      "tags": [
+        "capacitor",
+        "ceramic",
+        "preset",
+        "22pf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "22p",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "22p"
+      },
+      "pinCount": 0,
+      "id": "cap-22p",
+      "tagName": "wokwi-capacitor",
+      "name": "Cap. 22 pF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <ellipse cx=\"32\" cy=\"30\" rx=\"14\" ry=\"9\" fill=\"#165696\"/>\n    <ellipse cx=\"28\" cy=\"26\" rx=\"5\" ry=\"3\" fill=\"#3a7cc8\" opacity=\"0.5\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">?µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "ceramic",
+        "custom"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1u"
+      },
+      "pinCount": 0,
+      "id": "capacitor",
+      "tagName": "wokwi-capacitor",
+      "name": "Cap. ceramic (custom)",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"20\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"40\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"10\" width=\"36\" height=\"32\" rx=\"2\" fill=\"#1f3b6b\"/>\n    <ellipse cx=\"32\" cy=\"10\" rx=\"18\" ry=\"3\" fill=\"#2a4d8a\"/>\n    <rect x=\"38\" y=\"10\" width=\"12\" height=\"32\" rx=\"2\" fill=\"#dfe3ec\"/>\n    <text x=\"44\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"44\" y=\"34\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">1 µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "electrolytic",
+        "polarized",
+        "preset",
+        "1µf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1u"
+      },
+      "pinCount": 0,
+      "id": "cap-elec-1u",
+      "tagName": "wokwi-capacitor-electrolytic",
+      "name": "Electrolytic 1 µF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"20\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"40\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"10\" width=\"36\" height=\"32\" rx=\"2\" fill=\"#1f3b6b\"/>\n    <ellipse cx=\"32\" cy=\"10\" rx=\"18\" ry=\"3\" fill=\"#2a4d8a\"/>\n    <rect x=\"38\" y=\"10\" width=\"12\" height=\"32\" rx=\"2\" fill=\"#dfe3ec\"/>\n    <text x=\"44\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"44\" y=\"34\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">10 µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "electrolytic",
+        "polarized",
+        "preset",
+        "10µf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "10u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "10u"
+      },
+      "pinCount": 0,
+      "id": "cap-elec-10u",
+      "tagName": "wokwi-capacitor-electrolytic",
+      "name": "Electrolytic 10 µF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"20\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"40\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"10\" width=\"36\" height=\"32\" rx=\"2\" fill=\"#1f3b6b\"/>\n    <ellipse cx=\"32\" cy=\"10\" rx=\"18\" ry=\"3\" fill=\"#2a4d8a\"/>\n    <rect x=\"38\" y=\"10\" width=\"12\" height=\"32\" rx=\"2\" fill=\"#dfe3ec\"/>\n    <text x=\"44\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"44\" y=\"34\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">100 µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "electrolytic",
+        "polarized",
+        "preset",
+        "100µf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "100u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "100u"
+      },
+      "pinCount": 0,
+      "id": "cap-elec-100u",
+      "tagName": "wokwi-capacitor-electrolytic",
+      "name": "Electrolytic 100 µF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"20\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"40\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"10\" width=\"36\" height=\"32\" rx=\"2\" fill=\"#1f3b6b\"/>\n    <ellipse cx=\"32\" cy=\"10\" rx=\"18\" ry=\"3\" fill=\"#2a4d8a\"/>\n    <rect x=\"38\" y=\"10\" width=\"12\" height=\"32\" rx=\"2\" fill=\"#dfe3ec\"/>\n    <text x=\"44\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"44\" y=\"34\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">1000 µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "electrolytic",
+        "polarized",
+        "preset",
+        "1000µf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1000u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1000u"
+      },
+      "pinCount": 0,
+      "id": "cap-elec-1000u",
+      "tagName": "wokwi-capacitor-electrolytic",
+      "name": "Electrolytic 1000 µF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"20\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"40\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"10\" width=\"36\" height=\"32\" rx=\"2\" fill=\"#1f3b6b\"/>\n    <ellipse cx=\"32\" cy=\"10\" rx=\"18\" ry=\"3\" fill=\"#2a4d8a\"/>\n    <rect x=\"38\" y=\"10\" width=\"12\" height=\"32\" rx=\"2\" fill=\"#dfe3ec\"/>\n    <text x=\"44\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"44\" y=\"34\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">47 µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "electrolytic",
+        "polarized",
+        "preset",
+        "47µf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "47u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "47u"
+      },
+      "pinCount": 0,
+      "id": "cap-elec-47u",
+      "tagName": "wokwi-capacitor-electrolytic",
+      "name": "Electrolytic 47 µF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"20\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"40\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"10\" width=\"36\" height=\"32\" rx=\"2\" fill=\"#1f3b6b\"/>\n    <ellipse cx=\"32\" cy=\"10\" rx=\"18\" ry=\"3\" fill=\"#2a4d8a\"/>\n    <rect x=\"38\" y=\"10\" width=\"12\" height=\"32\" rx=\"2\" fill=\"#dfe3ec\"/>\n    <text x=\"44\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"44\" y=\"34\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">470 µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "electrolytic",
+        "polarized",
+        "preset",
+        "470µf"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "470u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "470u"
+      },
+      "pinCount": 0,
+      "id": "cap-elec-470u",
+      "tagName": "wokwi-capacitor-electrolytic",
+      "name": "Electrolytic 470 µF",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"20\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"40\" y=\"40\" width=\"2.5\" height=\"9\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"10\" width=\"36\" height=\"32\" rx=\"2\" fill=\"#1f3b6b\"/>\n    <ellipse cx=\"32\" cy=\"10\" rx=\"18\" ry=\"3\" fill=\"#2a4d8a\"/>\n    <rect x=\"38\" y=\"10\" width=\"12\" height=\"32\" rx=\"2\" fill=\"#dfe3ec\"/>\n    <text x=\"44\" y=\"22\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"44\" y=\"34\" text-anchor=\"middle\" font-size=\"10\" font-weight=\"bold\" fill=\"#1f3b6b\">−</text>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">?µF</text></svg>",
+      "tags": [
+        "capacitor",
+        "electrolytic",
+        "polarized",
+        "custom"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "10u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "10u"
+      },
+      "pinCount": 0,
+      "id": "capacitor-electrolytic",
+      "tagName": "wokwi-capacitor-electrolytic",
+      "name": "Electrolytic Cap. (custom)",
+      "category": "passive"
     },
     {
       "id": "franzininho",
@@ -2913,11 +3270,11 @@
       ]
     },
     {
-      "id": "inductor",
-      "tagName": "wokwi-inductor",
-      "name": "Inductor",
-      "category": "passive",
-      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        INDUCTOR\n      </text>\n    </svg>",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <path d=\"M 12 30 Q 16 18 20 30 Q 24 18 28 30 Q 32 18 36 30 Q 40 18 44 30 Q 48 18 52 30\"\n          fill=\"none\" stroke=\"#B23820\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">?mH</text></svg>",
+      "tags": [
+        "inductor",
+        "custom"
+      ],
       "properties": [
         {
           "name": "value",
@@ -2930,10 +3287,82 @@
         "value": "1m"
       },
       "pinCount": 0,
+      "id": "inductor",
+      "tagName": "wokwi-inductor",
+      "name": "Inductor (custom)",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <path d=\"M 12 30 Q 16 18 20 30 Q 24 18 28 30 Q 32 18 36 30 Q 40 18 44 30 Q 48 18 52 30\"\n          fill=\"none\" stroke=\"#B23820\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">1 mH</text></svg>",
       "tags": [
         "inductor",
-        ""
-      ]
+        "preset",
+        "1mh"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1m",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1m"
+      },
+      "pinCount": 0,
+      "id": "ind-1m",
+      "tagName": "wokwi-inductor",
+      "name": "Inductor 1 mH",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <path d=\"M 12 30 Q 16 18 20 30 Q 24 18 28 30 Q 32 18 36 30 Q 40 18 44 30 Q 48 18 52 30\"\n          fill=\"none\" stroke=\"#B23820\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">10 mH</text></svg>",
+      "tags": [
+        "inductor",
+        "preset",
+        "10mh"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "10m",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "10m"
+      },
+      "pinCount": 0,
+      "id": "ind-10m",
+      "tagName": "wokwi-inductor",
+      "name": "Inductor 10 mH",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <path d=\"M 12 30 Q 16 18 20 30 Q 24 18 28 30 Q 32 18 36 30 Q 40 18 44 30 Q 48 18 52 30\"\n          fill=\"none\" stroke=\"#B23820\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">100 µH</text></svg>",
+      "tags": [
+        "inductor",
+        "preset",
+        "100µh"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "100u",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "100u"
+      },
+      "pinCount": 0,
+      "id": "ind-100u",
+      "tagName": "wokwi-inductor",
+      "name": "Inductor 100 µH",
+      "category": "passive"
     },
     {
       "id": "ir-receiver",
@@ -2970,9 +3399,9 @@
     {
       "id": "resistor",
       "tagName": "wokwi-resistor",
-      "name": "Resistor",
+      "name": "Resistor (custom)",
       "category": "passive",
-      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        RESISTOR\n      </text>\n    </svg>",
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">?Ω</text></svg>",
       "properties": [
         {
           "name": "value",
@@ -2988,6 +3417,270 @@
       "tags": [
         "resistor"
       ]
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">1 kΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "1kω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1000",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1000"
+      },
+      "pinCount": 0,
+      "id": "resistor-1k",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 1 kΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#00B800\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">1 MΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "1mω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "1000000",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "1000000"
+      },
+      "pinCount": 0,
+      "id": "resistor-1m",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 1 MΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FC9700\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">10 kΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "10kω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "10000",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "10000"
+      },
+      "pinCount": 0,
+      "id": "resistor-10k",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 10 kΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FCF800\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">100 kΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "100kω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "100000",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "100000"
+      },
+      "pinCount": 0,
+      "id": "resistor-100k",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 100 kΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">2.2 kΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "2.2kω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "2200",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "2200"
+      },
+      "pinCount": 0,
+      "id": "resistor-2k2",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 2.2 kΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FC9700\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">22 kΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "22kω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "22000",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "22000"
+      },
+      "pinCount": 0,
+      "id": "resistor-22k",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 22 kΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">220 Ω</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "220ω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "220",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "220"
+      },
+      "pinCount": 0,
+      "id": "resistor-220",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 220 Ω",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FC9700\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FC9700\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">330 Ω</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "330ω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "330",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "330"
+      },
+      "pinCount": 0,
+      "id": "resistor-330",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 330 Ω",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FCF800\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#A803D6\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FB0000\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">4.7 kΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "4.7kω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "4700",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "4700"
+      },
+      "pinCount": 0,
+      "id": "resistor-4k7",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 4.7 kΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FCF800\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#A803D6\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FC9700\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">47 kΩ</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "47kω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "47000",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "47000"
+      },
+      "pinCount": 0,
+      "id": "resistor-47k",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 47 kΩ",
+      "category": "passive"
+    },
+    {
+      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#1a2332\" rx=\"4\"/>\n    <rect x=\"6\" y=\"29\" width=\"52\" height=\"3\" fill=\"#aaa\"/>\n    <rect x=\"14\" y=\"22\" width=\"36\" height=\"17\" rx=\"3\" fill=\"#d5b597\" stroke=\"#a37b4f\" stroke-width=\"0.6\"/>\n    <rect x=\"20\" y=\"22\" width=\"3\" height=\"17\" fill=\"#FCF800\"/>\n    <rect x=\"26\" y=\"22\" width=\"3\" height=\"17\" fill=\"#A803D6\"/>\n    <rect x=\"32\" y=\"22\" width=\"3\" height=\"17\" fill=\"#8F4814\"/>\n    <rect x=\"42\" y=\"22\" width=\"3\" height=\"17\" fill=\"#F1D863\"/>\n    <text x=\"32\" y=\"56\" text-anchor=\"middle\" font-size=\"10\" font-family=\"sans-serif\" fill=\"#e5e7eb\" font-weight=\"bold\">470 Ω</text></svg>",
+      "tags": [
+        "resistor",
+        "preset",
+        "470ω"
+      ],
+      "properties": [
+        {
+          "name": "value",
+          "type": "string",
+          "defaultValue": "470",
+          "control": "text"
+        }
+      ],
+      "defaultValues": {
+        "value": "470"
+      },
+      "pinCount": 0,
+      "id": "resistor-470",
+      "tagName": "wokwi-resistor",
+      "name": "Resistor 470 Ω",
+      "category": "passive"
     },
     {
       "id": "dht22",

@@ -12,7 +12,9 @@
  */
 
 import './capacitor-element';
+import './capacitor-electrolytic-element';
 import './inductor-element';
 
 export { CapacitorElement } from './capacitor-element';
+export { CapacitorElectrolyticElement } from './capacitor-electrolytic-element';
 export { InductorElement } from './inductor-element';

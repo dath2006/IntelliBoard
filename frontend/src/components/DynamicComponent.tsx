@@ -229,6 +229,7 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
           'resistor':               ['1', '2'],
           'resistor-us':            ['1', '2'],
           'capacitor':              ['1', '2'],
+          'capacitor-electrolytic': ['+', '−'],
           'inductor':               ['1', '2'],
           'analog-resistor':        ['A', 'B'],
           'analog-capacitor':       ['A', 'B'],
@@ -237,6 +238,29 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
           // + analog output); not traceable as 2-terminal passives. Their
           // analog output is already an ADC-readable pin on its own.
         };
+        // Preset variants of the generic passives share their parent's tag
+        // and pin layout — so resistor-220, cap-1u, ind-10m, etc. trace the
+        // same way as their canonical sibling above. The list mirrors the
+        // PASSIVE_PRESETS map in spice/componentToSpice.ts.
+        const PRESET_TO_BASE: Record<string, string> = {
+          'resistor-220': 'resistor', 'resistor-330': 'resistor', 'resistor-470': 'resistor',
+          'resistor-1k':  'resistor', 'resistor-2k2': 'resistor', 'resistor-4k7': 'resistor',
+          'resistor-10k': 'resistor', 'resistor-22k': 'resistor', 'resistor-47k': 'resistor',
+          'resistor-100k': 'resistor', 'resistor-1m': 'resistor',
+          'cap-10p': 'capacitor', 'cap-22p': 'capacitor', 'cap-100p': 'capacitor',
+          'cap-1n':  'capacitor', 'cap-10n': 'capacitor', 'cap-100n': 'capacitor',
+          'cap-1u':  'capacitor',
+          'cap-elec-1u':    'capacitor-electrolytic',
+          'cap-elec-10u':   'capacitor-electrolytic',
+          'cap-elec-47u':   'capacitor-electrolytic',
+          'cap-elec-100u':  'capacitor-electrolytic',
+          'cap-elec-470u':  'capacitor-electrolytic',
+          'cap-elec-1000u': 'capacitor-electrolytic',
+          'ind-100u': 'inductor', 'ind-1m': 'inductor', 'ind-10m': 'inductor',
+        };
+        for (const [preset, base] of Object.entries(PRESET_TO_BASE)) {
+          PASSIVE_PIN_PAIRS[preset] = PASSIVE_PIN_PAIRS[base];
+        }
 
         // Depth-limited BFS: trace from (fromId, fromPin) through wires,
         // traversing through passive components to reach a board pin.

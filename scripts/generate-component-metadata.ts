@@ -235,6 +235,15 @@ class MetadataGenerator {
         comp.defaultValues = { ...comp.defaultValues, ...ov.defaultValues };
       }
 
+      // Replace the picker label / SVG thumbnail (used to e.g. rename the
+      // canonical resistor to "Resistor (custom)" once preset variants exist).
+      if (typeof ov.name === 'string') {
+        comp.name = ov.name;
+      }
+      if (typeof ov.thumbnail === 'string') {
+        comp.thumbnail = ov.thumbnail;
+      }
+
       applied++;
       console.log(`  🔧 Applied overrides for ${comp.id}`);
     }

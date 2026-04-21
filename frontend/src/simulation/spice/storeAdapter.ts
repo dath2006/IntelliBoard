@@ -11,6 +11,7 @@ import type { Wire } from '../../types/wire';
 import type { BoardKind } from '../../types/board';
 import { BOARD_PIN_GROUPS } from './boardPinGroups';
 import { parseValueWithUnits } from './valueParser';
+import { PASSIVE_PRESETS } from './componentToSpice';
 
 // Minimum transient stop time so RC/decoupling networks reach steady-state
 // even if the source is very high frequency.
@@ -30,9 +31,32 @@ const STEP_RESPONSE_STEP_S = 1e-4;
 // through a 10 kΩ pull-up is a reasonable default).
 const DEFAULT_R_OHMS = 10e3;
 
-const CAPACITOR_META = new Set(['capacitor', 'analog-capacitor']);
-const INDUCTOR_META = new Set(['inductor', 'analog-inductor']);
-const RESISTOR_META = new Set(['resistor', 'resistor-us', 'analog-resistor']);
+// Build the meta-id sets dynamically by combining the canonical IDs with
+// every PASSIVE_PRESETS alias that maps to the same base — so adding a new
+// preset (e.g. resistor-470) doesn't require touching this file.
+const presetsOf = (base: 'resistor' | 'capacitor' | 'capacitor-electrolytic' | 'inductor') =>
+  Object.entries(PASSIVE_PRESETS)
+    .filter(([, b]) => b === base)
+    .map(([id]) => id);
+
+const CAPACITOR_META = new Set([
+  'capacitor',
+  'analog-capacitor',
+  'capacitor-electrolytic',
+  ...presetsOf('capacitor'),
+  ...presetsOf('capacitor-electrolytic'),
+]);
+const INDUCTOR_META = new Set([
+  'inductor',
+  'analog-inductor',
+  ...presetsOf('inductor'),
+]);
+const RESISTOR_META = new Set([
+  'resistor',
+  'resistor-us',
+  'analog-resistor',
+  ...presetsOf('resistor'),
+]);
 
 /** True if any board has at least one actively-driven pin (digital or PWM). */
 function hasDrivenPin(boards: StoreSnapshot['boards']): boolean {

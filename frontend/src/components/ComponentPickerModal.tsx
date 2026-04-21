@@ -18,6 +18,12 @@ import raspberryPi3Svg from '../assets/Raspberry_Pi_3_illustration.svg';
 import { Attiny85 } from './components-wokwi/Attiny85';
 import './components-wokwi/Esp32Element';        // registers wokwi-esp32
 import './components-wokwi/PiPicoWElement';      // registers wokwi-pi-pico-w
+// Register every wokwi tag that the picker might try to instantiate as a
+// thumbnail. The picker calls `document.createElement(tagName)`, so any tag
+// that isn't already a registered custom element renders as an empty
+// HTMLUnknownElement (blank card preview).
+import '@wokwi/elements';
+import '../wokwi-custom';
 import './ComponentPickerModal.css';
 
 interface ComponentPickerModalProps {
@@ -257,12 +263,30 @@ interface ComponentCardProps {
   onSelect: () => void;
 }
 
+// Passive components (resistor / capacitor / inductor) come with metadata
+// thumbnails that already encode the preset value (color bands for resistors,
+// value labels for caps/inductors). The live wokwi elements either ignore
+// `value` visually or render it identically across presets, so for these we
+// short-circuit to the SVG. Everything else still uses the live element so
+// LEDs, displays, etc. preview correctly.
+const PASSIVE_TAGS = new Set([
+  'wokwi-resistor',
+  'wokwi-capacitor',
+  'wokwi-capacitor-electrolytic',
+  'wokwi-inductor',
+]);
+
 const ComponentCard: React.FC<ComponentCardProps> = ({ component, onSelect }) => {
   const thumbnailRef = React.useRef<HTMLDivElement>(null);
+  const usePresetSvg =
+    PASSIVE_TAGS.has(component.tagName) &&
+    typeof component.thumbnail === 'string' &&
+    component.thumbnail.trim().startsWith('<svg');
 
   // Render actual web component as thumbnail
   React.useEffect(() => {
     if (!thumbnailRef.current) return;
+    if (usePresetSvg) return; // SVG is rendered via dangerouslySetInnerHTML below
 
     // Create the actual wokwi element
     const element = document.createElement(component.tagName);
@@ -277,6 +301,12 @@ const ComponentCard: React.FC<ComponentCardProps> = ({ component, onSelect }) =>
 
     (element as HTMLElement).style.transform = `scale(${scale})`;
     (element as HTMLElement).style.transformOrigin = 'center center';
+
+    // Pass the preset's default value through so value-sensitive elements
+    // (e.g. wokwi-resistor color bands) render the right look in the picker.
+    if (component.defaultValues?.value !== undefined) {
+      (element as any).value = component.defaultValues.value;
+    }
 
     // Set default properties for better preview appearance
     if (component.tagName === 'wokwi-led') {
@@ -300,12 +330,19 @@ const ComponentCard: React.FC<ComponentCardProps> = ({ component, onSelect }) =>
         thumbnailRef.current.innerHTML = '';
       }
     };
-  }, [component.tagName, component.defaultValues]);
+  }, [component.tagName, component.defaultValues, usePresetSvg]);
 
   return (
     <button className="component-card" onClick={onSelect}>
       <div className="card-thumbnail">
-        <div ref={thumbnailRef} className="component-preview" />
+        {usePresetSvg ? (
+          <div
+            className="component-preview"
+            dangerouslySetInnerHTML={{ __html: component.thumbnail }}
+          />
+        ) : (
+          <div ref={thumbnailRef} className="component-preview" />
+        )}
       </div>
       <div className="card-content">
         <div className="card-name">{component.name}</div>

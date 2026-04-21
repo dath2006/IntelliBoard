@@ -8,7 +8,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import { buildNetlist } from '../simulation/spice/NetlistBuilder';
-import { mappedMetadataIds, componentToSpice } from '../simulation/spice/componentToSpice';
+import { mappedMetadataIds, componentToSpice, PASSIVE_PRESETS } from '../simulation/spice/componentToSpice';
 import { runNetlist } from '../simulation/spice/SpiceEngine';
 
 /**
@@ -37,6 +37,7 @@ const MINIMAL_FIXTURES: Record<string, Fixture> = {
   resistor: { pins: ['1', '2'] },
   'resistor-us': { pins: ['1', '2'] },
   capacitor: { pins: ['1', '2'] },
+  'capacitor-electrolytic': { pins: ['+', '−'] },
   inductor: { pins: ['1', '2'] },
   'analog-resistor': { pins: ['A', 'B'], properties: { value: '10k' } },
   'analog-capacitor': { pins: ['A', 'B'], properties: { value: '1u' } },
@@ -114,6 +115,60 @@ const MINIMAL_FIXTURES: Record<string, Fixture> = {
   'ic-74hc86': { pins: ['1A', '1B', '1Y'] },
   'motor-driver-l293d': { pins: ['EN1', 'IN1', 'OUT1'] },
 };
+
+// Each PASSIVE_PRESETS entry shares pins with its base, so we derive the
+// fixture instead of restating it (keeps the two lists from drifting).
+const BASE_PINS: Record<string, string[]> = {
+  resistor: ['1', '2'],
+  capacitor: ['1', '2'],
+  'capacitor-electrolytic': ['+', '−'],
+  inductor: ['1', '2'],
+};
+for (const [presetId, baseId] of Object.entries(PASSIVE_PRESETS)) {
+  MINIMAL_FIXTURES[presetId] = { pins: BASE_PINS[baseId] };
+}
+
+describe('PASSIVE_PRESETS — preset variants share their base mapper', () => {
+  it('every preset emits the same card prefix as its base (just the value/id differ)', () => {
+    const PREFIX = { resistor: 'R_', capacitor: 'C_', 'capacitor-electrolytic': 'C_', inductor: 'L_' } as const;
+    for (const [presetId, baseId] of Object.entries(PASSIVE_PRESETS)) {
+      const fx = MINIMAL_FIXTURES[presetId];
+      const netLookup = (pin: string) => (fx.pins.includes(pin) ? `n_${pin}` : null);
+      const emission = componentToSpice(
+        { id: 'p', metadataId: presetId, properties: { value: '47' } },
+        netLookup,
+        { vcc: 5 },
+      );
+      expect(emission, `${presetId} emitted nothing`).not.toBeNull();
+      expect(
+        emission!.cards[0].startsWith(PREFIX[baseId]),
+        `${presetId} should emit a ${PREFIX[baseId]}… card, got: ${emission!.cards[0]}`,
+      ).toBe(true);
+    }
+  });
+
+  it('electrolytic uses the +/− pin names (not 1/2)', () => {
+    const onlyOnePinLookup = (pin: string) => (pin === '+' || pin === '−' ? `n_${pin}` : null);
+    const emission = componentToSpice(
+      { id: 'e1', metadataId: 'capacitor-electrolytic', properties: { value: '100u' } },
+      onlyOnePinLookup,
+      { vcc: 5 },
+    );
+    expect(emission).not.toBeNull();
+    expect(emission!.cards[0]).toContain('n_+');
+    expect(emission!.cards[0]).toContain('n_−');
+  });
+
+  it('electrolytic returns null if pin names are wrong', () => {
+    const wrongPinLookup = (pin: string) => (pin === '1' || pin === '2' ? `n_${pin}` : null);
+    const emission = componentToSpice(
+      { id: 'e1', metadataId: 'capacitor-electrolytic', properties: { value: '100u' } },
+      wrongPinLookup,
+      { vcc: 5 },
+    );
+    expect(emission).toBeNull();
+  });
+});
 
 describe('componentToSpice — catalog completeness', () => {
   it('every mapped metadataId has a test fixture', () => {

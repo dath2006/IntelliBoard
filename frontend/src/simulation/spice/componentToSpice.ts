@@ -98,6 +98,15 @@ const MAPPERS: Record<string, Mapper> = {
     const farads = parseValueWithUnits(comp.properties.value, 1e-6);
     return emitCapacitor(comp, pins, farads);
   },
+  // Polarized aluminum-can cap. Pin names match the visual SVG ('+' / '−');
+  // SPICE itself is bidirectional so the order doesn't matter for the solve,
+  // but the names let us validate user wiring later.
+  'capacitor-electrolytic': (comp, netLookup) => {
+    const pins = twoPin(comp, netLookup, '+', '−');
+    if (!pins) return null;
+    const farads = parseValueWithUnits(comp.properties.value, 1e-6);
+    return emitCapacitor(comp, pins, farads);
+  },
   inductor: (comp, netLookup) => {
     const pins = twoPin(comp, netLookup, '1', '2');
     if (!pins) return null;
@@ -1062,6 +1071,55 @@ const MAPPERS: Record<string, Mapper> = {
     return emitResistor(comp, pins, Rldr);
   },
 };
+
+/**
+ * Preset variants of the generic passive parts. Each preset shares the
+ * same web-component tag and the same SPICE emit logic as its base; the
+ * picker uses different `defaultValues.value` per entry so users get
+ * common values one click away (e.g. drop in a "Resistor 1kΩ" instead of
+ * having to type "1000" into the property dialog).
+ *
+ * Exported so storeAdapter and DynamicComponent can keep their meta-id
+ * tables in sync without restating the list.
+ */
+export const PASSIVE_PRESETS: Readonly<Record<string, 'resistor' | 'capacitor' | 'capacitor-electrolytic' | 'inductor'>> = {
+  // Resistors — E12 series subset covering the common Arduino-bench picks
+  'resistor-220':   'resistor',
+  'resistor-330':   'resistor',
+  'resistor-470':   'resistor',
+  'resistor-1k':    'resistor',
+  'resistor-2k2':   'resistor',
+  'resistor-4k7':   'resistor',
+  'resistor-10k':   'resistor',
+  'resistor-22k':   'resistor',
+  'resistor-47k':   'resistor',
+  'resistor-100k':  'resistor',
+  'resistor-1m':    'resistor',
+  // Ceramic caps (non-polarized, smaller end of the range)
+  'cap-10p':   'capacitor',
+  'cap-22p':   'capacitor',
+  'cap-100p':  'capacitor',
+  'cap-1n':    'capacitor',
+  'cap-10n':   'capacitor',
+  'cap-100n':  'capacitor',
+  'cap-1u':    'capacitor',
+  // Electrolytic caps (polarized, larger values)
+  'cap-elec-1u':    'capacitor-electrolytic',
+  'cap-elec-10u':   'capacitor-electrolytic',
+  'cap-elec-47u':   'capacitor-electrolytic',
+  'cap-elec-100u':  'capacitor-electrolytic',
+  'cap-elec-470u':  'capacitor-electrolytic',
+  'cap-elec-1000u': 'capacitor-electrolytic',
+  // Inductors
+  'ind-100u':  'inductor',
+  'ind-1m':    'inductor',
+  'ind-10m':   'inductor',
+};
+
+// Wire each preset to its base mapper.
+for (const [presetId, baseId] of Object.entries(PASSIVE_PRESETS)) {
+  MAPPERS[presetId] = MAPPERS[baseId];
+}
 
 /**
  * Public entry: map one Velxio component to SPICE cards.
