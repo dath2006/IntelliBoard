@@ -182,6 +182,11 @@ jobs:
         env:
           BACKEND_URL: http://localhost:8001
 
+      - name: Run ESP32 + ngspice photodiode co-simulation
+        run: node test/backend/e2e/test_esp32_spice_photodiode.mjs --timeout=150
+        env:
+          BACKEND_URL: http://localhost:8001
+
       # ── Always dump backend logs so failures are diagnosable ──────────────────
       - name: Show backend logs
         if: always()
