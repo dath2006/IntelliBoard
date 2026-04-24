@@ -1,71 +1,109 @@
-import { create } from 'zustand';
-import { AVRSimulator } from '../simulation/AVRSimulator';
-import { RP2040Simulator } from '../simulation/RP2040Simulator';
-import { RiscVSimulator } from '../simulation/RiscVSimulator';
-import { Esp32C3Simulator } from '../simulation/Esp32C3Simulator';
-import { PinManager } from '../simulation/PinManager';
-import { VirtualDS1307, VirtualTempSensor, I2CMemoryDevice } from '../simulation/I2CBusManager';
-import type { RP2040I2CDevice } from '../simulation/RP2040Simulator';
-import type { Wire, WireInProgress, WireEndpoint } from '../types/wire';
-import type { BoardKind, BoardInstance, LanguageMode } from '../types/board';
-import { BOARD_SUPPORTS_MICROPYTHON } from '../types/board';
-import { calculatePinPosition } from '../utils/pinPositionCalculator';
-import { useOscilloscopeStore } from './useOscilloscopeStore';
-import { RaspberryPi3Bridge } from '../simulation/RaspberryPi3Bridge';
-import { Esp32Bridge } from '../simulation/Esp32Bridge';
-import { useEditorStore } from './useEditorStore';
-import { useVfsStore } from './useVfsStore';
-import { boardPinToNumber, isBoardComponent } from '../utils/boardPinMapping';
+import { create } from "zustand";
+import { AVRSimulator } from "../simulation/AVRSimulator";
+import { RP2040Simulator } from "../simulation/RP2040Simulator";
+import { RiscVSimulator } from "../simulation/RiscVSimulator";
+import { Esp32C3Simulator } from "../simulation/Esp32C3Simulator";
+import { PinManager } from "../simulation/PinManager";
+import {
+  VirtualDS1307,
+  VirtualTempSensor,
+  I2CMemoryDevice,
+} from "../simulation/I2CBusManager";
+import type { RP2040I2CDevice } from "../simulation/RP2040Simulator";
+import type { Wire, WireInProgress, WireEndpoint } from "../types/wire";
+import type { BoardKind, BoardInstance, LanguageMode } from "../types/board";
+import { BOARD_SUPPORTS_MICROPYTHON } from "../types/board";
+import { calculatePinPosition } from "../utils/pinPositionCalculator";
+import { useOscilloscopeStore } from "./useOscilloscopeStore";
+import { RaspberryPi3Bridge } from "../simulation/RaspberryPi3Bridge";
+import { Esp32Bridge } from "../simulation/Esp32Bridge";
+import { useEditorStore } from "./useEditorStore";
+import { useVfsStore } from "./useVfsStore";
+import { boardPinToNumber, isBoardComponent } from "../utils/boardPinMapping";
 
 // ── Sensor pre-registration ──────────────────────────────────────────────────
 // Maps component metadataId → { sensorType, dataPinName, propertyKeys }
 // Used to pre-register sensors in the start_esp32 payload so the QEMU worker
 // has them ready before the firmware starts executing (prevents race conditions).
-const SENSOR_COMPONENT_MAP: Record<string, {
-  sensorType: string;
-  dataPinName: string;
-  propertyKeys: string[];
-  extraPins?: Record<string, string>; // extra pin mappings: prop name → component pin name
-}> = {
-  'dht22': { sensorType: 'dht22', dataPinName: 'SDA', propertyKeys: ['temperature', 'humidity'] },
-  'hc-sr04': { sensorType: 'hc-sr04', dataPinName: 'TRIG', propertyKeys: ['distance'], extraPins: { echo_pin: 'ECHO' } },
+const SENSOR_COMPONENT_MAP: Record<
+  string,
+  {
+    sensorType: string;
+    dataPinName: string;
+    propertyKeys: string[];
+    extraPins?: Record<string, string>; // extra pin mappings: prop name → component pin name
+  }
+> = {
+  dht22: {
+    sensorType: "dht22",
+    dataPinName: "SDA",
+    propertyKeys: ["temperature", "humidity"],
+  },
+  "hc-sr04": {
+    sensorType: "hc-sr04",
+    dataPinName: "TRIG",
+    propertyKeys: ["distance"],
+    extraPins: { echo_pin: "ECHO" },
+  },
 };
 
 // ── I2C sensor pre-registration ───────────────────────────────────────────────
 // I2C sensors use virtual pins (200 + i2c_addr) instead of real GPIO pins.
 // They are identified by I2C address and do not need wire-resolution.
 // `addrProp` is the component property that overrides the default address.
-const I2C_SENSOR_MAP: Record<string, {
-  sensorType: string;
-  defaultAddr: number;
-  addrProp?: string;       // property key that holds the I2C address (e.g. 'address')
-  addrIsBool?: boolean;    // true when addrProp is a boolean flag (e.g. AD0 → 0x68/0x69)
-  addrBoolHigh?: number;   // address when the boolean flag is truthy
-  propertyKeys?: string[]; // additional sensor values to forward (e.g. temperature, pressure)
-}> = {
-  'mpu6050': { sensorType: 'mpu6050', defaultAddr: 0x68, addrProp: 'ad0', addrIsBool: true, addrBoolHigh: 0x69 },
-  'bmp280':  { sensorType: 'bmp280',  defaultAddr: 0x76, addrProp: 'address', propertyKeys: ['temperature', 'pressure'] },
-  'ds1307':  { sensorType: 'ds1307',  defaultAddr: 0x68 },
-  'ds3231':  { sensorType: 'ds3231',  defaultAddr: 0x68, propertyKeys: ['temperature'] },
-  'ssd1306': { sensorType: 'ssd1306', defaultAddr: 0x3C },
-  'pcf8574': { sensorType: 'pcf8574', defaultAddr: 0x27, addrProp: 'i2cAddress' },
+const I2C_SENSOR_MAP: Record<
+  string,
+  {
+    sensorType: string;
+    defaultAddr: number;
+    addrProp?: string; // property key that holds the I2C address (e.g. 'address')
+    addrIsBool?: boolean; // true when addrProp is a boolean flag (e.g. AD0 → 0x68/0x69)
+    addrBoolHigh?: number; // address when the boolean flag is truthy
+    propertyKeys?: string[]; // additional sensor values to forward (e.g. temperature, pressure)
+  }
+> = {
+  mpu6050: {
+    sensorType: "mpu6050",
+    defaultAddr: 0x68,
+    addrProp: "ad0",
+    addrIsBool: true,
+    addrBoolHigh: 0x69,
+  },
+  bmp280: {
+    sensorType: "bmp280",
+    defaultAddr: 0x76,
+    addrProp: "address",
+    propertyKeys: ["temperature", "pressure"],
+  },
+  ds1307: { sensorType: "ds1307", defaultAddr: 0x68 },
+  ds3231: {
+    sensorType: "ds3231",
+    defaultAddr: 0x68,
+    propertyKeys: ["temperature"],
+  },
+  ssd1306: { sensorType: "ssd1306", defaultAddr: 0x3c },
+  pcf8574: { sensorType: "pcf8574", defaultAddr: 0x27, addrProp: "i2cAddress" },
 };
 
 // ── Legacy type aliases (keep external consumers working) ──────────────────
-export type BoardType = 'arduino-uno' | 'arduino-nano' | 'arduino-mega' | 'raspberry-pi-pico';
+export type BoardType =
+  | "arduino-uno"
+  | "arduino-nano"
+  | "arduino-mega"
+  | "raspberry-pi-pico";
 
 export const BOARD_FQBN: Record<BoardType, string> = {
-  'arduino-uno': 'arduino:avr:uno',
-  'arduino-nano': 'arduino:avr:nano:cpu=atmega328',
-  'arduino-mega': 'arduino:avr:mega',
-  'raspberry-pi-pico': 'rp2040:rp2040:rpipico',
+  "arduino-uno": "arduino:avr:uno",
+  "arduino-nano": "arduino:avr:nano:cpu=atmega328",
+  "arduino-mega": "arduino:avr:mega",
+  "raspberry-pi-pico": "rp2040:rp2040:rpipico",
 };
 
 export const BOARD_LABELS: Record<BoardType, string> = {
-  'arduino-uno': 'Arduino Uno',
-  'arduino-nano': 'Arduino Nano',
-  'arduino-mega': 'Arduino Mega 2560',
-  'raspberry-pi-pico': 'Raspberry Pi Pico',
+  "arduino-uno": "Arduino Uno",
+  "arduino-nano": "Arduino Nano",
+  "arduino-mega": "Arduino Mega 2560",
+  "raspberry-pi-pico": "Raspberry Pi Pico",
 };
 
 export const DEFAULT_BOARD_POSITION = { x: 50, y: 50 };
@@ -76,7 +114,9 @@ export const ARDUINO_POSITION = DEFAULT_BOARD_POSITION;
 class Esp32BridgeShim {
   pinManager: PinManager;
   onSerialData: ((ch: string) => void) | null = null;
-  onPinChangeWithTime: ((pin: number, state: boolean, timeMs: number) => void) | null = null;
+  onPinChangeWithTime:
+    | ((pin: number, state: boolean, timeMs: number) => void)
+    | null = null;
   onBaudRateChange: ((baud: number) => void) | null = null;
   private bridge: Esp32Bridge;
 
@@ -85,15 +125,25 @@ class Esp32BridgeShim {
     this.pinManager = pm;
   }
 
-  setPinState(pin: number, state: boolean): void { this.bridge.sendPinEvent(pin, state); }
-  getCurrentCycles(): number { return -1; }
-  getClockHz(): number { return 240_000_000; }
-  isRunning(): boolean { return this.bridge.connected; }
+  setPinState(pin: number, state: boolean): void {
+    this.bridge.sendPinEvent(pin, state);
+  }
+  getCurrentCycles(): number {
+    return -1;
+  }
+  getClockHz(): number {
+    return 240_000_000;
+  }
+  isRunning(): boolean {
+    return this.bridge.connected;
+  }
   serialWrite(text: string): void {
     this.bridge.sendSerialBytes(Array.from(new TextEncoder().encode(text)));
   }
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  getADC(): any { return null; }
+  getADC(): any {
+    return null;
+  }
 
   /**
    * Set ADC value for an ESP32 GPIO pin.
@@ -102,26 +152,47 @@ class Esp32BridgeShim {
    */
   setAdcVoltage(pin: number, voltage: number): boolean {
     let channel = -1;
-    if (pin >= 36 && pin <= 39) channel = pin - 36;       // GPIO 36→CH0, 37→CH1, 38→CH2, 39→CH3
-    else if (pin >= 32 && pin <= 35) channel = pin - 28;   // GPIO 32→CH4, 33→CH5, 34→CH6, 35→CH7
+    if (pin >= 36 && pin <= 39)
+      channel = pin - 36; // GPIO 36→CH0, 37→CH1, 38→CH2, 39→CH3
+    else if (pin >= 32 && pin <= 35) channel = pin - 28; // GPIO 32→CH4, 33→CH5, 34→CH6, 35→CH7
     if (channel < 0) return false;
     const millivolts = Math.round(voltage * 1000);
     this.bridge.setAdc(channel, millivolts);
     return true;
   }
-  getMCU(): null { return null; }
-  start(): void { /* managed by bridge */ }
-  stop(): void { /* managed by bridge */ }
-  reset(): void { /* managed by bridge */ }
-  setSpeed(_s: number): void { /* no-op */ }
-  getSpeed(): number { return 1; }
-  loadHex(_hex: string): void { /* no-op */ }
-  loadBinary(_b64: string): void { /* no-op */ }
+  getMCU(): null {
+    return null;
+  }
+  start(): void {
+    /* managed by bridge */
+  }
+  stop(): void {
+    /* managed by bridge */
+  }
+  reset(): void {
+    /* managed by bridge */
+  }
+  setSpeed(_s: number): void {
+    /* no-op */
+  }
+  getSpeed(): number {
+    return 1;
+  }
+  loadHex(_hex: string): void {
+    /* no-op */
+  }
+  loadBinary(_b64: string): void {
+    /* no-op */
+  }
 
   // ── Generic sensor registration (board-agnostic API) ──────────────────────
   // ESP32 delegates sensor protocols to the backend QEMU.
 
-  registerSensor(type: string, pin: number, properties: Record<string, unknown>): boolean {
+  registerSensor(
+    type: string,
+    pin: number,
+    properties: Record<string, unknown>,
+  ): boolean {
     this.bridge.sendSensorAttach(type, pin, properties);
     return true; // backend handles the protocol
   }
@@ -133,7 +204,10 @@ class Esp32BridgeShim {
   }
 
   // ── I2C write-only device relay (SSD1306, PCF8574) ───────────────────────
-  private _i2cTransactionListeners = new Map<number, (data: number[]) => void>();
+  private _i2cTransactionListeners = new Map<
+    number,
+    (data: number[]) => void
+  >();
 
   addI2CTransactionListener(addr: number, fn: (data: number[]) => void): void {
     this._i2cTransactionListeners.set(addr, fn);
@@ -168,7 +242,14 @@ function makeLedcUpdateHandler(boardId: string) {
 }
 
 // ── Runtime Maps (outside Zustand — not serialisable) ─────────────────────
-const simulatorMap = new Map<string, AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator | Esp32BridgeShim>();
+const simulatorMap = new Map<
+  string,
+  | AVRSimulator
+  | RP2040Simulator
+  | RiscVSimulator
+  | Esp32C3Simulator
+  | Esp32BridgeShim
+>();
 const pinManagerMap = new Map<string, PinManager>();
 const bridgeMap = new Map<string, RaspberryPi3Bridge>();
 const esp32BridgeMap = new Map<string, Esp32Bridge>();
@@ -180,14 +261,21 @@ export const getEsp32Bridge = (id: string) => esp32BridgeMap.get(id);
 
 // Xtensa-based ESP32 boards — use QEMU bridge (backend)
 const ESP32_KINDS = new Set<BoardKind>([
-  'esp32', 'esp32-devkit-c-v4', 'esp32-cam', 'wemos-lolin32-lite',
-  'esp32-s3', 'xiao-esp32-s3', 'arduino-nano-esp32',
+  "esp32",
+  "esp32-devkit-c-v4",
+  "esp32-cam",
+  "wemos-lolin32-lite",
+  "esp32-s3",
+  "xiao-esp32-s3",
+  "arduino-nano-esp32",
 ]);
 
 // RISC-V ESP32 boards — also use QEMU bridge (qemu-system-riscv32 -M esp32c3)
 // The browser-side Esp32C3Simulator cannot handle the 150+ ROM functions ESP-IDF needs.
 const ESP32_RISCV_KINDS = new Set<BoardKind>([
-  'esp32-c3', 'xiao-esp32-c3', 'aitewinrobot-esp32c3-supermini',
+  "esp32-c3",
+  "xiao-esp32-c3",
+  "aitewinrobot-esp32c3-supermini",
 ]);
 
 function isEsp32Kind(kind: BoardKind): boolean {
@@ -207,6 +295,19 @@ interface Component {
   properties: Record<string, unknown>;
 }
 
+export interface AgentAction {
+  type: string;
+  payload?: unknown;
+  timestamp: string;
+}
+
+export interface AgentContextWindow {
+  includeSerialLogs: boolean;
+  includeCompilationError: boolean;
+  serialOutputTail: string;
+  compilationError: string | null;
+}
+
 // ── Store interface ───────────────────────────────────────────────────────
 interface SimulatorState {
   // ── Multi-board state ───────────────────────────────────────────────────
@@ -219,7 +320,10 @@ interface SimulatorState {
   setBoardPosition: (pos: { x: number; y: number }, boardId?: string) => void;
   setActiveBoardId: (boardId: string) => void;
   compileBoardProgram: (boardId: string, program: string) => void;
-  loadMicroPythonProgram: (boardId: string, files: Array<{ name: string; content: string }>) => Promise<void>;
+  loadMicroPythonProgram: (
+    boardId: string,
+    files: Array<{ name: string; content: string }>,
+  ) => Promise<void>;
   setBoardLanguageMode: (boardId: string, mode: LanguageMode) => void;
   startBoard: (boardId: string) => void;
   stopBoard: (boardId: string) => void;
@@ -231,7 +335,13 @@ interface SimulatorState {
   /** @deprecated use boards[x].x/y */
   boardPosition: { x: number; y: number };
   /** @deprecated use getBoardSimulator(activeBoardId) */
-  simulator: AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator | Esp32BridgeShim | null;
+  simulator:
+    | AVRSimulator
+    | RP2040Simulator
+    | RiscVSimulator
+    | Esp32C3Simulator
+    | Esp32BridgeShim
+    | null;
   /** @deprecated use getBoardPinManager(activeBoardId) */
   pinManager: PinManager;
   running: boolean;
@@ -268,7 +378,11 @@ interface SimulatorState {
   removeComponent: (id: string) => void;
   updateComponent: (id: string, updates: Partial<Component>) => void;
   updateComponentState: (id: string, state: boolean) => void;
-  handleComponentEvent: (componentId: string, eventName: string, data?: unknown) => void;
+  handleComponentEvent: (
+    componentId: string,
+    eventName: string,
+    data?: unknown,
+  ) => void;
   setComponents: (components: Component[]) => void;
 
   // ── Wires ───────────────────────────────────────────────────────────────
@@ -295,6 +409,28 @@ interface SimulatorState {
   serialWriteToBoard: (boardId: string, text: string) => void;
   clearSerialOutput: () => void;
   clearBoardSerialOutput: (boardId: string) => void;
+
+  // ── Agent session/context ───────────────────────────────────────────────
+  agentSessionId: string | null;
+  lastAgentAction: AgentAction | null;
+  agentContextWindow: AgentContextWindow;
+  setAgentSessionId: (sessionId: string | null) => void;
+  setLastAgentAction: (action: AgentAction | null) => void;
+  setAgentContextWindow: (updates: Partial<AgentContextWindow>) => void;
+  applyAgentCircuitUpdate: (circuit: {
+    components?: Array<{
+      id: string;
+      type: string;
+      left: number;
+      top: number;
+      rotate?: number;
+      attrs?: Record<string, unknown>;
+    }>;
+    wires?: Wire[];
+  }) => void;
+  applyAgentCodeUpdate: (
+    files: Array<{ name: string; content: string }>,
+  ) => void;
 }
 
 // ── Helper: create a simulator for a given board kind ─────────────────────
@@ -306,18 +442,18 @@ function createSimulator(
   onPinTime: (pin: number, state: boolean, t: number) => void,
 ): AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator {
   let sim: AVRSimulator | RP2040Simulator | RiscVSimulator | Esp32C3Simulator;
-  if (boardKind === 'arduino-mega') {
-    sim = new AVRSimulator(pm, 'mega');
-  } else if (boardKind === 'attiny85') {
-    sim = new AVRSimulator(pm, 'tiny85');
-  } else if (boardKind === 'raspberry-pi-pico' || boardKind === 'pi-pico-w') {
+  if (boardKind === "arduino-mega") {
+    sim = new AVRSimulator(pm, "mega");
+  } else if (boardKind === "attiny85") {
+    sim = new AVRSimulator(pm, "tiny85");
+  } else if (boardKind === "raspberry-pi-pico" || boardKind === "pi-pico-w") {
     sim = new RP2040Simulator(pm);
   } else if (isRiscVEsp32Kind(boardKind)) {
     // ESP32-C3 / XIAO-C3 / C3 SuperMini — browser-side RV32IMC emulator
     sim = new Esp32C3Simulator(pm);
   } else {
     // arduino-uno, arduino-nano
-    sim = new AVRSimulator(pm, 'uno');
+    sim = new AVRSimulator(pm, "uno");
   }
   sim.onSerialData = onSerial;
   if (sim instanceof AVRSimulator) sim.onBaudRateChange = onBaud;
@@ -326,19 +462,19 @@ function createSimulator(
 }
 
 // ── Default initial board (Arduino Uno — same as old behaviour) ───────────
-const INITIAL_BOARD_ID = 'arduino-uno';
+const INITIAL_BOARD_ID = "arduino-uno";
 const INITIAL_BOARD: BoardInstance = {
   id: INITIAL_BOARD_ID,
-  boardKind: 'arduino-uno',
+  boardKind: "arduino-uno",
   x: DEFAULT_BOARD_POSITION.x,
   y: DEFAULT_BOARD_POSITION.y,
   running: false,
   compiledProgram: null,
-  serialOutput: '',
+  serialOutput: "",
   serialBaudRate: 0,
   serialMonitorOpen: false,
   activeFileGroupId: `group-${INITIAL_BOARD_ID}`,
-  languageMode: 'arduino' as LanguageMode,
+  languageMode: "arduino" as LanguageMode,
 };
 
 // ── Store ─────────────────────────────────────────────────────────────────
@@ -351,27 +487,33 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     return (pin: number, state: boolean, timeMs: number) => {
       const { channels, pushSample } = useOscilloscopeStore.getState();
       for (const ch of channels) {
-        if (ch.boardId === boardId && ch.pin === pin) pushSample(ch.id, timeMs, state);
+        if (ch.boardId === boardId && ch.pin === pin)
+          pushSample(ch.id, timeMs, state);
       }
     };
   }
 
   const initialSim = createSimulator(
-    'arduino-uno',
+    "arduino-uno",
     initialPm,
     (ch) => {
       set((s) => {
         const boards = s.boards.map((b) =>
-          b.id === INITIAL_BOARD_ID ? { ...b, serialOutput: b.serialOutput + ch } : b
+          b.id === INITIAL_BOARD_ID
+            ? { ...b, serialOutput: b.serialOutput + ch }
+            : b,
         );
         const isActive = s.activeBoardId === INITIAL_BOARD_ID;
-        return { boards, ...(isActive ? { serialOutput: s.serialOutput + ch } : {}) };
+        return {
+          boards,
+          ...(isActive ? { serialOutput: s.serialOutput + ch } : {}),
+        };
       });
     },
     (baud) => {
       set((s) => {
         const boards = s.boards.map((b) =>
-          b.id === INITIAL_BOARD_ID ? { ...b, serialBaudRate: baud } : b
+          b.id === INITIAL_BOARD_ID ? { ...b, serialBaudRate: baud } : b,
         );
         const isActive = s.activeBoardId === INITIAL_BOARD_ID;
         return { boards, ...(isActive ? { serialBaudRate: baud } : {}) };
@@ -400,9 +542,10 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
     addBoard: (boardKind: BoardKind, x: number, y: number) => {
       const existing = get().boards.filter((b) => b.boardKind === boardKind);
-      const id = existing.length === 0
-        ? boardKind
-        : `${boardKind}-${existing.length + 1}`;
+      const id =
+        existing.length === 0
+          ? boardKind
+          : `${boardKind}-${existing.length + 1}`;
 
       const pm = new PinManager();
       pinManagerMap.set(id, pm);
@@ -410,21 +553,25 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       const serialCallback = (ch: string) => {
         set((s) => {
           const boards = s.boards.map((b) =>
-            b.id === id ? { ...b, serialOutput: b.serialOutput + ch } : b
+            b.id === id ? { ...b, serialOutput: b.serialOutput + ch } : b,
           );
           const isActive = s.activeBoardId === id;
-          return { boards, ...(isActive ? { serialOutput: s.serialOutput + ch } : {}) };
+          return {
+            boards,
+            ...(isActive ? { serialOutput: s.serialOutput + ch } : {}),
+          };
         });
       };
 
-      if (boardKind === 'raspberry-pi-3') {
+      if (boardKind === "raspberry-pi-3") {
         const bridge = new RaspberryPi3Bridge(id);
         bridge.onSerialData = (ch: string) => {
           serialCallback(ch);
           // Cross-board serial bridge: Pi TX → all AVR simulators RX
           get().boards.forEach((b) => {
             const sim = simulatorMap.get(b.id);
-            if (sim instanceof AVRSimulator || sim instanceof RiscVSimulator) sim.serialWrite(ch);
+            if (sim instanceof AVRSimulator || sim instanceof RiscVSimulator)
+              sim.serialWrite(ch);
           });
         };
         bridge.onPinChange = (_gpioPin, _state) => {
@@ -443,7 +590,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         };
         bridge.onDisconnected = () => {
           set((s) => {
-            const boards = s.boards.map((b) => b.id === id ? { ...b, running: false } : b);
+            const boards = s.boards.map((b) =>
+              b.id === id ? { ...b, running: false } : b,
+            );
             const isActive = s.activeBoardId === id;
             return { boards, ...(isActive ? { running: false } : {}) };
           });
@@ -453,21 +602,27 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           // Forward WS2812 pixel data to any DOM element with id=`ws2812-{id}-{channel}`
           // (set by NeoPixel components rendered in SimulatorCanvas).
           // We fire a custom event that NeoPixel components can listen to.
-          const eventTarget = document.getElementById(`ws2812-${id}-${channel}`);
+          const eventTarget = document.getElementById(
+            `ws2812-${id}-${channel}`,
+          );
           if (eventTarget) {
             eventTarget.dispatchEvent(
-              new CustomEvent('ws2812-pixels', { detail: { pixels } })
+              new CustomEvent("ws2812-pixels", { detail: { pixels } }),
             );
           }
         };
         bridge.onWifiStatus = (ws) => {
           set((s) => ({
-            boards: s.boards.map((b) => b.id === id ? { ...b, wifiStatus: ws } : b),
+            boards: s.boards.map((b) =>
+              b.id === id ? { ...b, wifiStatus: ws } : b,
+            ),
           }));
         };
         bridge.onBleStatus = (bs) => {
           set((s) => ({
-            boards: s.boards.map((b) => b.id === id ? { ...b, bleStatus: bs } : b),
+            boards: s.boards.map((b) =>
+              b.id === id ? { ...b, bleStatus: bs } : b,
+            ),
           }));
         };
         esp32BridgeMap.set(id, bridge);
@@ -484,7 +639,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           (baud) => {
             set((s) => {
               const boards = s.boards.map((b) =>
-                b.id === id ? { ...b, serialBaudRate: baud } : b
+                b.id === id ? { ...b, serialBaudRate: baud } : b,
               );
               const isActive = s.activeBoardId === id;
               return { boards, ...(isActive ? { serialBaudRate: baud } : {}) };
@@ -505,19 +660,24 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       }
 
       const newBoard: BoardInstance = {
-        id, boardKind, x, y,
-        running: false, compiledProgram: null,
-        serialOutput: '', serialBaudRate: 0,
+        id,
+        boardKind,
+        x,
+        y,
+        running: false,
+        compiledProgram: null,
+        serialOutput: "",
+        serialBaudRate: 0,
         serialMonitorOpen: false,
         activeFileGroupId: `group-${id}`,
-        languageMode: 'arduino',
+        languageMode: "arduino",
       };
 
       set((s) => ({ boards: [...s.boards, newBoard] }));
       // Create the editor file group for this board
       useEditorStore.getState().createFileGroup(`group-${id}`);
       // Init VFS for Raspberry Pi 3 boards
-      if (boardKind === 'raspberry-pi-3') {
+      if (boardKind === "raspberry-pi-3") {
         useVfsStore.getState().initBoardVfs(id);
       }
       return id;
@@ -529,17 +689,25 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       simulatorMap.delete(boardId);
       pinManagerMap.delete(boardId);
       const bridge = getBoardBridge(boardId);
-      if (bridge) { bridge.disconnect(); bridgeMap.delete(boardId); }
+      if (bridge) {
+        bridge.disconnect();
+        bridgeMap.delete(boardId);
+      }
       const esp32Bridge = getEsp32Bridge(boardId);
-      if (esp32Bridge) { esp32Bridge.disconnect(); esp32BridgeMap.delete(boardId); }
+      if (esp32Bridge) {
+        esp32Bridge.disconnect();
+        esp32BridgeMap.delete(boardId);
+      }
       set((s) => {
         const boards = s.boards.filter((b) => b.id !== boardId);
-        const activeBoardId = s.activeBoardId === boardId
-          ? (boards[0]?.id ?? null)
-          : s.activeBoardId;
+        const activeBoardId =
+          s.activeBoardId === boardId
+            ? (boards[0]?.id ?? null)
+            : s.activeBoardId;
         // Remove wires connected to this board
-        const wires = s.wires.filter((w) =>
-          w.start.componentId !== boardId && w.end.componentId !== boardId
+        const wires = s.wires.filter(
+          (w) =>
+            w.start.componentId !== boardId && w.end.componentId !== boardId,
         );
         return { boards, activeBoardId, wires };
       });
@@ -551,7 +719,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
     updateBoard: (boardId: string, updates: Partial<BoardInstance>) => {
       set((s) => ({
-        boards: s.boards.map((b) => b.id === boardId ? { ...b, ...updates } : b),
+        boards: s.boards.map((b) =>
+          b.id === boardId ? { ...b, ...updates } : b,
+        ),
       }));
     },
 
@@ -559,7 +729,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       const id = boardId ?? get().activeBoardId ?? INITIAL_BOARD_ID;
       set((s) => ({
         boardPosition: s.activeBoardId === id ? pos : s.boardPosition,
-        boards: s.boards.map((b) => b.id === id ? { ...b, x: pos.x, y: pos.y } : b),
+        boards: s.boards.map((b) =>
+          b.id === id ? { ...b, x: pos.x, y: pos.y } : b,
+        ),
       }));
     },
 
@@ -569,7 +741,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       set({
         activeBoardId: boardId,
         // Sync legacy flat fields to this board's values
-        boardType: (board.boardKind === 'raspberry-pi-3' ? 'arduino-uno' : board.boardKind) as BoardType,
+        boardType: (board.boardKind === "raspberry-pi-3"
+          ? "arduino-uno"
+          : board.boardKind) as BoardType,
         boardPosition: { x: board.x, y: board.y },
         simulator: simulatorMap.get(boardId) ?? null,
         pinManager: pinManagerMap.get(boardId) ?? legacyPinManager,
@@ -578,7 +752,10 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         serialOutput: board.serialOutput,
         serialBaudRate: board.serialBaudRate,
         serialMonitorOpen: board.serialMonitorOpen,
-        remoteConnected: (bridgeMap.get(boardId)?.connected ?? esp32BridgeMap.get(boardId)?.connected) ?? false,
+        remoteConnected:
+          bridgeMap.get(boardId)?.connected ??
+          esp32BridgeMap.get(boardId)?.connected ??
+          false,
         remoteSocket: null,
       });
       // Switch the editor to this board's file group
@@ -603,13 +780,16 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           try {
             sim.loadFlashImage(program);
           } catch (err) {
-            console.error(`[Esp32C3Simulator] loadFlashImage failed for ${boardId}:`, err);
+            console.error(
+              `[Esp32C3Simulator] loadFlashImage failed for ${boardId}:`,
+              err,
+            );
             return;
           }
         }
       } else {
         const sim = getBoardSimulator(boardId);
-        if (sim && board.boardKind !== 'raspberry-pi-3') {
+        if (sim && board.boardKind !== "raspberry-pi-3") {
           try {
             if (sim instanceof AVRSimulator) {
               sim.loadHex(program);
@@ -631,33 +811,41 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
       set((s) => {
         const boards = s.boards.map((b) =>
-          b.id === boardId ? { ...b, compiledProgram: program } : b
+          b.id === boardId ? { ...b, compiledProgram: program } : b,
         );
         const isActive = s.activeBoardId === boardId;
         return {
           boards,
-          ...(isActive ? { compiledHex: program, hexEpoch: s.hexEpoch + 1 } : {}),
+          ...(isActive
+            ? { compiledHex: program, hexEpoch: s.hexEpoch + 1 }
+            : {}),
         };
       });
     },
 
-    loadMicroPythonProgram: async (boardId: string, files: Array<{ name: string; content: string }>) => {
+    loadMicroPythonProgram: async (
+      boardId: string,
+      files: Array<{ name: string; content: string }>,
+    ) => {
       const board = get().boards.find((b) => b.id === boardId);
       if (!board) return;
       if (!BOARD_SUPPORTS_MICROPYTHON.has(board.boardKind)) return;
 
       if (isEsp32Kind(board.boardKind)) {
         // ESP32 path: load MicroPython firmware via QEMU bridge, inject code via raw-paste REPL
-        const { getEsp32Firmware, padToFlashSize, uint8ArrayToBase64 } = await import('../simulation/Esp32MicroPythonLoader');
+        const { getEsp32Firmware, padToFlashSize, uint8ArrayToBase64 } =
+          await import("../simulation/Esp32MicroPythonLoader");
         const esp32Bridge = getEsp32Bridge(boardId);
         if (!esp32Bridge) return;
 
         const firmware = await getEsp32Firmware(board.boardKind);
-        const b64 = uint8ArrayToBase64(padToFlashSize(firmware, board.boardKind));
+        const b64 = uint8ArrayToBase64(
+          padToFlashSize(firmware, board.boardKind),
+        );
         esp32Bridge.loadFirmware(b64);
 
         // Queue code injection for after REPL boots
-        const mainFile = files.find(f => f.name === 'main.py') ?? files[0];
+        const mainFile = files.find((f) => f.name === "main.py") ?? files[0];
         if (mainFile) {
           esp32Bridge.setPendingMicroPythonCode(mainFile.content);
         }
@@ -670,12 +858,16 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
       set((s) => {
         const boards = s.boards.map((b) =>
-          b.id === boardId ? { ...b, compiledProgram: 'micropython-loaded' } : b
+          b.id === boardId
+            ? { ...b, compiledProgram: "micropython-loaded" }
+            : b,
         );
         const isActive = s.activeBoardId === boardId;
         return {
           boards,
-          ...(isActive ? { compiledHex: 'micropython-loaded', hexEpoch: s.hexEpoch + 1 } : {}),
+          ...(isActive
+            ? { compiledHex: "micropython-loaded", hexEpoch: s.hexEpoch + 1 }
+            : {}),
         };
       });
     },
@@ -685,7 +877,11 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       if (!board) return;
 
       // Only allow MicroPython for supported boards
-      if (mode === 'micropython' && !BOARD_SUPPORTS_MICROPYTHON.has(board.boardKind)) return;
+      if (
+        mode === "micropython" &&
+        !BOARD_SUPPORTS_MICROPYTHON.has(board.boardKind)
+      )
+        return;
 
       // Stop any running simulation
       if (board.running) get().stopBoard(boardId);
@@ -693,7 +889,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       // Clear compiled program since language changed
       set((s) => ({
         boards: s.boards.map((b) =>
-          b.id === boardId ? { ...b, languageMode: mode, compiledProgram: null } : b
+          b.id === boardId
+            ? { ...b, languageMode: mode, compiledProgram: null }
+            : b,
         ),
       }));
 
@@ -708,7 +906,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       const board = get().boards.find((b) => b.id === boardId);
       if (!board) return;
 
-      if (board.boardKind === 'raspberry-pi-3') {
+      if (board.boardKind === "raspberry-pi-3") {
         getBoardBridge(boardId)?.connect();
       } else if (isEsp32Kind(board.boardKind)) {
         // Pre-register sensors connected to this board so the QEMU worker
@@ -722,14 +920,22 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
             if (!sensorDef) continue;
             // Find the wire connecting this component's data pin to the board
             for (const w of wires) {
-              const compEndpoint = (w.start.componentId === comp.id && w.start.pinName === sensorDef.dataPinName)
-                ? w.start : (w.end.componentId === comp.id && w.end.pinName === sensorDef.dataPinName)
-                ? w.end : null;
+              const compEndpoint =
+                w.start.componentId === comp.id &&
+                w.start.pinName === sensorDef.dataPinName
+                  ? w.start
+                  : w.end.componentId === comp.id &&
+                      w.end.pinName === sensorDef.dataPinName
+                    ? w.end
+                    : null;
               if (!compEndpoint) continue;
               const boardEndpoint = compEndpoint === w.start ? w.end : w.start;
               if (!isBoardComponent(boardEndpoint.componentId)) continue;
               // Resolve GPIO pin number
-              const gpioPin = boardPinToNumber(board.boardKind, boardEndpoint.pinName);
+              const gpioPin = boardPinToNumber(
+                board.boardKind,
+                boardEndpoint.pinName,
+              );
               if (gpioPin === null || gpioPin < 0) continue;
               // Collect sensor properties from the component
               const props: Record<string, unknown> = {
@@ -738,19 +944,30 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               };
               for (const key of sensorDef.propertyKeys) {
                 const val = comp.properties[key];
-                if (val !== undefined) props[key] = typeof val === 'string' ? parseFloat(val) : val;
+                if (val !== undefined)
+                  props[key] = typeof val === "string" ? parseFloat(val) : val;
               }
               // Resolve extra pins (e.g. echo_pin for HC-SR04) from wires
               if (sensorDef.extraPins) {
-                for (const [propName, compPinName] of Object.entries(sensorDef.extraPins)) {
+                for (const [propName, compPinName] of Object.entries(
+                  sensorDef.extraPins,
+                )) {
                   for (const ew of wires) {
-                    const epComp = (ew.start.componentId === comp.id && ew.start.pinName === compPinName)
-                      ? ew.start : (ew.end.componentId === comp.id && ew.end.pinName === compPinName)
-                      ? ew.end : null;
+                    const epComp =
+                      ew.start.componentId === comp.id &&
+                      ew.start.pinName === compPinName
+                        ? ew.start
+                        : ew.end.componentId === comp.id &&
+                            ew.end.pinName === compPinName
+                          ? ew.end
+                          : null;
                     if (!epComp) continue;
                     const epBoard = epComp === ew.start ? ew.end : ew.start;
                     if (!isBoardComponent(epBoard.componentId)) continue;
-                    const extraGpio = boardPinToNumber(board.boardKind, epBoard.pinName);
+                    const extraGpio = boardPinToNumber(
+                      board.boardKind,
+                      epBoard.pinName,
+                    );
                     if (extraGpio !== null && extraGpio >= 0) {
                       props[propName] = extraGpio;
                     }
@@ -774,22 +991,34 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               if (rawAddr !== undefined) {
                 if (i2cDef.addrIsBool) {
                   // Boolean flag (e.g. AD0 on MPU-6050): truthy → high address
-                  if (rawAddr === true || rawAddr === 'true' || rawAddr === '1') {
+                  if (
+                    rawAddr === true ||
+                    rawAddr === "true" ||
+                    rawAddr === "1"
+                  ) {
                     addr = i2cDef.addrBoolHigh ?? i2cDef.defaultAddr;
                   }
                 } else {
-                  const parsed = typeof rawAddr === 'string'
-                    ? (rawAddr.startsWith('0x') ? parseInt(rawAddr, 16) : parseInt(rawAddr, 10))
-                    : Number(rawAddr);
+                  const parsed =
+                    typeof rawAddr === "string"
+                      ? rawAddr.startsWith("0x")
+                        ? parseInt(rawAddr, 16)
+                        : parseInt(rawAddr, 10)
+                      : Number(rawAddr);
                   if (!isNaN(parsed)) addr = parsed;
                 }
               }
             }
             const virtualPin = 200 + addr;
-            const props: Record<string, unknown> = { sensor_type: i2cDef.sensorType, pin: virtualPin, addr };
-            for (const key of (i2cDef.propertyKeys ?? [])) {
+            const props: Record<string, unknown> = {
+              sensor_type: i2cDef.sensorType,
+              pin: virtualPin,
+              addr,
+            };
+            for (const key of i2cDef.propertyKeys ?? []) {
               const val = comp.properties[key];
-              if (val !== undefined) props[key] = typeof val === 'string' ? parseFloat(val) : val;
+              if (val !== undefined)
+                props[key] = typeof val === "string" ? parseFloat(val) : val;
             }
             sensors.push(props);
           }
@@ -802,12 +1031,14 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           if (hasWifi === undefined) {
             const editorState = useEditorStore.getState();
             const rawFiles = editorState.fileGroups[board.activeFileGroupId];
-            const boardFiles = (rawFiles && rawFiles.length > 0) ? rawFiles : editorState.files;
-            hasWifi = boardFiles.some(f =>
-              f.content.includes('#include <WiFi.h>') ||
-              f.content.includes('#include <esp_wifi.h>') ||
-              f.content.includes('#include "WiFi.h"') ||
-              f.content.includes('WiFi.begin(')
+            const boardFiles =
+              rawFiles && rawFiles.length > 0 ? rawFiles : editorState.files;
+            hasWifi = boardFiles.some(
+              (f) =>
+                f.content.includes("#include <WiFi.h>") ||
+                f.content.includes("#include <esp_wifi.h>") ||
+                f.content.includes('#include "WiFi.h"') ||
+                f.content.includes("WiFi.begin("),
             );
           }
           esp32Bridge.wifiEnabled = hasWifi;
@@ -826,10 +1057,15 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
       set((s) => {
         const boards = s.boards.map((b) =>
-          b.id === boardId ? { ...b, running: true, serialMonitorOpen: true } : b
+          b.id === boardId
+            ? { ...b, running: true, serialMonitorOpen: true }
+            : b,
         );
         const isActive = s.activeBoardId === boardId;
-        return { boards, ...(isActive ? { running: true, serialMonitorOpen: true } : {}) };
+        return {
+          boards,
+          ...(isActive ? { running: true, serialMonitorOpen: true } : {}),
+        };
       });
     },
 
@@ -837,7 +1073,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       const board = get().boards.find((b) => b.id === boardId);
       if (!board) return;
 
-      if (board.boardKind === 'raspberry-pi-3') {
+      if (board.boardKind === "raspberry-pi-3") {
         getBoardBridge(boardId)?.disconnect();
       } else if (isEsp32Kind(board.boardKind)) {
         getEsp32Bridge(boardId)?.disconnect();
@@ -847,7 +1083,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
       set((s) => {
         const boards = s.boards.map((b) =>
-          b.id === boardId ? { ...b, running: false } : b
+          b.id === boardId ? { ...b, running: false } : b,
         );
         const isActive = s.activeBoardId === boardId;
         return { boards, ...(isActive ? { running: false } : {}) };
@@ -865,7 +1101,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           esp32Bridge.disconnect();
           setTimeout(() => esp32Bridge.connect(), 500);
         }
-      } else if (board.boardKind !== 'raspberry-pi-3') {
+      } else if (board.boardKind !== "raspberry-pi-3") {
         const sim = getBoardSimulator(boardId);
         if (sim) {
           sim.reset();
@@ -873,20 +1109,28 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           sim.onSerialData = (ch) => {
             set((s) => {
               const boards = s.boards.map((b) =>
-                b.id === boardId ? { ...b, serialOutput: b.serialOutput + ch } : b
+                b.id === boardId
+                  ? { ...b, serialOutput: b.serialOutput + ch }
+                  : b,
               );
               const isActive = s.activeBoardId === boardId;
-              return { boards, ...(isActive ? { serialOutput: s.serialOutput + ch } : {}) };
+              return {
+                boards,
+                ...(isActive ? { serialOutput: s.serialOutput + ch } : {}),
+              };
             });
           };
           if (sim instanceof AVRSimulator) {
             sim.onBaudRateChange = (baud) => {
               set((s) => {
                 const boards = s.boards.map((b) =>
-                  b.id === boardId ? { ...b, serialBaudRate: baud } : b
+                  b.id === boardId ? { ...b, serialBaudRate: baud } : b,
                 );
                 const isActive = s.activeBoardId === boardId;
-                return { boards, ...(isActive ? { serialBaudRate: baud } : {}) };
+                return {
+                  boards,
+                  ...(isActive ? { serialBaudRate: baud } : {}),
+                };
               });
             };
           }
@@ -895,26 +1139,42 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
       set((s) => {
         const boards = s.boards.map((b) =>
-          b.id === boardId ? { ...b, running: false, serialOutput: '', serialBaudRate: 0 } : b
+          b.id === boardId
+            ? { ...b, running: false, serialOutput: "", serialBaudRate: 0 }
+            : b,
         );
         const isActive = s.activeBoardId === boardId;
-        return { boards, ...(isActive ? { running: false, serialOutput: '', serialBaudRate: 0 } : {}) };
+        return {
+          boards,
+          ...(isActive
+            ? { running: false, serialOutput: "", serialBaudRate: 0 }
+            : {}),
+        };
       });
     },
 
     // ── Legacy single-board API ───────────────────────────────────────────
-    boardType: 'arduino-uno',
+    boardType: "arduino-uno",
     boardPosition: { ...DEFAULT_BOARD_POSITION },
     simulator: initialSim,
     pinManager: legacyPinManager,
     running: false,
     compiledHex: null,
     hexEpoch: 0,
-    serialOutput: '',
+    serialOutput: "",
     serialBaudRate: 0,
     serialMonitorOpen: false,
     remoteConnected: false,
     remoteSocket: null,
+
+    agentSessionId: null,
+    lastAgentAction: null,
+    agentContextWindow: {
+      includeSerialLogs: false,
+      includeCompilationError: true,
+      serialOutputTail: "",
+      compilationError: null,
+    },
 
     esp32CrashBoardId: null,
     dismissEsp32Crash: () => set({ esp32CrashBoardId: null }),
@@ -932,12 +1192,13 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       getEsp32Bridge(boardId)?.disconnect();
       esp32BridgeMap.delete(boardId);
 
-      const serialCallback = (ch: string) => set((s) => {
-        const boards = s.boards.map((b) =>
-          b.id === boardId ? { ...b, serialOutput: b.serialOutput + ch } : b
-        );
-        return { boards, serialOutput: s.serialOutput + ch };
-      });
+      const serialCallback = (ch: string) =>
+        set((s) => {
+          const boards = s.boards.map((b) =>
+            b.id === boardId ? { ...b, serialOutput: b.serialOutput + ch } : b,
+          );
+          return { boards, serialOutput: s.serialOutput + ch };
+        });
 
       if (isEsp32Kind(type as BoardKind)) {
         // ESP32: use bridge, not AVR simulator
@@ -947,19 +1208,27 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           const boardPm = pinManagerMap.get(boardId);
           if (boardPm) boardPm.triggerPinChange(gpioPin, state);
         };
-        bridge.onCrash = () => { set({ esp32CrashBoardId: boardId }); };
+        bridge.onCrash = () => {
+          set({ esp32CrashBoardId: boardId });
+        };
         bridge.onDisconnected = () => {
           set((s) => {
-            const boards = s.boards.map((b) => b.id === boardId ? { ...b, running: false } : b);
+            const boards = s.boards.map((b) =>
+              b.id === boardId ? { ...b, running: false } : b,
+            );
             const isActive = s.activeBoardId === boardId;
             return { boards, ...(isActive ? { running: false } : {}) };
           });
         };
         bridge.onLedcUpdate = makeLedcUpdateHandler(boardId);
         bridge.onWs2812Update = (channel, pixels) => {
-          const eventTarget = document.getElementById(`ws2812-${boardId}-${channel}`);
+          const eventTarget = document.getElementById(
+            `ws2812-${boardId}-${channel}`,
+          );
           if (eventTarget) {
-            eventTarget.dispatchEvent(new CustomEvent('ws2812-pixels', { detail: { pixels } }));
+            eventTarget.dispatchEvent(
+              new CustomEvent("ws2812-pixels", { detail: { pixels } }),
+            );
           }
         };
         esp32BridgeMap.set(boardId, bridge);
@@ -971,12 +1240,18 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           boardType: type,
           simulator: shim as any,
           compiledHex: null,
-          serialOutput: '',
+          serialOutput: "",
           serialBaudRate: 0,
           boards: s.boards.map((b) =>
             b.id === boardId
-              ? { ...b, boardKind: type as BoardKind, compiledProgram: null, serialOutput: '', serialBaudRate: 0 }
-              : b
+              ? {
+                  ...b,
+                  boardKind: type as BoardKind,
+                  compiledProgram: null,
+                  serialOutput: "",
+                  serialBaudRate: 0,
+                }
+              : b,
           ),
         }));
       } else {
@@ -984,13 +1259,14 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           type as BoardKind,
           pm,
           serialCallback,
-          (baud) => set((s) => {
-            const boards = s.boards.map((b) =>
-              b.id === boardId ? { ...b, serialBaudRate: baud } : b
-            );
-            return { boards, serialBaudRate: baud };
-          }),
-          getOscilloscopeCallback(),
+          (baud) =>
+            set((s) => {
+              const boards = s.boards.map((b) =>
+                b.id === boardId ? { ...b, serialBaudRate: baud } : b,
+              );
+              return { boards, serialBaudRate: baud };
+            }),
+          getOscilloscopeCallback(boardId),
         );
         simulatorMap.set(boardId, sim);
 
@@ -998,12 +1274,18 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           boardType: type,
           simulator: sim,
           compiledHex: null,
-          serialOutput: '',
+          serialOutput: "",
           serialBaudRate: 0,
           boards: s.boards.map((b) =>
             b.id === boardId
-              ? { ...b, boardKind: type as BoardKind, compiledProgram: null, serialOutput: '', serialBaudRate: 0 }
-              : b
+              ? {
+                  ...b,
+                  boardKind: type as BoardKind,
+                  compiledProgram: null,
+                  serialOutput: "",
+                  serialBaudRate: 0,
+                }
+              : b,
           ),
         }));
       }
@@ -1020,12 +1302,13 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       getEsp32Bridge(boardId)?.disconnect();
       esp32BridgeMap.delete(boardId);
 
-      const serialCallback = (ch: string) => set((s) => {
-        const boards = s.boards.map((b) =>
-          b.id === boardId ? { ...b, serialOutput: b.serialOutput + ch } : b
-        );
-        return { boards, serialOutput: s.serialOutput + ch };
-      });
+      const serialCallback = (ch: string) =>
+        set((s) => {
+          const boards = s.boards.map((b) =>
+            b.id === boardId ? { ...b, serialOutput: b.serialOutput + ch } : b,
+          );
+          return { boards, serialOutput: s.serialOutput + ch };
+        });
 
       if (isEsp32Kind(boardType as BoardKind)) {
         // ESP32: create bridge + shim (same as setBoardType)
@@ -1035,41 +1318,50 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           const boardPm = pinManagerMap.get(boardId);
           if (boardPm) boardPm.triggerPinChange(gpioPin, state);
         };
-        bridge.onCrash = () => { set({ esp32CrashBoardId: boardId }); };
+        bridge.onCrash = () => {
+          set({ esp32CrashBoardId: boardId });
+        };
         bridge.onDisconnected = () => {
           set((s) => {
-            const boards = s.boards.map((b) => b.id === boardId ? { ...b, running: false } : b);
+            const boards = s.boards.map((b) =>
+              b.id === boardId ? { ...b, running: false } : b,
+            );
             const isActive = s.activeBoardId === boardId;
             return { boards, ...(isActive ? { running: false } : {}) };
           });
         };
         bridge.onLedcUpdate = makeLedcUpdateHandler(boardId);
         bridge.onWs2812Update = (channel, pixels) => {
-          const eventTarget = document.getElementById(`ws2812-${boardId}-${channel}`);
+          const eventTarget = document.getElementById(
+            `ws2812-${boardId}-${channel}`,
+          );
           if (eventTarget) {
-            eventTarget.dispatchEvent(new CustomEvent('ws2812-pixels', { detail: { pixels } }));
+            eventTarget.dispatchEvent(
+              new CustomEvent("ws2812-pixels", { detail: { pixels } }),
+            );
           }
         };
         esp32BridgeMap.set(boardId, bridge);
         const shim = new Esp32BridgeShim(bridge, pm);
         shim.onSerialData = serialCallback;
         simulatorMap.set(boardId, shim);
-        set({ simulator: shim as any, serialOutput: '', serialBaudRate: 0 });
+        set({ simulator: shim as any, serialOutput: "", serialBaudRate: 0 });
       } else {
         const sim = createSimulator(
           boardType as BoardKind,
           pm,
           serialCallback,
-          (baud) => set((s) => {
-            const boards = s.boards.map((b) =>
-              b.id === boardId ? { ...b, serialBaudRate: baud } : b
-            );
-            return { boards, serialBaudRate: baud };
-          }),
-          getOscilloscopeCallback(),
+          (baud) =>
+            set((s) => {
+              const boards = s.boards.map((b) =>
+                b.id === boardId ? { ...b, serialBaudRate: baud } : b,
+              );
+              return { boards, serialBaudRate: baud };
+            }),
+          getOscilloscopeCallback(boardId),
         );
         simulatorMap.set(boardId, sim);
-        set({ simulator: sim, serialOutput: '', serialBaudRate: 0 });
+        set({ simulator: sim, serialOutput: "", serialBaudRate: 0 });
       }
       console.log(`Simulator initialized: ${boardType}`);
     },
@@ -1085,12 +1377,12 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           sim.addI2CDevice(new VirtualTempSensor());
           sim.addI2CDevice(new I2CMemoryDevice(0x50));
           set((s) => ({ compiledHex: hex, hexEpoch: s.hexEpoch + 1 }));
-          console.log('HEX file loaded successfully');
+          console.log("HEX file loaded successfully");
         } catch (error) {
-          console.error('Failed to load HEX:', error);
+          console.error("Failed to load HEX:", error);
         }
       } else {
-        console.warn('loadHex: simulator not initialized or wrong board type');
+        console.warn("loadHex: simulator not initialized or wrong board type");
       }
     },
 
@@ -1105,12 +1397,14 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           sim.addI2CDevice(new VirtualTempSensor() as RP2040I2CDevice);
           sim.addI2CDevice(new I2CMemoryDevice(0x50) as RP2040I2CDevice);
           set((s) => ({ compiledHex: base64, hexEpoch: s.hexEpoch + 1 }));
-          console.log('Binary loaded into RP2040 successfully');
+          console.log("Binary loaded into RP2040 successfully");
         } catch (error) {
-          console.error('Failed to load binary:', error);
+          console.error("Failed to load binary:", error);
         }
       } else {
-        console.warn('loadBinary: simulator not initialized or wrong board type');
+        console.warn(
+          "loadBinary: simulator not initialized or wrong board type",
+        );
       }
     },
 
@@ -1153,22 +1447,33 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         bridge.onSerialData = (ch) => {
           set((s) => {
             const boards = s.boards.map((b) =>
-              b.id === boardId ? { ...b, serialOutput: b.serialOutput + ch } : b
+              b.id === boardId
+                ? { ...b, serialOutput: b.serialOutput + ch }
+                : b,
             );
             const isActive = s.activeBoardId === boardId;
-            return { boards, ...(isActive ? { serialOutput: s.serialOutput + ch } : {}) };
+            return {
+              boards,
+              ...(isActive ? { serialOutput: s.serialOutput + ch } : {}),
+            };
           });
         };
         bridge.onPinChange = (gpioPin, state) => {
           const { wires } = get();
-          const sim = getBoardSimulator(get().activeBoardId ?? INITIAL_BOARD_ID);
+          const sim = getBoardSimulator(
+            get().activeBoardId ?? INITIAL_BOARD_ID,
+          );
           if (!sim) return;
-          const wire = wires.find(w =>
-            (w.start.componentId.includes('raspberry-pi') && w.start.pinName === String(gpioPin)) ||
-            (w.end.componentId.includes('raspberry-pi') && w.end.pinName === String(gpioPin))
+          const wire = wires.find(
+            (w) =>
+              (w.start.componentId.includes("raspberry-pi") &&
+                w.start.pinName === String(gpioPin)) ||
+              (w.end.componentId.includes("raspberry-pi") &&
+                w.end.pinName === String(gpioPin)),
           );
           if (wire) {
-            const isArduinoStart = !wire.start.componentId.includes('raspberry-pi');
+            const isArduinoStart =
+              !wire.start.componentId.includes("raspberry-pi");
             const targetEndpoint = isArduinoStart ? wire.start : wire.end;
             const pinNum = parseInt(targetEndpoint.pinName, 10);
             if (!isNaN(pinNum)) sim.setPinState(pinNum, state);
@@ -1196,43 +1501,49 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     // ── Components ────────────────────────────────────────────────────────
     components: [
       {
-        id: 'led-builtin',
-        metadataId: 'led',
+        id: "led-builtin",
+        metadataId: "led",
         x: 350,
         y: 100,
-        properties: { color: 'red' },
+        properties: { color: "red" },
       },
     ],
 
     wires: [
       {
-        id: 'wire-builtin-anode',
-        start: { componentId: 'arduino-uno', pinName: '13', x: 0, y: 0 },
-        end: { componentId: 'led-builtin', pinName: 'A', x: 0, y: 0 },
+        id: "wire-builtin-anode",
+        start: { componentId: "arduino-uno", pinName: "13", x: 0, y: 0 },
+        end: { componentId: "led-builtin", pinName: "A", x: 0, y: 0 },
         waypoints: [],
-        color: '#22c55e',
+        color: "#22c55e",
       },
       {
-        id: 'wire-builtin-cathode',
-        start: { componentId: 'arduino-uno', pinName: 'GND.1', x: 0, y: 0 },
-        end: { componentId: 'led-builtin', pinName: 'C', x: 0, y: 0 },
+        id: "wire-builtin-cathode",
+        start: { componentId: "arduino-uno", pinName: "GND.1", x: 0, y: 0 },
+        end: { componentId: "led-builtin", pinName: "C", x: 0, y: 0 },
         waypoints: [],
-        color: '#000000',
+        color: "#000000",
       },
     ],
     selectedWireId: null,
     wireInProgress: null,
 
-    addComponent: (component) => set((state) => ({ components: [...state.components, component] })),
+    addComponent: (component) =>
+      set((state) => ({ components: [...state.components, component] })),
 
-    removeComponent: (id) => set((state) => ({
-      components: state.components.filter((c) => c.id !== id),
-      wires: state.wires.filter((w) => w.start.componentId !== id && w.end.componentId !== id),
-    })),
+    removeComponent: (id) =>
+      set((state) => ({
+        components: state.components.filter((c) => c.id !== id),
+        wires: state.wires.filter(
+          (w) => w.start.componentId !== id && w.end.componentId !== id,
+        ),
+      })),
 
     updateComponent: (id, updates) => {
       set((state) => ({
-        components: state.components.map((c) => c.id === id ? { ...c, ...updates } : c),
+        components: state.components.map((c) =>
+          c.id === id ? { ...c, ...updates } : c,
+        ),
       }));
       if (updates.x !== undefined || updates.y !== undefined) {
         get().updateWirePositions(id);
@@ -1242,7 +1553,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     updateComponentState: (id, state) => {
       set((prevState) => ({
         components: prevState.components.map((c) =>
-          c.id === id ? { ...c, properties: { ...c.properties, state, value: state } } : c
+          c.id === id
+            ? { ...c, properties: { ...c.properties, state, value: state } }
+            : c,
         ),
       }));
     },
@@ -1253,51 +1566,63 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
     addWire: (wire) => set((state) => ({ wires: [...state.wires, wire] })),
 
-    removeWire: (wireId) => set((state) => ({
-      wires: state.wires.filter((w) => w.id !== wireId),
-      selectedWireId: state.selectedWireId === wireId ? null : state.selectedWireId,
-    })),
+    removeWire: (wireId) =>
+      set((state) => ({
+        wires: state.wires.filter((w) => w.id !== wireId),
+        selectedWireId:
+          state.selectedWireId === wireId ? null : state.selectedWireId,
+      })),
 
-    updateWire: (wireId, updates) => set((state) => ({
-      wires: state.wires.map((w) => w.id === wireId ? { ...w, ...updates } : w),
-    })),
+    updateWire: (wireId, updates) =>
+      set((state) => ({
+        wires: state.wires.map((w) =>
+          w.id === wireId ? { ...w, ...updates } : w,
+        ),
+      })),
 
     setSelectedWire: (wireId) => set({ selectedWireId: wireId }),
 
-    setWires: (wires) => set({
-      // Ensure every wire has waypoints (backwards-compatible with saved projects)
-      wires: wires.map((w) => ({ waypoints: [], ...w })),
-    }),
+    setWires: (wires) =>
+      set({
+        // Ensure every wire has waypoints (backwards-compatible with saved projects)
+        wires: wires.map((w) => ({ ...w, waypoints: w.waypoints ?? [] })),
+      }),
 
-    startWireCreation: (endpoint, color) => set({
-      wireInProgress: {
-        startEndpoint: endpoint,
-        waypoints: [],
-        color,
-        currentX: endpoint.x,
-        currentY: endpoint.y,
-      },
-    }),
-
-    updateWireInProgress: (x, y) => set((state) => {
-      if (!state.wireInProgress) return state;
-      return { wireInProgress: { ...state.wireInProgress, currentX: x, currentY: y } };
-    }),
-
-    addWireWaypoint: (x, y) => set((state) => {
-      if (!state.wireInProgress) return state;
-      return {
+    startWireCreation: (endpoint, color) =>
+      set({
         wireInProgress: {
-          ...state.wireInProgress,
-          waypoints: [...state.wireInProgress.waypoints, { x, y }],
+          startEndpoint: endpoint,
+          waypoints: [],
+          color,
+          currentX: endpoint.x,
+          currentY: endpoint.y,
         },
-      };
-    }),
+      }),
 
-    setWireInProgressColor: (color) => set((state) => {
-      if (!state.wireInProgress) return state;
-      return { wireInProgress: { ...state.wireInProgress, color } };
-    }),
+    updateWireInProgress: (x, y) =>
+      set((state) => {
+        if (!state.wireInProgress) return state;
+        return {
+          wireInProgress: { ...state.wireInProgress, currentX: x, currentY: y },
+        };
+      }),
+
+    addWireWaypoint: (x, y) =>
+      set((state) => {
+        if (!state.wireInProgress) return state;
+        return {
+          wireInProgress: {
+            ...state.wireInProgress,
+            waypoints: [...state.wireInProgress.waypoints, { x, y }],
+          },
+        };
+      }),
+
+    setWireInProgressColor: (color) =>
+      set((state) => {
+        if (!state.wireInProgress) return state;
+        return { wireInProgress: { ...state.wireInProgress, color } };
+      }),
 
     finishWireCreation: (endpoint) => {
       const state = get();
@@ -1310,7 +1635,10 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         waypoints,
         color,
       };
-      set((state) => ({ wires: [...state.wires, newWire], wireInProgress: null }));
+      set((state) => ({
+        wires: [...state.wires, newWire],
+        wireInProgress: null,
+      }));
     },
 
     cancelWireCreation: () => set({ wireInProgress: null }),
@@ -1322,17 +1650,35 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         const board = state.boards.find((b) => b.id === componentId);
         // Components have a DynamicComponent wrapper with border:2px + padding:4px → offset (4,6)
         // Boards are rendered directly without a wrapper, so no offset.
-        const compX = component ? component.x + 4 : (board ? board.x : state.boardPosition.x);
-        const compY = component ? component.y + 6 : (board ? board.y : state.boardPosition.y);
+        const compX = component
+          ? component.x + 4
+          : board
+            ? board.x
+            : state.boardPosition.x;
+        const compY = component
+          ? component.y + 6
+          : board
+            ? board.y
+            : state.boardPosition.y;
 
         const updatedWires = state.wires.map((wire) => {
           const updated = { ...wire };
           if (wire.start.componentId === componentId) {
-            const pos = calculatePinPosition(componentId, wire.start.pinName, compX, compY);
+            const pos = calculatePinPosition(
+              componentId,
+              wire.start.pinName,
+              compX,
+              compY,
+            );
             if (pos) updated.start = { ...wire.start, x: pos.x, y: pos.y };
           }
           if (wire.end.componentId === componentId) {
-            const pos = calculatePinPosition(componentId, wire.end.pinName, compX, compY);
+            const pos = calculatePinPosition(
+              componentId,
+              wire.end.pinName,
+              compX,
+              compY,
+            );
             if (pos) updated.end = { ...wire.end, x: pos.x, y: pos.y };
           }
           return updated;
@@ -1347,21 +1693,55 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         const updated = { ...wire };
 
         // Resolve start — components have wrapper offset (4,6), boards do not
-        const startComp = state.components.find((c) => c.id === wire.start.componentId);
-        const startBoard = state.boards.find((b) => b.id === wire.start.componentId);
-        const startX = startComp ? startComp.x + 4 : (startBoard ? startBoard.x : state.boardPosition.x);
-        const startY = startComp ? startComp.y + 6 : (startBoard ? startBoard.y : state.boardPosition.y);
-        const startPos = calculatePinPosition(wire.start.componentId, wire.start.pinName, startX, startY);
+        const startComp = state.components.find(
+          (c) => c.id === wire.start.componentId,
+        );
+        const startBoard = state.boards.find(
+          (b) => b.id === wire.start.componentId,
+        );
+        const startX = startComp
+          ? startComp.x + 4
+          : startBoard
+            ? startBoard.x
+            : state.boardPosition.x;
+        const startY = startComp
+          ? startComp.y + 6
+          : startBoard
+            ? startBoard.y
+            : state.boardPosition.y;
+        const startPos = calculatePinPosition(
+          wire.start.componentId,
+          wire.start.pinName,
+          startX,
+          startY,
+        );
         updated.start = startPos
           ? { ...wire.start, x: startPos.x, y: startPos.y }
           : { ...wire.start, x: startX, y: startY };
 
         // Resolve end — components have wrapper offset (4,6), boards do not
-        const endComp = state.components.find((c) => c.id === wire.end.componentId);
-        const endBoard = state.boards.find((b) => b.id === wire.end.componentId);
-        const endX = endComp ? endComp.x + 4 : (endBoard ? endBoard.x : state.boardPosition.x);
-        const endY = endComp ? endComp.y + 6 : (endBoard ? endBoard.y : state.boardPosition.y);
-        const endPos = calculatePinPosition(wire.end.componentId, wire.end.pinName, endX, endY);
+        const endComp = state.components.find(
+          (c) => c.id === wire.end.componentId,
+        );
+        const endBoard = state.boards.find(
+          (b) => b.id === wire.end.componentId,
+        );
+        const endX = endComp
+          ? endComp.x + 4
+          : endBoard
+            ? endBoard.x
+            : state.boardPosition.x;
+        const endY = endComp
+          ? endComp.y + 6
+          : endBoard
+            ? endBoard.y
+            : state.boardPosition.y;
+        const endPos = calculatePinPosition(
+          wire.end.componentId,
+          wire.end.pinName,
+          endX,
+          endY,
+        );
         updated.end = endPos
           ? { ...wire.end, x: endPos.x, y: endPos.y }
           : { ...wire.end, x: endX, y: endY };
@@ -1371,7 +1751,8 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       set({ wires: updatedWires });
     },
 
-    toggleSerialMonitor: () => set((s) => ({ serialMonitorOpen: !s.serialMonitorOpen })),
+    toggleSerialMonitor: () =>
+      set((s) => ({ serialMonitorOpen: !s.serialMonitorOpen })),
 
     serialWrite: (text: string) => {
       const { activeBoardId } = get();
@@ -1379,7 +1760,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       const board = get().boards.find((b) => b.id === boardId);
       if (!board) return;
 
-      if (board.boardKind === 'raspberry-pi-3') {
+      if (board.boardKind === "raspberry-pi-3") {
         const bridge = getBoardBridge(boardId);
         if (bridge) {
           for (let i = 0; i < text.length; i++) {
@@ -1389,7 +1770,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       } else if (isEsp32Kind(board.boardKind)) {
         const esp32Bridge = getEsp32Bridge(boardId);
         if (esp32Bridge) {
-          esp32Bridge.sendSerialBytes(Array.from(new TextEncoder().encode(text)));
+          esp32Bridge.sendSerialBytes(
+            Array.from(new TextEncoder().encode(text)),
+          );
         }
       } else {
         getBoardSimulator(boardId)?.serialWrite(text);
@@ -1400,15 +1783,17 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       const { activeBoardId } = get();
       const boardId = activeBoardId ?? INITIAL_BOARD_ID;
       set((s) => ({
-        serialOutput: '',
-        boards: s.boards.map((b) => b.id === boardId ? { ...b, serialOutput: '' } : b),
+        serialOutput: "",
+        boards: s.boards.map((b) =>
+          b.id === boardId ? { ...b, serialOutput: "" } : b,
+        ),
       }));
     },
 
     serialWriteToBoard: (boardId: string, text: string) => {
       const board = get().boards.find((b) => b.id === boardId);
       if (!board) return;
-      if (board.boardKind === 'raspberry-pi-3') {
+      if (board.boardKind === "raspberry-pi-3") {
         const bridge = getBoardBridge(boardId);
         if (bridge) {
           for (let i = 0; i < text.length; i++) {
@@ -1418,7 +1803,9 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       } else if (isEsp32Kind(board.boardKind)) {
         const esp32Bridge = getEsp32Bridge(boardId);
         if (esp32Bridge) {
-          esp32Bridge.sendSerialBytes(Array.from(new TextEncoder().encode(text)));
+          esp32Bridge.sendSerialBytes(
+            Array.from(new TextEncoder().encode(text)),
+          );
         }
       } else {
         getBoardSimulator(boardId)?.serialWrite(text);
@@ -1428,9 +1815,172 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     clearBoardSerialOutput: (boardId: string) => {
       const isActive = get().activeBoardId === boardId;
       set((s) => ({
-        ...(isActive ? { serialOutput: '' } : {}),
-        boards: s.boards.map((b) => b.id === boardId ? { ...b, serialOutput: '' } : b),
+        ...(isActive ? { serialOutput: "" } : {}),
+        boards: s.boards.map((b) =>
+          b.id === boardId ? { ...b, serialOutput: "" } : b,
+        ),
       }));
+    },
+
+    setAgentSessionId: (sessionId: string | null) => {
+      set({ agentSessionId: sessionId });
+    },
+
+    setLastAgentAction: (action: AgentAction | null) => {
+      set({ lastAgentAction: action });
+    },
+
+    setAgentContextWindow: (updates: Partial<AgentContextWindow>) => {
+      set((s) => ({
+        agentContextWindow: { ...s.agentContextWindow, ...updates },
+      }));
+    },
+
+    applyAgentCircuitUpdate: (circuit: {
+      components?: Array<{
+        id: string;
+        type?: string;
+        metadataId?: string;
+        left: number;
+        top: number;
+        rotate?: number;
+        attrs?: Record<string, unknown>;
+      }>;
+      wires?: Wire[];
+      connections?: Array<{
+        from_part: string;
+        from_pin: string;
+        to_part: string;
+        to_pin: string;
+        color?: string;
+      }>;
+    }) => {
+      const warnings: string[] = [];
+
+      const normalizeMetaId = (comp: {
+        type?: string;
+        metadataId?: string;
+      }) => {
+        if (typeof comp.metadataId === "string" && comp.metadataId.trim()) {
+          return comp.metadataId;
+        }
+        if (typeof comp.type === "string" && comp.type.trim()) {
+          return comp.type.replace(/^wokwi-/, "");
+        }
+        return "";
+      };
+
+      const nextComponents = Array.isArray(circuit.components)
+        ? circuit.components
+            .map((comp, index) => {
+              const metadataId = normalizeMetaId(comp);
+              if (!metadataId || !comp.id) {
+                warnings.push(
+                  `Agent circuit component #${index} is malformed and was skipped. ` +
+                    `Expected id and type/metadataId.`,
+                );
+                return null;
+              }
+              // Skip board components (boards are tracked separately in the boards array)
+              const BOARD_METADATA_IDS = ["arduino-uno", "arduino-mega", "arduino-nano", "pi-pico", "esp32", "esp32-c3", "raspberry-pi-3"];
+              if (BOARD_METADATA_IDS.includes(metadataId)) {
+                return null;
+              }
+              
+              return {
+                id: comp.id,
+                metadataId,
+                x: comp.left,
+                y: comp.top,
+                properties: comp.attrs || {},
+              };
+            })
+            .filter((comp): comp is Component => comp !== null)
+        : get().components;
+
+      const wiresFromConnections = Array.isArray(circuit.connections)
+        ? circuit.connections
+            .map((conn, index) => {
+              if (
+                !conn.from_part ||
+                !conn.from_pin ||
+                !conn.to_part ||
+                !conn.to_pin
+              ) {
+                warnings.push(
+                  `Agent circuit connection #${index} is malformed and was skipped. ` +
+                    `Expected from_part/from_pin/to_part/to_pin.`,
+                );
+                return null;
+              }
+
+              const wire: Wire = {
+                id: `wire-${Date.now()}-${index}`,
+                start: {
+                  componentId: conn.from_part,
+                  pinName: conn.from_pin,
+                  x: 0,
+                  y: 0,
+                },
+                end: {
+                  componentId: conn.to_part,
+                  pinName: conn.to_pin,
+                  x: 0,
+                  y: 0,
+                },
+                waypoints: [],
+                color: conn.color || "green",
+              };
+
+              return wire;
+            })
+            .filter((wire): wire is Wire => wire !== null)
+        : [];
+
+      const nextWires = Array.isArray(circuit.wires)
+        ? circuit.wires.map((w) => ({ ...w, waypoints: [] }))
+        : wiresFromConnections.length > 0
+          ? wiresFromConnections
+          : get().wires;
+
+      if (warnings.length > 0) {
+        console.warn(
+          "Agent circuit update contained malformed entries:",
+          warnings,
+          circuit,
+        );
+      }
+
+      set({
+        components: nextComponents,
+        wires: nextWires,
+        lastAgentAction: {
+          type: "circuit_update",
+          payload: {
+            componentCount: nextComponents.length,
+            wireCount: nextWires.length,
+            warnings,
+          },
+          timestamp: new Date().toISOString(),
+        },
+      });
+
+      if (nextWires.length > 0) {
+        get().recalculateAllWirePositions();
+      }
+    },
+
+    applyAgentCodeUpdate: (files: Array<{ name: string; content: string }>) => {
+      if (!Array.isArray(files) || files.length === 0) return;
+
+      useEditorStore.getState().loadFiles(files);
+      set({
+        lastAgentAction: {
+          type: "code_update",
+          payload: { fileCount: files.length },
+          timestamp: new Date().toISOString(),
+        },
+      });
     },
   };
 });

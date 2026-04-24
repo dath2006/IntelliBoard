@@ -2,30 +2,38 @@
  * Editor Page — main editor + simulator with resizable panels
  */
 
-import React, { useRef, useState, useCallback, useEffect, lazy, Suspense } from 'react';
-import { useSEO } from '../utils/useSEO';
-import { CodeEditor } from '../components/editor/CodeEditor';
-import { EditorToolbar } from '../components/editor/EditorToolbar';
-import { FileTabs } from '../components/editor/FileTabs';
-import { FileExplorer } from '../components/editor/FileExplorer';
+import React, { useState, useCallback, useEffect, lazy, Suspense } from "react";
+import { useNavigate } from "react-router-dom";
+import { useSEO } from "../utils/useSEO";
+import { CodeEditor } from "../components/editor/CodeEditor";
+import { EditorToolbar } from "../components/editor/EditorToolbar";
+import { FileTabs } from "../components/editor/FileTabs";
+import { FileExplorer } from "../components/editor/FileExplorer";
 
 // Lazy-load Pi workspace so xterm.js isn't in the main bundle
 const RaspberryPiWorkspace = lazy(() =>
-  import('../components/raspberry-pi/RaspberryPiWorkspace').then((m) => ({ default: m.RaspberryPiWorkspace }))
+  import("../components/raspberry-pi/RaspberryPiWorkspace").then((m) => ({
+    default: m.RaspberryPiWorkspace,
+  })),
 );
-import { CompilationConsole } from '../components/editor/CompilationConsole';
-import { SimulatorCanvas } from '../components/simulator/SimulatorCanvas';
-import { SerialMonitor } from '../components/simulator/SerialMonitor';
-import { Oscilloscope } from '../components/simulator/Oscilloscope';
-import { AppHeader } from '../components/layout/AppHeader';
-import { SaveProjectModal } from '../components/layout/SaveProjectModal';
-import { LoginPromptModal } from '../components/layout/LoginPromptModal';
-import { GitHubStarBanner } from '../components/layout/GitHubStarBanner';
-import { useSimulatorStore } from '../store/useSimulatorStore';
-import { useOscilloscopeStore } from '../store/useOscilloscopeStore';
-import { useAuthStore } from '../store/useAuthStore';
-import type { CompilationLog } from '../utils/compilationLogger';
-import '../App.css';
+import { CompilationConsole } from "../components/editor/CompilationConsole";
+import { SimulatorCanvas } from "../components/simulator/SimulatorCanvas";
+import { SerialMonitor } from "../components/simulator/SerialMonitor";
+import { Oscilloscope } from "../components/simulator/Oscilloscope";
+import { AppHeader } from "../components/layout/AppHeader";
+import { SaveProjectModal } from "../components/layout/SaveProjectModal";
+import { OpenProjectModal } from "../components/layout/OpenProjectModal";
+import { NewProjectModal } from "../components/layout/NewProjectModal";
+import { LoginPromptModal } from "../components/layout/LoginPromptModal";
+import { GitHubStarBanner } from "../components/layout/GitHubStarBanner";
+import { AgentChat } from "../components/agent/AgentChat";
+import { AgentContextPanel } from "../components/agent/AgentContextPanel";
+import { useSimulatorStore } from "../store/useSimulatorStore";
+import { useOscilloscopeStore } from "../store/useOscilloscopeStore";
+import { useAuthStore } from "../store/useAuthStore";
+import { useProjectStore } from "../store/useProjectStore";
+import type { CompilationLog } from "../utils/compilationLogger";
+import "../App.css";
 
 const MOBILE_BREAKPOINT = 768;
 
@@ -40,48 +48,50 @@ const EXPLORER_DEFAULT = 210;
 const resizeHandleStyle: React.CSSProperties = {
   height: 5,
   flexShrink: 0,
-  cursor: 'row-resize',
-  background: '#2a2d2e',
-  borderTop: '1px solid #3c3c3c',
-  borderBottom: '1px solid #3c3c3c',
+  cursor: "row-resize",
+  background: "#2a2d2e",
+  borderTop: "1px solid #3c3c3c",
+  borderBottom: "1px solid #3c3c3c",
 };
 
 export const EditorPage: React.FC = () => {
+  const navigate = useNavigate();
   useSEO({
-    title: 'Multi-Board Simulator Editor — Arduino, ESP32, RP2040, RISC-V | Velxio',
+    title:
+      "Multi-Board Simulator Editor — Arduino, ESP32, RP2040, RISC-V | Velxio",
     description:
-      'Write, compile and simulate Arduino, ESP32, Raspberry Pi Pico, ESP32-C3, and Raspberry Pi 3 code in your browser. 19 boards, 5 CPU architectures, 48+ components. Free and open-source.',
-    url: 'https://velxio.dev/editor',
+      "Write, compile and simulate Arduino, ESP32, Raspberry Pi Pico, ESP32-C3, and Raspberry Pi 3 code in your browser. 19 boards, 5 CPU architectures, 48+ components. Free and open-source.",
+    url: "https://velxio.dev/editor",
   });
 
-  const [editorWidthPct, setEditorWidthPct] = useState(45);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const resizingRef = useRef(false);
   const serialMonitorOpen = useSimulatorStore((s) => s.serialMonitorOpen);
   const activeBoardId = useSimulatorStore((s) => s.activeBoardId);
-  const activeBoardKind = useSimulatorStore((s) =>
-    s.boards.find((b) => b.id === s.activeBoardId)?.boardKind
+  const activeBoardKind = useSimulatorStore(
+    (s) => s.boards.find((b) => b.id === s.activeBoardId)?.boardKind,
   );
-  const isRaspberryPi3 = activeBoardKind === 'raspberry-pi-3';
+  const isRaspberryPi3 = activeBoardKind === "raspberry-pi-3";
   const oscilloscopeOpen = useOscilloscopeStore((s) => s.open);
   const [consoleOpen, setConsoleOpen] = useState(false);
   const [compileLogs, setCompileLogs] = useState<CompilationLog[]>([]);
-  const [bottomPanelHeight, setBottomPanelHeight] = useState(BOTTOM_PANEL_DEFAULT);
+  const [bottomPanelHeight, setBottomPanelHeight] =
+    useState(BOTTOM_PANEL_DEFAULT);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
+  const [openProjectModalOpen, setOpenProjectModalOpen] = useState(false);
+  const [newProjectModalOpen, setNewProjectModalOpen] = useState(false);
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [showStarBanner, setShowStarBanner] = useState(false);
 
   // ── GitHub star prompt (show once: 2nd visit OR after 3 min) ──────────────
   useEffect(() => {
-    const STAR_KEY = 'velxio_star_prompted';
-    const VISITS_KEY = 'velxio_editor_visits';
-    const FIRST_VISIT_KEY = 'velxio_editor_first_visit';
+    const STAR_KEY = "velxio_star_prompted";
+    const VISITS_KEY = "velxio_editor_visits";
+    const FIRST_VISIT_KEY = "velxio_editor_first_visit";
     const THREE_MIN = 3 * 60 * 1000;
 
     if (localStorage.getItem(STAR_KEY)) return;
 
     // Increment visit counter
-    const visits = parseInt(localStorage.getItem(VISITS_KEY) ?? '0', 10) + 1;
+    const visits = parseInt(localStorage.getItem(VISITS_KEY) ?? "0", 10) + 1;
     localStorage.setItem(VISITS_KEY, String(visits));
 
     // Record timestamp of first visit
@@ -106,15 +116,19 @@ export const EditorPage: React.FC = () => {
   }, []);
 
   const handleDismissStarBanner = () => {
-    localStorage.setItem('velxio_star_prompted', '1');
+    localStorage.setItem("velxio_star_prompted", "1");
     setShowStarBanner(false);
   };
   const [explorerOpen, setExplorerOpen] = useState(true);
   const [explorerWidth, setExplorerWidth] = useState(EXPLORER_DEFAULT);
-  const [isMobile, setIsMobile] = useState(() => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches);
-  // Default to 'code' on mobile — show the editor so users can write/view code
-  const [mobileView, setMobileView] = useState<'code' | 'circuit'>('code');
+  const [isMobile, setIsMobile] = useState(
+    () => window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT}px)`).matches,
+  );
+  const [activeView, setActiveView] = useState<"code" | "simulator" | "agent">(
+    "code",
+  );
   const user = useAuthStore((s) => s.user);
+  const currentProjectId = useProjectStore((s) => s.currentProject?.id ?? null);
 
   const handleSaveClick = useCallback(() => {
     if (!user) {
@@ -122,6 +136,22 @@ export const EditorPage: React.FC = () => {
     } else {
       setSaveModalOpen(true);
     }
+  }, [user]);
+
+  const handleOpenProjectClick = useCallback(() => {
+    if (!user) {
+      navigate("/login");
+      return;
+    }
+    setOpenProjectModalOpen(true);
+  }, [navigate, user]);
+
+  const handleNewProjectClick = useCallback(() => {
+    if (!user) {
+      setLoginPromptOpen(true);
+      return;
+    }
+    setNewProjectModalOpen(true);
   }, [user]);
 
   // Track mobile breakpoint
@@ -133,166 +163,226 @@ export const EditorPage: React.FC = () => {
       if (mobile) setExplorerOpen(false);
     };
     update(mq);
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
   }, []);
 
   // Ctrl+S shortcut
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         handleSaveClick();
       }
     };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, [handleSaveClick]);
 
   // Prevent body scroll on the editor page
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
-    html.style.overflow = 'hidden';
-    body.style.overflow = 'hidden';
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
     window.scrollTo(0, 0);
     return () => {
-      html.style.overflow = '';
-      body.style.overflow = '';
+      html.style.overflow = "";
+      body.style.overflow = "";
     };
   }, []);
 
-  const handleResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    resizingRef.current = true;
+  const handleBottomPanelResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startY = e.clientY;
+      const startHeight = bottomPanelHeight;
 
-    const handleMouseMove = (ev: MouseEvent) => {
-      if (!resizingRef.current || !containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const pct = ((ev.clientX - rect.left) / rect.width) * 100;
-      setEditorWidthPct(Math.max(20, Math.min(80, pct)));
-    };
+      const onMove = (ev: MouseEvent) => {
+        const delta = startY - ev.clientY;
+        setBottomPanelHeight(
+          Math.max(
+            BOTTOM_PANEL_MIN,
+            Math.min(BOTTOM_PANEL_MAX, startHeight + delta),
+          ),
+        );
+      };
+      const onUp = () => {
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.body.style.cursor = "row-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [bottomPanelHeight],
+  );
 
-    const handleMouseUp = () => {
-      resizingRef.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
+  const handleExplorerResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = explorerWidth;
 
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-  }, []);
-
-  const handleBottomPanelResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startY = e.clientY;
-    const startHeight = bottomPanelHeight;
-
-    const onMove = (ev: MouseEvent) => {
-      const delta = startY - ev.clientY;
-      setBottomPanelHeight(Math.max(BOTTOM_PANEL_MIN, Math.min(BOTTOM_PANEL_MAX, startHeight + delta)));
-    };
-    const onUp = () => {
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.body.style.cursor = 'row-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [bottomPanelHeight]);
-
-  const handleExplorerResizeMouseDown = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-    const startX = e.clientX;
-    const startWidth = explorerWidth;
-
-    const onMove = (ev: MouseEvent) => {
-      const delta = ev.clientX - startX;
-      setExplorerWidth(Math.max(EXPLORER_MIN, Math.min(EXPLORER_MAX, startWidth + delta)));
-    };
-    const onUp = () => {
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    };
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }, [explorerWidth]);
+      const onMove = (ev: MouseEvent) => {
+        const delta = ev.clientX - startX;
+        setExplorerWidth(
+          Math.max(EXPLORER_MIN, Math.min(EXPLORER_MAX, startWidth + delta)),
+        );
+      };
+      const onUp = () => {
+        document.body.style.cursor = "";
+        document.body.style.userSelect = "";
+        document.removeEventListener("mousemove", onMove);
+        document.removeEventListener("mouseup", onUp);
+      };
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+      document.addEventListener("mousemove", onMove);
+      document.addEventListener("mouseup", onUp);
+    },
+    [explorerWidth],
+  );
 
   return (
     <div className="app">
       <AppHeader />
 
-      {/* ── Mobile tab bar (top, above panels) ── */}
-      {isMobile && (
-        <nav className="mobile-tab-bar">
-          <button
-            className={`mobile-tab-btn${mobileView === 'code' ? ' mobile-tab-btn--active' : ''}`}
-            onClick={() => setMobileView('code')}
+      <nav className={isMobile ? "mobile-tab-bar" : "workspace-tab-bar"}>
+        <button
+          className={`mobile-tab-btn${activeView === "code" ? " mobile-tab-btn--active" : ""}`}
+          onClick={() => setActiveView("code")}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="16 18 22 12 16 6" />
-              <polyline points="8 6 2 12 8 18" />
-            </svg>
-            <span>&lt;/&gt; Code</span>
-          </button>
-          <button
-            className={`mobile-tab-btn${mobileView === 'circuit' ? ' mobile-tab-btn--active' : ''}`}
-            onClick={() => setMobileView('circuit')}
+            <polyline points="16 18 22 12 16 6" />
+            <polyline points="8 6 2 12 8 18" />
+          </svg>
+          <span>Code</span>
+        </button>
+        <button
+          className={`mobile-tab-btn${activeView === "simulator" ? " mobile-tab-btn--active" : ""}`}
+          onClick={() => setActiveView("simulator")}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="2" y="7" width="20" height="14" rx="2" />
-              <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
-              <line x1="12" y1="12" x2="12" y2="16" />
-              <line x1="10" y1="14" x2="14" y2="14" />
-            </svg>
-            <span>Circuit</span>
-          </button>
-        </nav>
-      )}
+            <rect x="2" y="7" width="20" height="14" rx="2" />
+            <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+            <line x1="12" y1="12" x2="12" y2="16" />
+            <line x1="10" y1="14" x2="14" y2="14" />
+          </svg>
+          <span>Simulator</span>
+        </button>
+        <button
+          className={`mobile-tab-btn${activeView === "agent" ? " mobile-tab-btn--active" : ""}`}
+          onClick={() => setActiveView("agent")}
+        >
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <path d="M8 12h8" />
+            <path d="M12 8v8" />
+          </svg>
+          <span>Agent</span>
+        </button>
+      </nav>
 
-      <div className="app-container" ref={containerRef}>
+      <div className="app-container">
         {/* ── Editor side ── */}
         <div
           className="editor-panel"
           style={{
-            width: isMobile ? '100%' : `${editorWidthPct}%`,
-            display: isMobile && mobileView !== 'code' ? 'none' : 'flex',
-            flexDirection: 'row',
+            width: "100%",
+            minWidth: "100%",
+            maxWidth: "100%",
+            display: activeView !== "code" ? "none" : "flex",
+            flexDirection: "row",
           }}
         >
           {/* File explorer sidebar + resize handle */}
           {explorerOpen && (
             <>
-              <div style={{ width: explorerWidth, flexShrink: 0, display: 'flex', overflow: 'hidden' }}>
-                <FileExplorer onSaveClick={handleSaveClick} />
+              <div
+                style={{
+                  width: explorerWidth,
+                  flexShrink: 0,
+                  display: "flex",
+                  overflow: "hidden",
+                }}
+              >
+                <FileExplorer
+                  onSaveClick={handleSaveClick}
+                  onOpenProjectClick={handleOpenProjectClick}
+                  onNewProjectClick={handleNewProjectClick}
+                />
               </div>
               {!isMobile && (
-                <div className="explorer-resize-handle" onMouseDown={handleExplorerResizeMouseDown} />
+                <div
+                  className="explorer-resize-handle"
+                  onMouseDown={handleExplorerResizeMouseDown}
+                />
               )}
             </>
           )}
 
           {/* Editor main area */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+          <div
+            style={{
+              flex: 1,
+              display: "flex",
+              flexDirection: "column",
+              overflow: "hidden",
+              minWidth: 0,
+            }}
+          >
             {/* Explorer toggle + toolbar */}
-            <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+            <div
+              style={{ display: "flex", alignItems: "stretch", flexShrink: 0 }}
+            >
               <button
                 className="explorer-toggle-btn"
                 onClick={() => setExplorerOpen((v) => !v)}
-                title={explorerOpen ? 'Hide file explorer' : 'Show file explorer'}
+                title={
+                  explorerOpen ? "Hide file explorer" : "Show file explorer"
+                }
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
               </button>
@@ -310,9 +400,18 @@ export const EditorPage: React.FC = () => {
             {!isRaspberryPi3 && <FileTabs />}
 
             {/* Editor area: Pi workspace or Monaco editor */}
-            <div className="editor-wrapper" style={{ flex: 1, overflow: 'hidden', minHeight: 0 }}>
+            <div
+              className="editor-wrapper"
+              style={{ flex: 1, overflow: "hidden", minHeight: 0 }}
+            >
               {isRaspberryPi3 && activeBoardId ? (
-                <Suspense fallback={<div style={{ color: '#666', padding: 16, fontSize: 12 }}>Loading Pi workspace…</div>}>
+                <Suspense
+                  fallback={
+                    <div style={{ color: "#666", padding: 16, fontSize: 12 }}>
+                      Loading Pi workspace…
+                    </div>
+                  }
+                >
                   <RaspberryPiWorkspace boardId={activeBoardId} />
                 </Suspense>
               ) : (
@@ -341,23 +440,23 @@ export const EditorPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Resize handle (desktop only) */}
-        {!isMobile && (
-          <div className="resize-handle" onMouseDown={handleResizeMouseDown}>
-            <div className="resize-handle-grip" />
-          </div>
-        )}
-
         {/* ── Simulator side ── */}
         <div
           className="simulator-panel"
           style={{
-            width: isMobile ? '100%' : `${100 - editorWidthPct}%`,
-            display: isMobile && mobileView !== 'circuit' ? 'none' : 'flex',
-            flexDirection: 'column',
+            width: "100%",
+            display: activeView !== "simulator" ? "none" : "flex",
+            flexDirection: "column",
           }}
         >
-          <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 }}>
+          <div
+            style={{
+              flex: 1,
+              overflow: "hidden",
+              position: "relative",
+              minHeight: 0,
+            }}
+          >
             <SimulatorCanvas />
           </div>
           {serialMonitorOpen && (
@@ -385,10 +484,41 @@ export const EditorPage: React.FC = () => {
             </>
           )}
         </div>
+
+        <div
+          className="agent-layout"
+          style={{
+            display: activeView !== "agent" ? "none" : "flex",
+            flex: 1,
+            minHeight: 0,
+            overflow: "hidden",
+            width: "100%",
+          }}
+        >
+          <div className="agent-layout-main" style={{ height: "100%" }}>
+            <AgentChat projectId={currentProjectId} />
+          </div>
+          <div className="agent-layout-side" style={{ height: "100%" }}>
+            <AgentContextPanel compileLogs={compileLogs} />
+          </div>
+        </div>
       </div>
 
-      {saveModalOpen && <SaveProjectModal onClose={() => setSaveModalOpen(false)} />}
-      {loginPromptOpen && <LoginPromptModal onClose={() => setLoginPromptOpen(false)} />}
+      {saveModalOpen && (
+        <SaveProjectModal onClose={() => setSaveModalOpen(false)} />
+      )}
+      {openProjectModalOpen && (
+        <OpenProjectModal
+          onClose={() => setOpenProjectModalOpen(false)}
+          onNewProjectClick={handleNewProjectClick}
+        />
+      )}
+      {newProjectModalOpen && (
+        <NewProjectModal onClose={() => setNewProjectModalOpen(false)} />
+      )}
+      {loginPromptOpen && (
+        <LoginPromptModal onClose={() => setLoginPromptOpen(false)} />
+      )}
       {showStarBanner && <GitHubStarBanner onClose={handleDismissStarBanner} />}
     </div>
   );

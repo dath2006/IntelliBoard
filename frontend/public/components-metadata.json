@@ -1,6 +1,6 @@
 {
   "version": "1.0.0",
-  "generatedAt": "2026-04-08T23:38:55.702Z",
+  "generatedAt": "2026-04-24T18:04:28.172Z",
   "components": [
     {
       "id": "arduino-mega",
@@ -47,8 +47,270 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
-      "tags": ["arduino-mega", "arduino mega", "arduino", "mega"]
+      "pinCount": 85,
+      "pins": [
+        {
+          "name": "SCL"
+        },
+        {
+          "name": "SDA"
+        },
+        {
+          "name": "AREF"
+        },
+        {
+          "name": "GND.1"
+        },
+        {
+          "name": "13"
+        },
+        {
+          "name": "12"
+        },
+        {
+          "name": "11"
+        },
+        {
+          "name": "10"
+        },
+        {
+          "name": "9"
+        },
+        {
+          "name": "8"
+        },
+        {
+          "name": "7"
+        },
+        {
+          "name": "6"
+        },
+        {
+          "name": "5"
+        },
+        {
+          "name": "4"
+        },
+        {
+          "name": "3"
+        },
+        {
+          "name": "2"
+        },
+        {
+          "name": "1"
+        },
+        {
+          "name": "0"
+        },
+        {
+          "name": "14"
+        },
+        {
+          "name": "15"
+        },
+        {
+          "name": "16"
+        },
+        {
+          "name": "17"
+        },
+        {
+          "name": "18"
+        },
+        {
+          "name": "19"
+        },
+        {
+          "name": "20"
+        },
+        {
+          "name": "21"
+        },
+        {
+          "name": "5V.1"
+        },
+        {
+          "name": "5V.2"
+        },
+        {
+          "name": "22"
+        },
+        {
+          "name": "23"
+        },
+        {
+          "name": "24"
+        },
+        {
+          "name": "25"
+        },
+        {
+          "name": "26"
+        },
+        {
+          "name": "27"
+        },
+        {
+          "name": "28"
+        },
+        {
+          "name": "29"
+        },
+        {
+          "name": "30"
+        },
+        {
+          "name": "31"
+        },
+        {
+          "name": "32"
+        },
+        {
+          "name": "33"
+        },
+        {
+          "name": "34"
+        },
+        {
+          "name": "35"
+        },
+        {
+          "name": "36"
+        },
+        {
+          "name": "37"
+        },
+        {
+          "name": "38"
+        },
+        {
+          "name": "39"
+        },
+        {
+          "name": "40"
+        },
+        {
+          "name": "41"
+        },
+        {
+          "name": "42"
+        },
+        {
+          "name": "43"
+        },
+        {
+          "name": "44"
+        },
+        {
+          "name": "45"
+        },
+        {
+          "name": "46"
+        },
+        {
+          "name": "47"
+        },
+        {
+          "name": "48"
+        },
+        {
+          "name": "49"
+        },
+        {
+          "name": "50"
+        },
+        {
+          "name": "51"
+        },
+        {
+          "name": "52"
+        },
+        {
+          "name": "53"
+        },
+        {
+          "name": "GND.4"
+        },
+        {
+          "name": "GND.5"
+        },
+        {
+          "name": "IOREF"
+        },
+        {
+          "name": "RESET"
+        },
+        {
+          "name": "3.3V"
+        },
+        {
+          "name": "5V"
+        },
+        {
+          "name": "GND.2"
+        },
+        {
+          "name": "GND.3"
+        },
+        {
+          "name": "VIN"
+        },
+        {
+          "name": "A0"
+        },
+        {
+          "name": "A1"
+        },
+        {
+          "name": "A2"
+        },
+        {
+          "name": "A3"
+        },
+        {
+          "name": "A4"
+        },
+        {
+          "name": "A5"
+        },
+        {
+          "name": "A6"
+        },
+        {
+          "name": "A7"
+        },
+        {
+          "name": "A8"
+        },
+        {
+          "name": "A9"
+        },
+        {
+          "name": "A10"
+        },
+        {
+          "name": "A11"
+        },
+        {
+          "name": "A12"
+        },
+        {
+          "name": "A13"
+        },
+        {
+          "name": "A14"
+        },
+        {
+          "name": "A15"
+        }
+      ],
+      "tags": [
+        "arduino-mega",
+        "arduino mega",
+        "arduino",
+        "mega"
+      ]
     },
     {
       "id": "arduino-nano",
@@ -95,8 +357,123 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
-      "tags": ["arduino-nano", "arduino nano", "arduino", "nano"]
+      "pinCount": 36,
+      "pins": [
+        {
+          "name": "12"
+        },
+        {
+          "name": "11"
+        },
+        {
+          "name": "10"
+        },
+        {
+          "name": "9"
+        },
+        {
+          "name": "8"
+        },
+        {
+          "name": "7"
+        },
+        {
+          "name": "6"
+        },
+        {
+          "name": "5"
+        },
+        {
+          "name": "4"
+        },
+        {
+          "name": "3"
+        },
+        {
+          "name": "2"
+        },
+        {
+          "name": "GND.2"
+        },
+        {
+          "name": "RESET.2"
+        },
+        {
+          "name": "0"
+        },
+        {
+          "name": "1"
+        },
+        {
+          "name": "13"
+        },
+        {
+          "name": "3.3V"
+        },
+        {
+          "name": "AREF"
+        },
+        {
+          "name": "A0"
+        },
+        {
+          "name": "A1"
+        },
+        {
+          "name": "A2"
+        },
+        {
+          "name": "A3"
+        },
+        {
+          "name": "A4"
+        },
+        {
+          "name": "A5"
+        },
+        {
+          "name": "A6"
+        },
+        {
+          "name": "A7"
+        },
+        {
+          "name": "5V"
+        },
+        {
+          "name": "RESET"
+        },
+        {
+          "name": "GND.1"
+        },
+        {
+          "name": "VIN"
+        },
+        {
+          "name": "12.2"
+        },
+        {
+          "name": "5V.2"
+        },
+        {
+          "name": "13.2"
+        },
+        {
+          "name": "11.2"
+        },
+        {
+          "name": "RESET.3"
+        },
+        {
+          "name": "GND.3"
+        }
+      ],
+      "tags": [
+        "arduino-nano",
+        "arduino nano",
+        "arduino",
+        "nano"
+      ]
     },
     {
       "id": "arduino-uno",
@@ -143,8 +520,108 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
-      "tags": ["arduino-uno", "arduino uno", "arduino", "uno"]
+      "pinCount": 31,
+      "pins": [
+        {
+          "name": "A5.2"
+        },
+        {
+          "name": "A4.2"
+        },
+        {
+          "name": "AREF"
+        },
+        {
+          "name": "GND.1"
+        },
+        {
+          "name": "13"
+        },
+        {
+          "name": "12"
+        },
+        {
+          "name": "11"
+        },
+        {
+          "name": "10"
+        },
+        {
+          "name": "9"
+        },
+        {
+          "name": "8"
+        },
+        {
+          "name": "7"
+        },
+        {
+          "name": "6"
+        },
+        {
+          "name": "5"
+        },
+        {
+          "name": "4"
+        },
+        {
+          "name": "3"
+        },
+        {
+          "name": "2"
+        },
+        {
+          "name": "1"
+        },
+        {
+          "name": "0"
+        },
+        {
+          "name": "IOREF"
+        },
+        {
+          "name": "RESET"
+        },
+        {
+          "name": "3.3V"
+        },
+        {
+          "name": "5V"
+        },
+        {
+          "name": "GND.2"
+        },
+        {
+          "name": "GND.3"
+        },
+        {
+          "name": "VIN"
+        },
+        {
+          "name": "A0"
+        },
+        {
+          "name": "A1"
+        },
+        {
+          "name": "A2"
+        },
+        {
+          "name": "A3"
+        },
+        {
+          "name": "A4"
+        },
+        {
+          "name": "A5"
+        }
+      ],
+      "tags": [
+        "arduino-uno",
+        "arduino uno",
+        "arduino",
+        "uno"
+      ]
     },
     {
       "id": "esp32-devkit-v1",
@@ -170,8 +647,106 @@
         "led1": false,
         "ledPower": false
       },
-      "pinCount": 0,
-      "tags": ["esp32-devkit-v1", "esp32 devkit v1", "esp32", "devkit", "v1"]
+      "pinCount": 30,
+      "pins": [
+        {
+          "name": "VIN"
+        },
+        {
+          "name": "GND.2"
+        },
+        {
+          "name": "D13"
+        },
+        {
+          "name": "D12"
+        },
+        {
+          "name": "D14"
+        },
+        {
+          "name": "D27"
+        },
+        {
+          "name": "D26"
+        },
+        {
+          "name": "D25"
+        },
+        {
+          "name": "D33"
+        },
+        {
+          "name": "D32"
+        },
+        {
+          "name": "D35"
+        },
+        {
+          "name": "D34"
+        },
+        {
+          "name": "VN"
+        },
+        {
+          "name": "VP"
+        },
+        {
+          "name": "EN"
+        },
+        {
+          "name": "3V3"
+        },
+        {
+          "name": "GND.1"
+        },
+        {
+          "name": "D15"
+        },
+        {
+          "name": "D2"
+        },
+        {
+          "name": "D4"
+        },
+        {
+          "name": "RX2"
+        },
+        {
+          "name": "TX2"
+        },
+        {
+          "name": "D5"
+        },
+        {
+          "name": "D18"
+        },
+        {
+          "name": "D19"
+        },
+        {
+          "name": "D21"
+        },
+        {
+          "name": "RX0"
+        },
+        {
+          "name": "TX0"
+        },
+        {
+          "name": "D22"
+        },
+        {
+          "name": "D23"
+        }
+      ],
+      "tags": [
+        "esp32-devkit-v1",
+        "esp32 devkit v1",
+        "esp32",
+        "devkit",
+        "v1"
+      ]
     },
     {
       "id": "ili9341",
@@ -197,8 +772,39 @@
         "flipHorizontal": false,
         "flipVertical": false
       },
-      "pinCount": 0,
-      "tags": ["ili9341"]
+      "pinCount": 9,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "CS"
+        },
+        {
+          "name": "RST"
+        },
+        {
+          "name": "D/C"
+        },
+        {
+          "name": "MOSI"
+        },
+        {
+          "name": "SCK"
+        },
+        {
+          "name": "LED"
+        },
+        {
+          "name": "MISO"
+        }
+      ],
+      "tags": [
+        "ili9341"
+      ]
     },
     {
       "id": "lcd2004",
@@ -209,7 +815,10 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": ["lcd2004"]
+      "pins": [],
+      "tags": [
+        "lcd2004"
+      ]
     },
     {
       "id": "ssd1306",
@@ -229,14 +838,45 @@
           "defaultValue": "i2c",
           "control": "select",
           "description": "Communication protocol",
-          "options": ["i2c", "spi"]
+          "options": [
+            "i2c",
+            "spi"
+          ]
         }
       ],
       "defaultValues": {
         "protocol": "i2c"
       },
-      "pinCount": 0,
-      "tags": ["ssd1306"]
+      "pinCount": 8,
+      "pins": [
+        {
+          "name": "DATA"
+        },
+        {
+          "name": "CLK"
+        },
+        {
+          "name": "DC"
+        },
+        {
+          "name": "RST"
+        },
+        {
+          "name": "CS"
+        },
+        {
+          "name": "3V3"
+        },
+        {
+          "name": "VIN"
+        },
+        {
+          "name": "GND"
+        }
+      ],
+      "tags": [
+        "ssd1306"
+      ]
     },
     {
       "id": "dip-switch-8",
@@ -248,15 +888,89 @@
         {
           "name": "values",
           "type": "string",
-          "defaultValue": [0, 0, 0, 0, 0, 0, 0, 0],
+          "defaultValue": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
           "control": "text"
         }
       ],
       "defaultValues": {
-        "values": [0, 0, 0, 0, 0, 0, 0, 0]
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
       },
-      "pinCount": 0,
-      "tags": ["dip-switch-8", "dip switch 8", "dip", "switch", "8"]
+      "pinCount": 16,
+      "pins": [
+        {
+          "name": "1a"
+        },
+        {
+          "name": "2a"
+        },
+        {
+          "name": "3a"
+        },
+        {
+          "name": "4a"
+        },
+        {
+          "name": "5a"
+        },
+        {
+          "name": "6a"
+        },
+        {
+          "name": "7a"
+        },
+        {
+          "name": "8a"
+        },
+        {
+          "name": "8b"
+        },
+        {
+          "name": "7b"
+        },
+        {
+          "name": "6b"
+        },
+        {
+          "name": "5b"
+        },
+        {
+          "name": "4b"
+        },
+        {
+          "name": "3b"
+        },
+        {
+          "name": "2b"
+        },
+        {
+          "name": "1b"
+        }
+      ],
+      "tags": [
+        "dip-switch-8",
+        "dip switch 8",
+        "dip",
+        "switch",
+        "8"
+      ]
     },
     {
       "id": "membrane-keypad",
@@ -324,7 +1038,59 @@
         ]
       },
       "pinCount": 15,
-      "tags": ["membrane-keypad", "membrane keypad", "membrane", "keypad"]
+      "pins": [
+        {
+          "name": "R1"
+        },
+        {
+          "name": "R2"
+        },
+        {
+          "name": "R3"
+        },
+        {
+          "name": "R4"
+        },
+        {
+          "name": "C1"
+        },
+        {
+          "name": "C2"
+        },
+        {
+          "name": "C3"
+        },
+        {
+          "name": "R1"
+        },
+        {
+          "name": "R2"
+        },
+        {
+          "name": "R3"
+        },
+        {
+          "name": "R4"
+        },
+        {
+          "name": "C1"
+        },
+        {
+          "name": "C2"
+        },
+        {
+          "name": "C3"
+        },
+        {
+          "name": "C4"
+        }
+      ],
+      "tags": [
+        "membrane-keypad",
+        "membrane keypad",
+        "membrane",
+        "keypad"
+      ]
     },
     {
       "id": "potentiometer",
@@ -378,8 +1144,21 @@
         "startDegree": -135,
         "endDegree": 135
       },
-      "pinCount": 0,
-      "tags": ["potentiometer"]
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "SIG"
+        },
+        {
+          "name": "VCC"
+        }
+      ],
+      "tags": [
+        "potentiometer"
+      ]
     },
     {
       "id": "pushbutton",
@@ -419,8 +1198,24 @@
         "label": "",
         "xray": false
       },
-      "pinCount": 0,
-      "tags": ["pushbutton"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "1.l"
+        },
+        {
+          "name": "2.l"
+        },
+        {
+          "name": "1.r"
+        },
+        {
+          "name": "2.r"
+        }
+      ],
+      "tags": [
+        "pushbutton"
+      ]
     },
     {
       "id": "slide-switch",
@@ -439,8 +1234,24 @@
       "defaultValues": {
         "value": 0
       },
-      "pinCount": 0,
-      "tags": ["slide-switch", "slide switch", "slide", "switch"]
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "1"
+        },
+        {
+          "name": "2"
+        },
+        {
+          "name": "3"
+        }
+      ],
+      "tags": [
+        "slide-switch",
+        "slide switch",
+        "slide",
+        "switch"
+      ]
     },
     {
       "id": "biaxial-stepper",
@@ -508,8 +1319,39 @@
         "innerHandColor": "silver",
         "innerHandShape": "plain"
       },
-      "pinCount": 9,
-      "tags": ["biaxial-stepper", "biaxial stepper", "biaxial", "stepper"]
+      "pinCount": 8,
+      "pins": [
+        {
+          "name": "A1-"
+        },
+        {
+          "name": "A1+"
+        },
+        {
+          "name": "B1+"
+        },
+        {
+          "name": "B1-"
+        },
+        {
+          "name": "A2-"
+        },
+        {
+          "name": "A2+"
+        },
+        {
+          "name": "B2+"
+        },
+        {
+          "name": "B2-"
+        }
+      ],
+      "tags": [
+        "biaxial-stepper",
+        "biaxial stepper",
+        "biaxial",
+        "stepper"
+      ]
     },
     {
       "id": "servo",
@@ -543,8 +1385,21 @@
         "horn": "single",
         "hornColor": "#ccc"
       },
-      "pinCount": 0,
-      "tags": ["servo"]
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "V+"
+        },
+        {
+          "name": "PWM"
+        }
+      ],
+      "tags": [
+        "servo"
+      ]
     },
     {
       "id": "7segment",
@@ -598,7 +1453,16 @@
         {
           "name": "values",
           "type": "number",
-          "defaultValue": [0, 0, 0, 0, 0, 0, 0, 0],
+          "defaultValue": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
           "control": "range"
         }
       ],
@@ -610,10 +1474,161 @@
         "colon": false,
         "colonValue": false,
         "pins": "top",
-        "values": [0, 0, 0, 0, 0, 0, 0, 0]
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
       },
-      "pinCount": 47,
-      "tags": ["7segment", "7 segment", "7", "segment"]
+      "pinCount": 45,
+      "pins": [
+        {
+          "name": "A"
+        },
+        {
+          "name": "B"
+        },
+        {
+          "name": "C"
+        },
+        {
+          "name": "D"
+        },
+        {
+          "name": "E"
+        },
+        {
+          "name": "F"
+        },
+        {
+          "name": "G"
+        },
+        {
+          "name": "DP"
+        },
+        {
+          "name": "DIG1"
+        },
+        {
+          "name": "DIG2"
+        },
+        {
+          "name": "DIG3"
+        },
+        {
+          "name": "DIG4"
+        },
+        {
+          "name": "COM"
+        },
+        {
+          "name": "CLN"
+        },
+        {
+          "name": "A"
+        },
+        {
+          "name": "B"
+        },
+        {
+          "name": "C"
+        },
+        {
+          "name": "D"
+        },
+        {
+          "name": "E"
+        },
+        {
+          "name": "F"
+        },
+        {
+          "name": "G"
+        },
+        {
+          "name": "DP"
+        },
+        {
+          "name": "DIG1"
+        },
+        {
+          "name": "DIG2"
+        },
+        {
+          "name": "DIG3"
+        },
+        {
+          "name": "DIG1"
+        },
+        {
+          "name": "DIG2"
+        },
+        {
+          "name": "A"
+        },
+        {
+          "name": "B"
+        },
+        {
+          "name": "C"
+        },
+        {
+          "name": "D"
+        },
+        {
+          "name": "E"
+        },
+        {
+          "name": "F"
+        },
+        {
+          "name": "G"
+        },
+        {
+          "name": "DP"
+        },
+        {
+          "name": "COM.1"
+        },
+        {
+          "name": "COM.2"
+        },
+        {
+          "name": "A"
+        },
+        {
+          "name": "B"
+        },
+        {
+          "name": "C"
+        },
+        {
+          "name": "D"
+        },
+        {
+          "name": "E"
+        },
+        {
+          "name": "F"
+        },
+        {
+          "name": "G"
+        },
+        {
+          "name": "DP"
+        }
+      ],
+      "tags": [
+        "7segment",
+        "7 segment",
+        "7",
+        "segment"
+      ]
     },
     {
       "id": "analog-joystick",
@@ -646,8 +1661,30 @@
         "yValue": 0,
         "pressed": false
       },
-      "pinCount": 0,
-      "tags": ["analog-joystick", "analog joystick", "analog", "joystick"]
+      "pinCount": 5,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "VERT"
+        },
+        {
+          "name": "HORZ"
+        },
+        {
+          "name": "SEL"
+        },
+        {
+          "name": "GND"
+        }
+      ],
+      "tags": [
+        "analog-joystick",
+        "analog joystick",
+        "analog",
+        "joystick"
+      ]
     },
     {
       "id": "big-sound-sensor",
@@ -673,8 +1710,28 @@
         "led1": false,
         "led2": false
       },
-      "pinCount": 0,
-      "tags": ["big-sound-sensor", "big sound sensor", "big", "sound", "sensor"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "AOUT"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "DOUT"
+        }
+      ],
+      "tags": [
+        "big-sound-sensor",
+        "big sound sensor",
+        "big",
+        "sound",
+        "sensor"
+      ]
     },
     {
       "id": "ds1307",
@@ -684,8 +1741,27 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DS1307\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["ds1307"]
+      "pinCount": 5,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "5V"
+        },
+        {
+          "name": "SDA"
+        },
+        {
+          "name": "SCL"
+        },
+        {
+          "name": "SQW"
+        }
+      ],
+      "tags": [
+        "ds1307"
+      ]
     },
     {
       "id": "flame-sensor",
@@ -711,8 +1787,27 @@
         "ledPower": false,
         "ledSignal": false
       },
-      "pinCount": 0,
-      "tags": ["flame-sensor", "flame sensor", "flame", "sensor"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "DOUT"
+        },
+        {
+          "name": "AOUT"
+        }
+      ],
+      "tags": [
+        "flame-sensor",
+        "flame sensor",
+        "flame",
+        "sensor"
+      ]
     },
     {
       "id": "gas-sensor",
@@ -738,8 +1833,27 @@
         "ledPower": false,
         "ledD0": false
       },
-      "pinCount": 0,
-      "tags": ["gas-sensor", "gas sensor", "gas", "sensor"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "AOUT"
+        },
+        {
+          "name": "DOUT"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        }
+      ],
+      "tags": [
+        "gas-sensor",
+        "gas sensor",
+        "gas",
+        "sensor"
+      ]
     },
     {
       "id": "heart-beat-sensor",
@@ -749,7 +1863,18 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        HEART-BEAT-SENSOR\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "OUT"
+        }
+      ],
       "tags": [
         "heart-beat-sensor",
         "heart beat sensor",
@@ -772,8 +1897,24 @@
         }
       ],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["hx711"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "DT"
+        },
+        {
+          "name": "SCK"
+        },
+        {
+          "name": "GND"
+        }
+      ],
+      "tags": [
+        "hx711"
+      ]
     },
     {
       "id": "ks2e-m-dc5",
@@ -783,8 +1924,39 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        KS2E-M-DC5\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["ks2e-m-dc5", "ks2e", "m", "dc5"]
+      "pinCount": 8,
+      "pins": [
+        {
+          "name": "NO2"
+        },
+        {
+          "name": "NC2"
+        },
+        {
+          "name": "P2"
+        },
+        {
+          "name": "COIL2"
+        },
+        {
+          "name": "NO1"
+        },
+        {
+          "name": "NC1"
+        },
+        {
+          "name": "P1"
+        },
+        {
+          "name": "COIL1"
+        }
+      ],
+      "tags": [
+        "ks2e-m-dc5",
+        "ks2e",
+        "m",
+        "dc5"
+      ]
     },
     {
       "id": "ky-040",
@@ -817,8 +1989,30 @@
         "stepSize": 18,
         "pressed": false
       },
-      "pinCount": 0,
-      "tags": ["ky-040", "ky040", "ky", "040"]
+      "pinCount": 5,
+      "pins": [
+        {
+          "name": "CLK"
+        },
+        {
+          "name": "DT"
+        },
+        {
+          "name": "SW"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "GND"
+        }
+      ],
+      "tags": [
+        "ky-040",
+        "ky040",
+        "ky",
+        "040"
+      ]
     },
     {
       "id": "led-ring",
@@ -858,8 +2052,27 @@
         "background": "#363",
         "animation": false
       },
-      "pinCount": 5,
-      "tags": ["led-ring", "led ring", "led", "ring"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "DIN"
+        },
+        {
+          "name": "DOUT"
+        }
+      ],
+      "tags": [
+        "led-ring",
+        "led ring",
+        "led",
+        "ring"
+      ]
     },
     {
       "id": "microsd-card",
@@ -869,8 +2082,36 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        MICROSD-CARD\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["microsd-card", "microsd card", "microsd", "card"]
+      "pinCount": 7,
+      "pins": [
+        {
+          "name": "CD"
+        },
+        {
+          "name": "DO"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "SCK"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "DI"
+        },
+        {
+          "name": "CS"
+        }
+      ],
+      "tags": [
+        "microsd-card",
+        "microsd card",
+        "microsd",
+        "card"
+      ]
     },
     {
       "id": "nano-rp2040-connect",
@@ -917,7 +2158,99 @@
         "ledBuiltIn": false,
         "ledPower": false
       },
-      "pinCount": 0,
+      "pinCount": 30,
+      "pins": [
+        {
+          "name": "D12"
+        },
+        {
+          "name": "D11"
+        },
+        {
+          "name": "D10"
+        },
+        {
+          "name": "D9"
+        },
+        {
+          "name": "D8"
+        },
+        {
+          "name": "D7"
+        },
+        {
+          "name": "D6"
+        },
+        {
+          "name": "D5"
+        },
+        {
+          "name": "D4"
+        },
+        {
+          "name": "D3"
+        },
+        {
+          "name": "D2"
+        },
+        {
+          "name": "GND.1"
+        },
+        {
+          "name": "RESET"
+        },
+        {
+          "name": "RX"
+        },
+        {
+          "name": "TX"
+        },
+        {
+          "name": "D13"
+        },
+        {
+          "name": "3.3V"
+        },
+        {
+          "name": "AREF"
+        },
+        {
+          "name": "A0"
+        },
+        {
+          "name": "A1"
+        },
+        {
+          "name": "A2"
+        },
+        {
+          "name": "A3"
+        },
+        {
+          "name": "A4"
+        },
+        {
+          "name": "A5"
+        },
+        {
+          "name": "A6"
+        },
+        {
+          "name": "A7"
+        },
+        {
+          "name": "5V"
+        },
+        {
+          "name": "RESET.2"
+        },
+        {
+          "name": "GND.2"
+        },
+        {
+          "name": "VIN"
+        }
+      ],
       "tags": [
         "nano-rp2040-connect",
         "nano rp2040 connect",
@@ -978,8 +2311,27 @@
         "blurLight": false,
         "animation": false
       },
-      "pinCount": 5,
-      "tags": ["neopixel-matrix", "neopixel matrix", "neopixel", "matrix"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "DIN"
+        },
+        {
+          "name": "DOUT"
+        }
+      ],
+      "tags": [
+        "neopixel-matrix",
+        "neopixel matrix",
+        "neopixel",
+        "matrix"
+      ]
     },
     {
       "id": "pushbutton-6mm",
@@ -1019,8 +2371,27 @@
         "label": "",
         "xray": false
       },
-      "pinCount": 0,
-      "tags": ["pushbutton-6mm", "pushbutton 6mm", "pushbutton", "6mm"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "1.l"
+        },
+        {
+          "name": "2.l"
+        },
+        {
+          "name": "1.r"
+        },
+        {
+          "name": "2.r"
+        }
+      ],
+      "tags": [
+        "pushbutton-6mm",
+        "pushbutton 6mm",
+        "pushbutton",
+        "6mm"
+      ]
     },
     {
       "id": "rotary-dialer",
@@ -1030,8 +2401,24 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ROTARY-DIALER\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["rotary-dialer", "", "rotary", "dialer"]
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "DIAL"
+        },
+        {
+          "name": "PULSE"
+        }
+      ],
+      "tags": [
+        "rotary-dialer",
+        "",
+        "rotary",
+        "dialer"
+      ]
     },
     {
       "id": "slide-potentiometer",
@@ -1079,6 +2466,17 @@
         "step": 2
       },
       "pinCount": 3,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "SIG"
+        },
+        {
+          "name": "GND"
+        }
+      ],
       "tags": [
         "slide-potentiometer",
         "slide potentiometer",
@@ -1110,7 +2508,21 @@
         "ledPower": false,
         "ledSignal": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "AOUT"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "DOUT"
+        }
+      ],
       "tags": [
         "small-sound-sensor",
         "small sound sensor",
@@ -1127,8 +2539,24 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        TILT-SWITCH\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["tilt-switch", "tilt switch", "tilt", "switch"]
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "OUT"
+        }
+      ],
+      "tags": [
+        "tilt-switch",
+        "tilt switch",
+        "tilt",
+        "switch"
+      ]
     },
     {
       "id": "buzzer",
@@ -1148,8 +2576,18 @@
       "defaultValues": {
         "hasSignal": false
       },
-      "pinCount": 0,
-      "tags": ["buzzer"]
+      "pinCount": 2,
+      "pins": [
+        {
+          "name": "1"
+        },
+        {
+          "name": "2"
+        }
+      ],
+      "tags": [
+        "buzzer"
+      ]
     },
     {
       "id": "led",
@@ -1213,7 +2651,17 @@
         "flip": false
       },
       "pinCount": 2,
-      "tags": ["led"]
+      "pins": [
+        {
+          "name": "A"
+        },
+        {
+          "name": "C"
+        }
+      ],
+      "tags": [
+        "led"
+      ]
     },
     {
       "id": "led-bar-graph",
@@ -1237,17 +2685,107 @@
         {
           "name": "values",
           "type": "number",
-          "defaultValue": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+          "defaultValue": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
           "control": "range"
         }
       ],
       "defaultValues": {
         "color": "red",
         "offColor": "#444",
-        "values": [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        "values": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
       },
-      "pinCount": 0,
-      "tags": ["led-bar-graph", "led bar graph", "led", "bar", "graph"]
+      "pinCount": 20,
+      "pins": [
+        {
+          "name": "A1"
+        },
+        {
+          "name": "A2"
+        },
+        {
+          "name": "A3"
+        },
+        {
+          "name": "A4"
+        },
+        {
+          "name": "A5"
+        },
+        {
+          "name": "A6"
+        },
+        {
+          "name": "A7"
+        },
+        {
+          "name": "A8"
+        },
+        {
+          "name": "A9"
+        },
+        {
+          "name": "A10"
+        },
+        {
+          "name": "C1"
+        },
+        {
+          "name": "C2"
+        },
+        {
+          "name": "C3"
+        },
+        {
+          "name": "C4"
+        },
+        {
+          "name": "C5"
+        },
+        {
+          "name": "C6"
+        },
+        {
+          "name": "C7"
+        },
+        {
+          "name": "C8"
+        },
+        {
+          "name": "C9"
+        },
+        {
+          "name": "C10"
+        }
+      ],
+      "tags": [
+        "led-bar-graph",
+        "led bar graph",
+        "led",
+        "bar",
+        "graph"
+      ]
     },
     {
       "id": "neopixel",
@@ -1280,8 +2818,24 @@
         "g": 0,
         "b": 0
       },
-      "pinCount": 0,
-      "tags": ["neopixel"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "VDD"
+        },
+        {
+          "name": "DOUT"
+        },
+        {
+          "name": "VSS"
+        },
+        {
+          "name": "DIN"
+        }
+      ],
+      "tags": [
+        "neopixel"
+      ]
     },
     {
       "id": "rgb-led",
@@ -1314,8 +2868,27 @@
         "ledGreen": 0,
         "ledBlue": 0
       },
-      "pinCount": 0,
-      "tags": ["rgb-led", "rgb led", "rgb", "led"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "R"
+        },
+        {
+          "name": "COM"
+        },
+        {
+          "name": "G"
+        },
+        {
+          "name": "B"
+        }
+      ],
+      "tags": [
+        "rgb-led",
+        "rgb led",
+        "rgb",
+        "led"
+      ]
     },
     {
       "id": "franzininho",
@@ -1348,8 +2921,45 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
-      "tags": ["franzininho"]
+      "pinCount": 11,
+      "pins": [
+        {
+          "name": "GND.1"
+        },
+        {
+          "name": "VCC.1"
+        },
+        {
+          "name": "PB4"
+        },
+        {
+          "name": "PB5"
+        },
+        {
+          "name": "PB3"
+        },
+        {
+          "name": "PB2"
+        },
+        {
+          "name": "PB1"
+        },
+        {
+          "name": "PB0"
+        },
+        {
+          "name": "VIN"
+        },
+        {
+          "name": "GND.2"
+        },
+        {
+          "name": "VCC.2"
+        }
+      ],
+      "tags": [
+        "franzininho"
+      ]
     },
     {
       "id": "ir-receiver",
@@ -1359,8 +2969,24 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        IR-RECEIVER\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["ir-receiver", "ir receiver", "ir", "receiver"]
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "DAT"
+        }
+      ],
+      "tags": [
+        "ir-receiver",
+        "ir receiver",
+        "ir",
+        "receiver"
+      ]
     },
     {
       "id": "ir-remote",
@@ -1371,7 +2997,13 @@
       "properties": [],
       "defaultValues": {},
       "pinCount": 0,
-      "tags": ["ir-remote", "ir remote", "ir", "remote"]
+      "pins": [],
+      "tags": [
+        "ir-remote",
+        "ir remote",
+        "ir",
+        "remote"
+      ]
     },
     {
       "id": "resistor",
@@ -1390,8 +3022,18 @@
       "defaultValues": {
         "value": "1000"
       },
-      "pinCount": 0,
-      "tags": ["resistor"]
+      "pinCount": 2,
+      "pins": [
+        {
+          "name": "1"
+        },
+        {
+          "name": "2"
+        }
+      ],
+      "tags": [
+        "resistor"
+      ]
     },
     {
       "id": "dht22",
@@ -1401,8 +3043,24 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DHT22\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["dht22"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "SDA"
+        },
+        {
+          "name": "NC"
+        },
+        {
+          "name": "GND"
+        }
+      ],
+      "tags": [
+        "dht22"
+      ]
     },
     {
       "id": "hc-sr04",
@@ -1412,8 +3070,26 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        HC-SR04\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
-      "tags": ["hc-sr04", "hc", "sr04"]
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "TRIG"
+        },
+        {
+          "name": "ECHO"
+        },
+        {
+          "name": "GND"
+        }
+      ],
+      "tags": [
+        "hc-sr04",
+        "hc",
+        "sr04"
+      ]
     },
     {
       "id": "mpu6050",
@@ -1432,8 +3108,36 @@
       "defaultValues": {
         "led1": false
       },
-      "pinCount": 0,
-      "tags": ["mpu6050"]
+      "pinCount": 8,
+      "pins": [
+        {
+          "name": "INT"
+        },
+        {
+          "name": "AD0"
+        },
+        {
+          "name": "XCL"
+        },
+        {
+          "name": "XDA"
+        },
+        {
+          "name": "SDA"
+        },
+        {
+          "name": "SCL"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        }
+      ],
+      "tags": [
+        "mpu6050"
+      ]
     },
     {
       "id": "ntc-temperature-sensor",
@@ -1443,7 +3147,18 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        NTC-TEMPERATURE-SENSOR\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "GND"
+        },
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "OUT"
+        }
+      ],
       "tags": [
         "ntc-temperature-sensor",
         "ntc temperature sensor",
@@ -1476,7 +3191,21 @@
         "ledDO": false,
         "ledPower": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "GND"
+        },
+        {
+          "name": "DO"
+        },
+        {
+          "name": "AO"
+        }
+      ],
       "tags": [
         "photoresistor-sensor",
         "photoresistor sensor",
@@ -1492,54 +3221,23 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        PIR-MOTION-SENSOR\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pins": [
+        {
+          "name": "VCC"
+        },
+        {
+          "name": "OUT"
+        },
+        {
+          "name": "GND"
+        }
+      ],
       "tags": [
         "pir-motion-sensor",
         "pir motion sensor",
         "pir",
         "motion",
-        "sensor"
-      ]
-    },
-    {
-      "id": "bmp280",
-      "tagName": "wokwi-bmp280",
-      "name": "BMP280",
-      "category": "sensors",
-      "description": "BMP280 barometric pressure and temperature sensor (I2C). Pins: VCC, GND, SDA, SCL.",
-      "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"64\" height=\"64\" fill=\"#2d6a2d\" rx=\"4\"/><rect x=\"16\" y=\"20\" width=\"32\" height=\"24\" rx=\"2\" fill=\"#111\"/><text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"9\" fill=\"#aaa\">BMP280</text></svg>",
-      "properties": [
-        {
-          "name": "temperature",
-          "type": "string",
-          "defaultValue": "25",
-          "control": "text"
-        },
-        {
-          "name": "pressure",
-          "type": "string",
-          "defaultValue": "1013.25",
-          "control": "text"
-        },
-        {
-          "name": "address",
-          "type": "string",
-          "defaultValue": "0x76",
-          "control": "text"
-        }
-      ],
-      "defaultValues": {
-        "temperature": "25",
-        "pressure": "1013.25",
-        "address": "0x76"
-      },
-      "pinCount": 4,
-      "tags": [
-        "bmp280",
-        "barometric",
-        "i2c",
-        "pressure",
-        "temperature",
         "sensor"
       ]
     }

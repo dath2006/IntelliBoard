@@ -13,3 +13,8 @@ authlib==1.3.1
 email-validator==2.2.0
 mcp>=1.0.0
 esptool>=4.7.0
+
+# AI Agent Dependencies
+pydantic-ai-slim[openai]==0.7.1
+sentence-transformers==3.2.0
+chromadb==1.5.8

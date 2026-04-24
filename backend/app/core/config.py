@@ -1,3 +1,4 @@
+from pydantic import ConfigDict
 from pydantic_settings import BaseSettings
 
 
@@ -12,8 +13,15 @@ class Settings(BaseSettings):
     # Set to true in production (HTTPS). Controls the Secure flag on the JWT cookie.
     COOKIE_SECURE: bool = False
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
+    
+    # AI Agent Settings
+    OPENAI_API_KEY: str = ""  # User-provided or backend proxy key
+    OPENAI_BASE_URL: str | None = None  # For AI Gateway / Proxy endpoints
+    AGENT_MODEL: str = "openai:gpt-5.4-mini"  # Pydantic AI model string
+    KNOWLEDGE_DB_PATH: str = "./knowledge_db"  # Path for RAG knowledge base
+    CHROMA_PERSISTENCE_DIR: str = "./.chroma"  # Chroma vector DB persistence
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = ConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 settings = Settings()

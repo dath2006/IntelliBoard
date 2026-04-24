@@ -10,6 +10,15 @@ Exposes the following tools to MCP-compatible agents (e.g. Claude):
   - create_circuit        Create a new circuit definition
   - update_circuit        Merge changes into an existing circuit definition
   - generate_code_files   Generate starter Arduino code from a circuit
+    - validate_circuit      Validate circuit wiring and power assumptions
+    - optimize_circuit      Suggest wiring/component optimizations
+    - debug_code            Analyze compile/runtime issues
+    - analyze_serial_logs   Detect runtime log patterns
+    - suggest_components    Recommend components from requirements
+    - fix_errors            Apply template-based code corrections
+    - save_project_to_db    Persist project artifacts
+    - load_project_from_db  Load project artifacts
+    - update_project_in_db  Update project artifacts
 
 Transport:
   - stdio  — run `python mcp_server.py` for Claude Desktop / CLI agents
@@ -24,6 +33,8 @@ from typing import Annotated, Any
 
 from mcp.server.fastmcp import FastMCP
 
+from app.mcp import agent_tools as agent_tooling
+from app.mcp import project_tools as project_tooling
 from app.mcp.wokwi import (
     format_wokwi_diagram,
     generate_arduino_sketch,
@@ -404,3 +415,250 @@ async def generate_code_files(
         "files": [{"name": f"{sketch_name}.ino", "content": sketch_content}],
         "board_fqbn": board_fqbn,
     }
+
+
+# ---------------------------------------------------------------------------
+# validate_circuit
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def validate_circuit(
+    circuit: Annotated[
+        dict[str, Any],
+        "Velxio circuit object with components, connections, and board_fqbn.",
+    ],
+    board_variant: Annotated[
+        str,
+        "Board FQBN used for validation rules.",
+    ] = "arduino:avr:uno",
+) -> dict[str, Any]:
+    """Validate circuit for pin conflicts, duplicate wiring, and rough power budget."""
+    return await agent_tooling.validate_circuit(circuit, board_variant)
+
+
+# ---------------------------------------------------------------------------
+# optimize_circuit
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def optimize_circuit(
+    circuit: Annotated[
+        dict[str, Any],
+        "Velxio circuit object.",
+    ],
+    components_metadata: Annotated[
+        dict[str, Any] | None,
+        "Optional component metadata for richer optimization hints.",
+    ] = None,
+) -> dict[str, Any]:
+    """Return optimization suggestions for circuit reliability and power usage."""
+    return await agent_tooling.optimize_circuit(circuit, components_metadata)
+
+
+# ---------------------------------------------------------------------------
+# debug_code
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def debug_code(
+    code: Annotated[
+        str,
+        "Arduino source code to debug.",
+    ],
+    circuit: Annotated[
+        dict[str, Any],
+        "Circuit context used for pin and component sanity checks.",
+    ],
+    compilation_error: Annotated[
+        str | None,
+        "Optional compiler error text.",
+    ] = None,
+    serial_output: Annotated[
+        str | None,
+        "Optional serial output logs for runtime troubleshooting.",
+    ] = None,
+) -> dict[str, Any]:
+    """Analyze code with compile/runtime context and suggest targeted fixes."""
+    return await agent_tooling.debug_code(code, circuit, compilation_error, serial_output)
+
+
+# ---------------------------------------------------------------------------
+# analyze_serial_logs
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def analyze_serial_logs(
+    serial_output: Annotated[
+        str,
+        "Serial monitor output text.",
+    ],
+    circuit: Annotated[
+        dict[str, Any],
+        "Circuit context for cross-checking likely runtime causes.",
+    ],
+    code: Annotated[
+        str,
+        "Current code used to infer expected runtime behavior.",
+    ] = "",
+) -> dict[str, Any]:
+    """Analyze serial output and return observations, likely issues, and suggestions."""
+    return await agent_tooling.analyze_serial_logs(serial_output, circuit, code)
+
+
+# ---------------------------------------------------------------------------
+# suggest_components
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def suggest_components(
+    requirements: Annotated[
+        str,
+        "Natural language hardware requirements.",
+    ],
+    constraints: Annotated[
+        dict[str, Any] | None,
+        "Optional constraints such as voltage, interface, or budget.",
+    ] = None,
+) -> list[dict[str, Any]]:
+    """Return top component suggestions ranked by relevance."""
+    return await agent_tooling.suggest_components(requirements, constraints)
+
+
+# ---------------------------------------------------------------------------
+# fix_errors
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def fix_errors(
+    code: Annotated[
+        str,
+        "Arduino source code to patch.",
+    ],
+    error_type: Annotated[
+        str,
+        "Error category: missing_include, undefined_variable, wrong_pin, wrong_function, syntax, logic.",
+    ],
+    circuit: Annotated[
+        dict[str, Any],
+        "Circuit context for pin-aware fixes.",
+    ],
+) -> dict[str, Any]:
+    """Apply template-based corrections for common code errors."""
+    return await agent_tooling.fix_errors(code, error_type, circuit)
+
+
+# ---------------------------------------------------------------------------
+# save_project_to_db
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def save_project_to_db(
+    circuit: Annotated[
+        dict[str, Any],
+        "Circuit snapshot to persist.",
+    ],
+    code_files: Annotated[
+        list[dict[str, str]],
+        "List of files in {name, content} shape.",
+    ],
+    project_name: Annotated[
+        str,
+        "Project name.",
+    ],
+    user_id: Annotated[
+        str,
+        "Owner user ID.",
+    ],
+    description: Annotated[
+        str | None,
+        "Optional project description.",
+    ] = None,
+    is_public: Annotated[
+        bool,
+        "Whether the project is public.",
+    ] = True,
+) -> dict[str, Any]:
+    """Persist a project artifact created by the agent."""
+    return await project_tooling.save_project_to_db(
+        circuit=circuit,
+        code_files=code_files,
+        project_name=project_name,
+        user_id=user_id,
+        description=description,
+        is_public=is_public,
+    )
+
+
+# ---------------------------------------------------------------------------
+# load_project_from_db
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def load_project_from_db(
+    project_id: Annotated[
+        str,
+        "Project ID to load.",
+    ],
+    user_id: Annotated[
+        str,
+        "Owner user ID.",
+    ],
+) -> dict[str, Any]:
+    """Load persisted project state for an agent workflow."""
+    return await project_tooling.load_project_from_db(project_id, user_id)
+
+
+# ---------------------------------------------------------------------------
+# update_project_in_db
+# ---------------------------------------------------------------------------
+
+
+@mcp.tool()
+async def update_project_in_db(
+    project_id: Annotated[
+        str,
+        "Project ID to update.",
+    ],
+    circuit: Annotated[
+        dict[str, Any],
+        "Updated circuit snapshot.",
+    ],
+    code_files: Annotated[
+        list[dict[str, str]],
+        "Updated source files.",
+    ],
+    user_id: Annotated[
+        str,
+        "Owner user ID.",
+    ],
+    project_name: Annotated[
+        str | None,
+        "Optional updated project name.",
+    ] = None,
+    description: Annotated[
+        str | None,
+        "Optional updated description.",
+    ] = None,
+    is_public: Annotated[
+        bool | None,
+        "Optional updated visibility.",
+    ] = None,
+) -> dict[str, Any]:
+    """Update project artifacts created or modified by agent workflows."""
+    return await project_tooling.update_project_in_db(
+        project_id=project_id,
+        circuit=circuit,
+        code_files=code_files,
+        user_id=user_id,
+        project_name=project_name,
+        description=description,
+        is_public=is_public,
+    )

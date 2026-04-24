@@ -31,3 +31,4 @@ class Project(Base):
     )
 
     owner: Mapped["User"] = relationship("User", back_populates="projects")  # noqa: F821
+    agent_sessions: Mapped[list["AgentSession"]] = relationship("AgentSession", back_populates="project", lazy="select")  # noqa: F821

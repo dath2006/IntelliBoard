@@ -5,7 +5,9 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Helvetica Neue", Arial, sans-serif;
   background-color: #000;
   color: #f5f5f7;
   -webkit-font-smoothing: antialiased;
@@ -100,7 +102,9 @@ body {
   border-radius: 100px;
   font-size: 13px;
   font-weight: 400;
-  transition: color 0.2s, background 0.2s;
+  transition:
+    color 0.2s,
+    background 0.2s;
   white-space: nowrap;
 }
 
@@ -186,7 +190,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.1s, color 0.1s;
+  transition:
+    background 0.1s,
+    color 0.1s;
 }
 
 .explorer-toggle-btn:hover {
@@ -279,7 +285,52 @@ body {
   display: none;
 }
 
+.workspace-tab-bar {
+  display: flex;
+  flex-shrink: 0;
+  height: 40px;
+  background: #1e1e1e;
+  border-bottom: 1px solid #333;
+  z-index: 40;
+}
+
+.mobile-tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #7a7a7a;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s,
+    border-color 0.15s;
+  padding: 8px 0;
+  margin-bottom: -1px;
+}
+
+.mobile-tab-btn--active {
+  color: #007acc;
+  border-bottom-color: #007acc;
+  background: rgba(0, 122, 204, 0.1);
+}
+
+.mobile-tab-btn:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 @media (max-width: 768px) {
+  .workspace-tab-bar {
+    display: none;
+  }
+
   .mobile-tab-bar {
     display: flex;
     flex-shrink: 0;
@@ -291,32 +342,7 @@ body {
   }
 
   .mobile-tab-btn {
-    flex: 1;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 6px;
-    background: transparent;
-    border: none;
-    border-bottom: 2px solid transparent;
-    color: #7a7a7a;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: color 0.15s, background 0.15s, border-color 0.15s;
-    padding: 8px 0;
     margin-bottom: -2px;
-  }
-
-  .mobile-tab-btn--active {
-    color: #007acc;
-    border-bottom-color: #007acc;
-    background: rgba(0, 122, 204, 0.1);
-  }
-
-  .mobile-tab-btn:active {
-    background: rgba(255, 255, 255, 0.06);
   }
 }
 

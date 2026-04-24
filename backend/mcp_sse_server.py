@@ -40,7 +40,10 @@ if __name__ == "__main__":
     print(f"Starting Velxio MCP SSE server on {args.host}:{args.port}")
     print(f"SSE endpoint: http://{args.host}:{args.port}/sse")
     print(f"Tools: compile_project, run_project, import_wokwi_json, export_wokwi_json,")
-    print(f"       create_circuit, update_circuit, generate_code_files")
+    print(f"       create_circuit, update_circuit, generate_code_files,")
+    print(f"       validate_circuit, optimize_circuit, debug_code, analyze_serial_logs,")
+    print(f"       suggest_components, fix_errors, save_project_to_db, load_project_from_db,")
+    print(f"       update_project_in_db")
 
     sse_app = mcp.sse_app()
     uvicorn.run(sse_app, host=args.host, port=args.port)

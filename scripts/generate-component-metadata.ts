@@ -89,6 +89,7 @@ interface ParsedComponent {
     defaultValue?: any;
   }>;
   pinCount: number;
+  pins?: Array<{name: string}>;
 }
 
 class MetadataGenerator {
@@ -256,6 +257,7 @@ class MetadataGenerator {
       })),
       defaultValues: this.extractDefaultValues(parsed.properties),
       pinCount: parsed.pinCount,
+      pins: parsed.pins,
       tags: this.generateTags(id, storiesMetadata?.name || ''),
     };
   }
@@ -268,6 +270,7 @@ class MetadataGenerator {
     let className = '';
     const properties: ParsedComponent['properties'] = [];
     let pinCount = 0;
+    let pins: Array<{name: string}> = [];
 
     const visit = (node: ts.Node) => {
       // Find @customElement decorator
@@ -309,12 +312,14 @@ class MetadataGenerator {
             }
           }
 
-          // Count pins from pinInfo getter
-          if (ts.isGetAccessor(member)) {
-            const accessorName = member.name.getText();
-            if (accessorName === 'pinInfo') {
-              const bodyText = member.body?.getText() || '';
-              // Count array elements in return statement
+          // Extract pins from pinInfo property or getter
+          if (member.name?.getText() === 'pinInfo') {
+            const bodyText = member.getText();
+            const nameMatches = [...bodyText.matchAll(/name:\s*['"]([^'"]+)['"]/g)];
+            if (nameMatches.length > 0) {
+              pins = nameMatches.map(m => ({ name: m[1] }));
+              pinCount = pins.length;
+            } else {
               const matches = bodyText.match(/\{[^}]+\}/g);
               if (matches) {
                 pinCount = matches.length;
@@ -331,7 +336,7 @@ class MetadataGenerator {
 
     if (!tagName || !className) return null;
 
-    return { tagName, className, properties, pinCount };
+    return { tagName, className, properties, pinCount, pins };
   }
 
   /**

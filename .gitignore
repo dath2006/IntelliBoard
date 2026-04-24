@@ -128,3 +128,8 @@ frontend/src/__tests__/fixtures/rp2040-blink/
 **/*.ino.with_bootloader.hex
 **/*.ino.map
 **/*.ino.uf2
+
+
+.agent
+.agents
+.chroma

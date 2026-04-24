@@ -37,6 +37,7 @@ export interface ComponentMetadata {
   properties: PropertyDescriptor[];
   defaultValues: Record<string, any>;
   pinCount: number;
+  pins?: { name: string; description?: string }[];
   tags: string[];                // For search functionality
 }
 

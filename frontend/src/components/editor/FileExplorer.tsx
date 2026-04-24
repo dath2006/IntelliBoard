@@ -1,20 +1,38 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useEditorStore } from '../../store/useEditorStore';
-import { useSimulatorStore } from '../../store/useSimulatorStore';
-import type { BoardKind } from '../../types/board';
-import { BOARD_KIND_LABELS } from '../../types/board';
-import './FileExplorer.css';
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useEditorStore } from "../../store/useEditorStore";
+import { useSimulatorStore } from "../../store/useSimulatorStore";
+import type { BoardKind } from "../../types/board";
+import { BOARD_KIND_LABELS } from "../../types/board";
+import "./FileExplorer.css";
 
 // SVG icons — same style as EditorToolbar (stroke-based, 16x16)
 const IcoFile = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
   </svg>
 );
 
 const IcoHeader = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
     <line x1="9" y1="13" x2="15" y2="13" />
@@ -23,7 +41,16 @@ const IcoHeader = () => (
 );
 
 const IcoNewFile = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
     <polyline points="14 2 14 8 20 8" />
     <line x1="12" y1="18" x2="12" y2="12" />
@@ -32,18 +59,67 @@ const IcoNewFile = () => (
 );
 
 const IcoSave = () => (
-  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
     <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
     <polyline points="17 21 17 13 7 13 7 21" />
     <polyline points="7 3 7 8 15 8" />
   </svg>
 );
 
+const IcoOpen = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v1" />
+    <path d="M3 11h18l-2.2 8.1A2 2 0 0 1 16.87 21H5.13a2 2 0 0 1-1.93-1.49L1 11h2z" />
+  </svg>
+);
+
+const IcoNewProject = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 5v14M5 12h14" />
+  </svg>
+);
+
 const IcoChevron = ({ open }: { open: boolean }) => (
   <svg
-    width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-    style={{ transform: open ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}
+    width="12"
+    height="12"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2.5"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    style={{
+      transform: open ? "rotate(90deg)" : "rotate(0deg)",
+      transition: "transform 0.15s",
+    }}
   >
     <polyline points="9 18 15 12 9 6" />
   </svg>
@@ -51,31 +127,49 @@ const IcoChevron = ({ open }: { open: boolean }) => (
 
 // Board emoji icons — mirrors BoardPickerModal
 const BOARD_ICON: Record<BoardKind, string> = {
-  'arduino-uno':       '⬤',
-  'arduino-nano':      '▪',
-  'arduino-mega':      '▬',
-  'raspberry-pi-pico': '◆',
-  'raspberry-pi-3':    '⬛',
-  'esp32':    '⬡',
-  'esp32-s3': '⬡',
-  'esp32-c3': '⬡',
+  "arduino-uno": "⬤",
+  "arduino-nano": "▪",
+  "arduino-mega": "▬",
+  "attiny85": "·",
+  "raspberry-pi-pico": "◆",
+  "pi-pico-w": "◆",
+  "raspberry-pi-3": "⬛",
+  "esp32": "⬡",
+  "esp32-devkit-c-v4": "⬡",
+  "esp32-cam": "⬡",
+  "wemos-lolin32-lite": "⬡",
+  "esp32-s3": "⬡",
+  "xiao-esp32-s3": "⬡",
+  "arduino-nano-esp32": "⬡",
+  "esp32-c3": "⬡",
+  "xiao-esp32-c3": "⬡",
+  "aitewinrobot-esp32c3-supermini": "⬡",
 };
 
 // Color accent per board family
 const BOARD_COLOR: Record<BoardKind, string> = {
-  'arduino-uno':       '#4fc3f7',
-  'arduino-nano':      '#4fc3f7',
-  'arduino-mega':      '#4fc3f7',
-  'raspberry-pi-pico': '#ce93d8',
-  'raspberry-pi-3':    '#ef9a9a',
-  'esp32':    '#a5d6a7',
-  'esp32-s3': '#a5d6a7',
-  'esp32-c3': '#a5d6a7',
+  "arduino-uno": "#4fc3f7",
+  "arduino-nano": "#4fc3f7",
+  "arduino-mega": "#4fc3f7",
+  "attiny85": "#90a4ae",
+  "raspberry-pi-pico": "#ce93d8",
+  "pi-pico-w": "#ce93d8",
+  "raspberry-pi-3": "#ef9a9a",
+  "esp32": "#a5d6a7",
+  "esp32-devkit-c-v4": "#a5d6a7",
+  "esp32-cam": "#a5d6a7",
+  "wemos-lolin32-lite": "#a5d6a7",
+  "esp32-s3": "#a5d6a7",
+  "xiao-esp32-s3": "#a5d6a7",
+  "arduino-nano-esp32": "#a5d6a7",
+  "esp32-c3": "#a5d6a7",
+  "xiao-esp32-c3": "#a5d6a7",
+  "aitewinrobot-esp32c3-supermini": "#a5d6a7",
 };
 
 function FileIcon({ name }: { name: string }) {
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  if (['h', 'hpp'].includes(ext)) return <IcoHeader />;
+  const ext = name.split(".").pop()?.toLowerCase() ?? "";
+  if (["h", "hpp"].includes(ext)) return <IcoHeader />;
   return <IcoFile />;
 }
 
@@ -88,21 +182,36 @@ interface ContextMenu {
 
 interface FileExplorerProps {
   onSaveClick: () => void;
+  onOpenProjectClick: () => void;
+  onNewProjectClick: () => void;
 }
 
-export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
-  const { fileGroups, activeFileId, activeGroupId, openFile, createFile, deleteFile, renameFile, setActiveGroup } =
-    useEditorStore();
+
+export const FileExplorer: React.FC<FileExplorerProps> = ({
+  onSaveClick,
+  onOpenProjectClick,
+  onNewProjectClick,
+}) => {
+  const {
+    fileGroups,
+    activeFileId,
+    activeGroupId,
+    openFile,
+    createFile,
+    deleteFile,
+    renameFile,
+    setActiveGroup,
+  } = useEditorStore();
   const boards = useSimulatorStore((s) => s.boards);
   const activeBoardId = useSimulatorStore((s) => s.activeBoardId);
   const setActiveBoardId = useSimulatorStore((s) => s.setActiveBoardId);
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
-  const [renameValue, setRenameValue] = useState('');
+  const [renameValue, setRenameValue] = useState("");
   // Track which board group is creating a file: boardGroupId or null
   const [creatingInGroup, setCreatingInGroup] = useState<string | null>(null);
-  const [newFileName, setNewFileName] = useState('');
+  const [newFileName, setNewFileName] = useState("");
   // Collapsed state per board ID
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
 
@@ -126,25 +235,35 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   useEffect(() => {
     if (!contextMenu) return;
     const handler = () => setContextMenu(null);
-    document.addEventListener('click', handler);
-    return () => document.removeEventListener('click', handler);
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
   }, [contextMenu]);
 
-  const switchToBoard = useCallback((boardId: string, groupId: string) => {
-    setActiveBoardId(boardId);
-    // setActiveBoardId already calls setActiveGroup internally via the store
-    // but we make sure the editor group is also in sync
-    setActiveGroup(groupId);
-  }, [setActiveBoardId, setActiveGroup]);
+  const switchToBoard = useCallback(
+    (boardId: string, groupId: string) => {
+      setActiveBoardId(boardId);
+      // setActiveBoardId already calls setActiveGroup internally via the store
+      // but we make sure the editor group is also in sync
+      setActiveGroup(groupId);
+    },
+    [setActiveBoardId, setActiveGroup],
+  );
 
-  const handleFileClick = useCallback((fileId: string, boardId: string, groupId: string) => {
-    if (boardId !== activeBoardId) {
-      switchToBoard(boardId, groupId);
-    }
-    openFile(fileId);
-  }, [activeBoardId, switchToBoard, openFile]);
+  const handleFileClick = useCallback(
+    (fileId: string, boardId: string, groupId: string) => {
+      if (boardId !== activeBoardId) {
+        switchToBoard(boardId, groupId);
+      }
+      openFile(fileId);
+    },
+    [activeBoardId, switchToBoard, openFile],
+  );
 
-  const handleContextMenu = (e: React.MouseEvent, fileId: string, boardGroupId: string) => {
+  const handleContextMenu = (
+    e: React.MouseEvent,
+    fileId: string,
+    boardGroupId: string,
+  ) => {
     e.preventDefault();
     e.stopPropagation();
     setContextMenu({ fileId, boardGroupId, x: e.clientX, y: e.clientY });
@@ -170,7 +289,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
     setContextMenu(null);
     const files = fileGroups[groupId] ?? [];
     if (files.length <= 1) return;
-    if (!window.confirm('Delete this file?')) return;
+    if (!window.confirm("Delete this file?")) return;
     deleteFile(fileId);
   };
 
@@ -178,7 +297,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
     // Switch to this board first so createFile targets the right group
     switchToBoard(boardId, groupId);
     setCreatingInGroup(groupId);
-    setNewFileName('');
+    setNewFileName("");
     setContextMenu(null);
   };
 
@@ -186,7 +305,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
     const name = newFileName.trim();
     if (name) createFile(name);
     setCreatingInGroup(null);
-    setNewFileName('');
+    setNewFileName("");
   }, [newFileName, createFile]);
 
   const toggleCollapse = (boardId: string) => {
@@ -198,6 +317,20 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
       <div className="file-explorer-header">
         <span className="file-explorer-title">WORKSPACE</span>
         <div className="file-explorer-header-actions">
+          <button
+            className="file-explorer-open-btn"
+            title="New project"
+            onClick={onNewProjectClick}
+          >
+            <IcoNewProject />
+          </button>
+          <button
+            className="file-explorer-open-btn"
+            title="Open saved project"
+            onClick={onOpenProjectClick}
+          >
+            <IcoOpen />
+          </button>
           <button
             className="file-explorer-save-btn"
             title="Save project (Ctrl+S)"
@@ -218,16 +351,16 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
 
           // Status dot color
           const statusColor = board.running
-            ? '#22c55e'
+            ? "#22c55e"
             : board.compiledProgram
-            ? '#f59e0b'
-            : '#6b7280';
+              ? "#f59e0b"
+              : "#6b7280";
 
           return (
             <div key={board.id} className="fe-board-section">
               {/* Board section header */}
               <div
-                className={`fe-board-header${isActiveBoard ? ' fe-board-header-active' : ''}`}
+                className={`fe-board-header${isActiveBoard ? " fe-board-header-active" : ""}`}
                 onClick={() => {
                   switchToBoard(board.id, groupId);
                   if (!isOpen) toggleCollapse(board.id);
@@ -236,8 +369,11 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
               >
                 <button
                   className="fe-collapse-btn"
-                  onClick={(e) => { e.stopPropagation(); toggleCollapse(board.id); }}
-                  title={isOpen ? 'Collapse' : 'Expand'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    toggleCollapse(board.id);
+                  }}
+                  title={isOpen ? "Collapse" : "Expand"}
                 >
                   <IcoChevron open={isOpen} />
                 </button>
@@ -246,19 +382,30 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
                   {BOARD_ICON[board.boardKind]}
                 </span>
 
-                <span className="fe-board-label">{BOARD_KIND_LABELS[board.boardKind]}</span>
+                <span className="fe-board-label">
+                  {BOARD_KIND_LABELS[board.boardKind]}
+                </span>
 
                 <span
                   className="fe-status-dot"
                   style={{ background: statusColor }}
-                  title={board.running ? 'Running' : board.compiledProgram ? 'Compiled' : 'Idle'}
+                  title={
+                    board.running
+                      ? "Running"
+                      : board.compiledProgram
+                        ? "Compiled"
+                        : "Idle"
+                  }
                 />
 
                 {/* New file button — visible on hover */}
                 <button
                   className="fe-board-new-btn"
                   title="New file in this board"
-                  onClick={(e) => { e.stopPropagation(); startCreateFile(board.id, groupId); }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    startCreateFile(board.id, groupId);
+                  }}
                 >
                   <IcoNewFile />
                 </button>
@@ -268,15 +415,23 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
               {isOpen && (
                 <div className="fe-board-files">
                   {groupFiles.map((file) => {
-                    const isActiveFile = isActiveBoard && file.id === activeFileId;
+                    const isActiveFile =
+                      isActiveBoard && file.id === activeFileId;
                     return (
                       <div
                         key={file.id}
-                        className={`file-explorer-item fe-file-item${isActiveFile ? ' file-explorer-item-active' : ''}`}
-                        onClick={() => handleFileClick(file.id, board.id, groupId)}
-                        onContextMenu={(e) => handleContextMenu(e, file.id, groupId)}
-                        onDoubleClick={() => { switchToBoard(board.id, groupId); startRename(file.id, groupId); }}
-                        title={`${file.name}${file.modified ? ' (unsaved)' : ''}`}
+                        className={`file-explorer-item fe-file-item${isActiveFile ? " file-explorer-item-active" : ""}`}
+                        onClick={() =>
+                          handleFileClick(file.id, board.id, groupId)
+                        }
+                        onContextMenu={(e) =>
+                          handleContextMenu(e, file.id, groupId)
+                        }
+                        onDoubleClick={() => {
+                          switchToBoard(board.id, groupId);
+                          startRename(file.id, groupId);
+                        }}
+                        title={`${file.name}${file.modified ? " (unsaved)" : ""}`}
                       >
                         <span className="file-explorer-icon">
                           <FileIcon name={file.name} />
@@ -290,17 +445,22 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
                             onChange={(e) => setRenameValue(e.target.value)}
                             onBlur={commitRename}
                             onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitRename();
-                              if (e.key === 'Escape') setRenamingId(null);
+                              if (e.key === "Enter") commitRename();
+                              if (e.key === "Escape") setRenamingId(null);
                             }}
                             onClick={(e) => e.stopPropagation()}
                           />
                         ) : (
-                          <span className="file-explorer-name">{file.name}</span>
+                          <span className="file-explorer-name">
+                            {file.name}
+                          </span>
                         )}
 
                         {file.modified && (
-                          <span className="file-explorer-dot" title="Unsaved changes" />
+                          <span
+                            className="file-explorer-dot"
+                            title="Unsaved changes"
+                          />
                         )}
                       </div>
                     );
@@ -320,10 +480,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
                         onChange={(e) => setNewFileName(e.target.value)}
                         onBlur={commitCreateFile}
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitCreateFile();
-                          if (e.key === 'Escape') {
+                          if (e.key === "Enter") commitCreateFile();
+                          if (e.key === "Escape") {
                             setCreatingInGroup(null);
-                            setNewFileName('');
+                            setNewFileName("");
                           }
                         }}
                         onClick={(e) => e.stopPropagation()}
@@ -338,7 +498,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
 
         {/* Fallback: no boards yet */}
         {boards.length === 0 && (
-          <div style={{ color: '#666', fontSize: 11, padding: '12px 12px', lineHeight: 1.5 }}>
+          <div
+            style={{
+              color: "#666",
+              fontSize: 11,
+              padding: "12px 12px",
+              lineHeight: 1.5,
+            }}
+          >
             Add a board to the canvas to start editing code.
           </div>
         )}
@@ -350,12 +517,18 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
           style={{ top: contextMenu.y, left: contextMenu.x }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button onClick={() => startRename(contextMenu.fileId, contextMenu.boardGroupId)}>
+          <button
+            onClick={() =>
+              startRename(contextMenu.fileId, contextMenu.boardGroupId)
+            }
+          >
             Rename
           </button>
           <button
             className="ctx-delete"
-            onClick={() => handleDelete(contextMenu.fileId, contextMenu.boardGroupId)}
+            onClick={() =>
+              handleDelete(contextMenu.fileId, contextMenu.boardGroupId)
+            }
             disabled={(fileGroups[contextMenu.boardGroupId] ?? []).length <= 1}
           >
             Delete

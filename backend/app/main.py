@@ -18,12 +18,15 @@ from app.api.routes import compile, libraries
 from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.projects import router as projects_router
+from app.api.routes.agent import router as agent_router
 from app.core.config import settings
 from app.database.session import Base, async_engine
+from app.services.knowledge_db import initialize_knowledge_db
 
 # Import models so SQLAlchemy registers them before create_all
 import app.models.user  # noqa: F401
 import app.models.project  # noqa: F401
+import app.models.agent_session  # noqa: F401
 
 
 @asynccontextmanager
@@ -35,6 +38,14 @@ async def lifespan(_app: FastAPI):
             await conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
         except Exception:
             pass  # Column already exists
+
+    try:
+        await initialize_knowledge_db()
+    except Exception:
+        logging.getLogger(__name__).warning(
+            "Knowledge DB initialization failed; agent suggestions will use fallback mode",
+            exc_info=True,
+        )
     yield
 
 
@@ -70,6 +81,7 @@ app.include_router(libraries.router, prefix="/api/libraries", tags=["libraries"]
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(projects_router, prefix="/api", tags=["projects"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
+app.include_router(agent_router, tags=["agent"])
 
 # WebSockets
 from app.api.routes import simulation

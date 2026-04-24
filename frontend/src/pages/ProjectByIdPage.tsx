@@ -54,18 +54,39 @@ export const ProjectByIdPage: React.FC = () => {
 
     getProjectById(id)
       .then((project) => {
-        const files =
-          project.files.length > 0
-            ? project.files
-            : [{ name: 'sketch.ino', content: project.code }];
-        loadFiles(files);
-        setBoardType(project.board_type as any);
-        try {
-          setComponents(JSON.parse(project.components_json));
-          setWires(JSON.parse(project.wires_json));
-        } catch {
-          // keep defaults if JSON is malformed
+        // For new empty projects, files array is empty and code is "".
+        // Provide a meaningful empty starter file rather than a blank one.
+        let files = project.files;
+        if (files.length === 0) {
+          const code = project.code ?? "";
+          // If there's legacy code content, use it; otherwise provide an empty sketch stub
+          const content = code.trim()
+            ? code
+            : `// New project — board: ${project.board_type}\n// Use the Agent tab to build your circuit and code.\n`;
+          files = [{ name: "sketch.ino", content }];
         }
+        loadFiles(files);
+
+        // Always set the board type via the legacy API for compatibility.
+        // For boards not in the legacy enum (ESP32, attiny, etc.) this is a no-op,
+        // but the canvas board is correctly seeded by the simulator store initial state.
+        setBoardType(project.board_type as any);
+
+        // Parse circuit state — clear to empty arrays if JSON is empty/malformed
+        try {
+          const comps = project.components_json
+            ? JSON.parse(project.components_json)
+            : [];
+          const wires = project.wires_json
+            ? JSON.parse(project.wires_json)
+            : [];
+          setComponents(Array.isArray(comps) ? comps : []);
+          setWires(Array.isArray(wires) ? wires : []);
+        } catch {
+          setComponents([]);
+          setWires([]);
+        }
+
         setCurrentProject({
           id: project.id,
           slug: project.slug,
@@ -88,6 +109,7 @@ export const ProjectByIdPage: React.FC = () => {
         clearCurrentProject();
       });
   }, [id]);
+
 
   if (error) {
     return (
