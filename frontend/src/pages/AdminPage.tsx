@@ -14,8 +14,25 @@ import {
   type AdminProjectResponse,
   type AdminUserUpdateRequest,
 } from '../services/adminService';
+import { AdminDashboardTab } from '../components/admin/AdminDashboardTab';
+import { AdminBoardsTab } from '../components/admin/AdminBoardsTab';
+import { countryFlag } from '../utils/countryFlag';
 
-type Tab = 'users' | 'projects';
+type Tab = 'dashboard' | 'users' | 'projects' | 'boards';
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  const diff = Date.now() - d.getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const h = Math.floor(min / 60);
+  if (h < 24) return `${h}h ago`;
+  const days = Math.floor(h / 24);
+  if (days < 30) return `${days}d ago`;
+  return d.toLocaleDateString();
+}
 
 // ── Edit User Modal ───────────────────────────────────────────────────────────
 
@@ -344,45 +361,84 @@ function UsersTab({ currentUserId }: { currentUserId: string }) {
                 <th style={s.th}>Role</th>
                 <th style={s.th}>Status</th>
                 <th style={s.th}>Projects</th>
+                <th style={s.th}>Compiles</th>
+                <th style={s.th}>Runs</th>
+                <th style={s.th}>Boards</th>
+                <th style={s.th}>Country</th>
+                <th style={s.th}>Last active</th>
                 <th style={s.th}>Joined</th>
                 <th style={s.th}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((u) => (
-                <tr key={u.id} style={s.tr}>
-                  <td style={s.td}>
-                    <span style={s.username}>{u.username}</span>
-                    {u.id === currentUserId && <span style={s.youBadge}>you</span>}
-                  </td>
-                  <td style={s.td}>{u.email}</td>
-                  <td style={s.td}>
-                    <span style={u.is_admin ? s.adminBadge : s.userBadge}>
-                      {u.is_admin ? 'admin' : 'user'}
-                    </span>
-                  </td>
-                  <td style={s.td}>
-                    <span style={u.is_active ? s.activeBadge : s.inactiveBadge}>
-                      {u.is_active ? 'active' : 'disabled'}
-                    </span>
-                  </td>
-                  <td style={s.td}>{u.project_count}</td>
-                  <td style={s.td}>{new Date(u.created_at).toLocaleDateString()}</td>
-                  <td style={s.td}>
-                    <button style={s.editBtn} onClick={() => setEditUser(u)}>
-                      Edit
-                    </button>
-                    {u.id !== currentUserId && (
-                      <button style={s.deleteBtn} onClick={() => handleDelete(u)}>
-                        Delete
+              {filtered.map((u) => {
+                const errPct =
+                  u.total_compiles > 0
+                    ? ((u.total_compile_errors / u.total_compiles) * 100).toFixed(0)
+                    : null;
+                return (
+                  <tr key={u.id} style={s.tr}>
+                    <td style={s.td}>
+                      <span style={s.username}>{u.username}</span>
+                      {u.id === currentUserId && <span style={s.youBadge}>you</span>}
+                    </td>
+                    <td style={s.td}>{u.email}</td>
+                    <td style={s.td}>
+                      <span style={u.is_admin ? s.adminBadge : s.userBadge}>
+                        {u.is_admin ? 'admin' : 'user'}
+                      </span>
+                    </td>
+                    <td style={s.td}>
+                      <span style={u.is_active ? s.activeBadge : s.inactiveBadge}>
+                        {u.is_active ? 'active' : 'disabled'}
+                      </span>
+                    </td>
+                    <td style={s.td}>{u.project_count}</td>
+                    <td style={s.td} title={errPct ? `${errPct}% errors` : undefined}>
+                      {u.total_compiles}
+                      {errPct ? <span style={s.errPct}> ({errPct}% err)</span> : null}
+                    </td>
+                    <td style={s.td}>{u.total_runs}</td>
+                    <td style={s.td}>
+                      {u.boards_used.length === 0
+                        ? '—'
+                        : u.boards_used.map((b) => (
+                            <span key={b} style={s.boardChip}>
+                              {b}
+                            </span>
+                          ))}
+                    </td>
+                    <td
+                      style={s.td}
+                      title={
+                        u.signup_country && u.signup_country !== u.last_country
+                          ? `Signed up: ${u.signup_country}\nLast: ${u.last_country ?? '—'}`
+                          : u.last_country ?? 'Unknown'
+                      }
+                    >
+                      <span style={{ fontSize: 16 }}>{countryFlag(u.last_country)}</span>{' '}
+                      <span style={{ fontSize: 11, color: '#888' }}>
+                        {u.last_country ?? '—'}
+                      </span>
+                    </td>
+                    <td style={s.td}>{formatRelative(u.last_active_at)}</td>
+                    <td style={s.td}>{new Date(u.created_at).toLocaleDateString()}</td>
+                    <td style={s.td}>
+                      <button style={s.editBtn} onClick={() => setEditUser(u)}>
+                        Edit
                       </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+                      {u.id !== currentUserId && (
+                        <button style={s.deleteBtn} onClick={() => handleDelete(u)}>
+                          Delete
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} style={{ ...s.td, textAlign: 'center', color: '#666' }}>
+                  <td colSpan={12} style={{ ...s.td, textAlign: 'center', color: '#666' }}>
                     No users found.
                   </td>
                 </tr>
@@ -456,6 +512,10 @@ function ProjectsTab() {
                 <th style={s.th}>Owner</th>
                 <th style={s.th}>Board</th>
                 <th style={s.th}>Visibility</th>
+                <th style={s.th}>Compiles</th>
+                <th style={s.th}>Runs</th>
+                <th style={s.th}>Updates</th>
+                <th style={s.th}>Last compile</th>
                 <th style={s.th}>Updated</th>
                 <th style={s.th}>Actions</th>
               </tr>
@@ -468,8 +528,10 @@ function ProjectsTab() {
                       to={`/project/${p.id}`}
                       style={{ color: '#4fc3f7', textDecoration: 'none' }}
                       target="_blank"
+                      title={p.is_public ? undefined : 'Private project (admin view)'}
                     >
                       {p.name}
+                      {!p.is_public && <span style={s.lockIcon}> 🔒</span>}
                     </Link>
                   </td>
                   <td style={s.td}>
@@ -487,6 +549,15 @@ function ProjectsTab() {
                       {p.is_public ? 'public' : 'private'}
                     </span>
                   </td>
+                  <td style={s.td}>
+                    {p.compile_count}
+                    {p.compile_error_count > 0 && (
+                      <span style={s.errPct}> ({p.compile_error_count} err)</span>
+                    )}
+                  </td>
+                  <td style={s.td}>{p.run_count}</td>
+                  <td style={s.td}>{p.update_count}</td>
+                  <td style={s.td}>{formatRelative(p.last_compiled_at)}</td>
                   <td style={s.td}>{new Date(p.updated_at).toLocaleDateString()}</td>
                   <td style={s.td}>
                     <button style={s.deleteBtn} onClick={() => handleDelete(p)}>
@@ -497,7 +568,7 @@ function ProjectsTab() {
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} style={{ ...s.td, textAlign: 'center', color: '#666' }}>
+                  <td colSpan={10} style={{ ...s.td, textAlign: 'center', color: '#666' }}>
                     No projects found.
                   </td>
                 </tr>
@@ -513,7 +584,7 @@ function ProjectsTab() {
 // ── Admin dashboard ───────────────────────────────────────────────────────────
 
 function AdminDashboard() {
-  const [tab, setTab] = useState<Tab>('users');
+  const [tab, setTab] = useState<Tab>('dashboard');
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const navigate = useNavigate();
@@ -542,6 +613,12 @@ function AdminDashboard() {
       </div>
 
       <div style={s.tabs}>
+        <button
+          style={tab === 'dashboard' ? s.tabActive : s.tabBtn}
+          onClick={() => setTab('dashboard')}
+        >
+          Dashboard
+        </button>
         <button style={tab === 'users' ? s.tabActive : s.tabBtn} onClick={() => setTab('users')}>
           Users
         </button>
@@ -551,10 +628,26 @@ function AdminDashboard() {
         >
           Projects
         </button>
+        <button
+          style={tab === 'boards' ? s.tabActive : s.tabBtn}
+          onClick={() => setTab('boards')}
+        >
+          Boards
+        </button>
       </div>
 
+      {tab === 'dashboard' && (
+        <div style={s.tabContent}>
+          <AdminDashboardTab />
+        </div>
+      )}
       {tab === 'users' && <UsersTab currentUserId={user?.id || ''} />}
       {tab === 'projects' && <ProjectsTab />}
+      {tab === 'boards' && (
+        <div style={s.tabContent}>
+          <AdminBoardsTab />
+        </div>
+      )}
     </div>
   );
 }
@@ -800,4 +893,16 @@ const s: Record<string, React.CSSProperties> = {
     fontSize: 12,
     cursor: 'pointer',
   },
+  errPct: { color: '#f48771', fontSize: 11, marginLeft: 4 },
+  boardChip: {
+    display: 'inline-block',
+    background: '#2d3a5a',
+    color: '#9cdcfe',
+    border: '1px solid #4a6a9a',
+    borderRadius: 4,
+    padding: '1px 6px',
+    fontSize: 11,
+    marginRight: 4,
+  },
+  lockIcon: { fontSize: 10, opacity: 0.7, marginLeft: 4 },
 };

@@ -47,5 +47,12 @@ class ProjectResponse(BaseModel):
     owner_username: str
     created_at: datetime
     updated_at: datetime
+    # Usage metrics (kept in sync by MetricsService)
+    compile_count: int = 0
+    compile_error_count: int = 0
+    run_count: int = 0
+    update_count: int = 0
+    last_compiled_at: datetime | None = None
+    last_run_at: datetime | None = None
 
     model_config = {"from_attributes": True}

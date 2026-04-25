@@ -22,6 +22,7 @@ export interface CompileResult {
 export async function compileCode(
   files: SketchFile[],
   board: string = 'arduino:avr:uno',
+  projectId?: string | null,
 ): Promise<CompileResult> {
   try {
     console.log('Sending compilation request to:', `${API_BASE}/compile`);
@@ -33,7 +34,7 @@ export async function compileCode(
 
     const response = await axios.post<CompileResult>(
       `${API_BASE}/compile/`,
-      { files, board_fqbn: board },
+      { files, board_fqbn: board, project_id: projectId ?? null },
       { withCredentials: true, timeout: 180000 },
     );
 

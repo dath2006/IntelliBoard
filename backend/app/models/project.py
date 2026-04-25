@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.database.session import Base
@@ -29,5 +29,13 @@ class Project(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+    # Aggregate usage counters (kept in sync by MetricsService for O(1) reads)
+    compile_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    compile_error_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    run_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    update_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    last_compiled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     owner: Mapped["User"] = relationship("User", back_populates="projects")  # noqa: F821

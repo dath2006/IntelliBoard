@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +9,7 @@ from app.database.session import get_db
 from app.models.project import Project
 from app.models.user import User
 from app.schemas.project import ProjectCreateRequest, ProjectResponse, ProjectUpdateRequest, SketchFile
+from app.services.metrics import record_project_open, record_save
 from app.services.project_files import delete_files, read_files, write_files
 from app.utils.slug import slugify
 
@@ -41,6 +42,12 @@ def _to_response(project: Project, owner_username: str) -> ProjectResponse:
         owner_username=owner_username,
         created_at=project.created_at,
         updated_at=project.updated_at,
+        compile_count=project.compile_count,
+        compile_error_count=project.compile_error_count,
+        run_count=project.run_count,
+        update_count=project.update_count,
+        last_compiled_at=project.last_compiled_at,
+        last_run_at=project.last_run_at,
     )
 
 
@@ -76,6 +83,7 @@ async def my_projects(
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
 async def get_project_by_id(
     project_id: str,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_current_user),
 ):
@@ -85,11 +93,17 @@ async def get_project_by_id(
         raise HTTPException(status_code=404, detail="Project not found.")
 
     is_own = current_user and current_user.id == project.user_id
-    if not project.is_public and not is_own:
+    is_admin = current_user and current_user.is_admin
+    if not project.is_public and not is_own and not is_admin:
         raise HTTPException(status_code=403, detail="This project is private.")
 
     owner_result = await db.execute(select(User).where(User.id == project.user_id))
     owner = owner_result.scalar_one_or_none()
+
+    # Record open events from non-owners (views), not owner edits.
+    if not is_own:
+        await record_project_open(db, user=current_user, project_id=project.id, request=request)
+
     return _to_response(project, owner.username if owner else "")
 
 
@@ -98,6 +112,7 @@ async def get_project_by_id(
 @router.post("/projects/", response_model=ProjectResponse, status_code=status.HTTP_201_CREATED)
 async def create_project(
     body: ProjectCreateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_auth),
 ):
@@ -124,6 +139,7 @@ async def create_project(
     if files:
         write_files(project.id, [f.model_dump() for f in files])
 
+    await record_save(db, user=user, project=project, is_create=True, request=request)
     return _to_response(project, user.username)
 
 
@@ -133,6 +149,7 @@ async def create_project(
 async def update_project(
     project_id: str,
     body: ProjectUpdateRequest,
+    request: Request,
     db: AsyncSession = Depends(get_db),
     user: User = Depends(require_auth),
 ):
@@ -174,6 +191,7 @@ async def update_project(
         if not existing:
             write_files(project.id, [{"name": "sketch.ino", "content": body.code}])
 
+    await record_save(db, user=user, project=project, is_create=False, request=request)
     return _to_response(project, user.username)
 
 

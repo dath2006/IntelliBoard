@@ -4,6 +4,8 @@ import { useSimulatorStore } from '../../store/useSimulatorStore';
 import type { BoardKind, LanguageMode } from '../../types/board';
 import { BOARD_KIND_FQBN, BOARD_KIND_LABELS, BOARD_SUPPORTS_MICROPYTHON } from '../../types/board';
 import { compileCode } from '../../services/compilation';
+import { reportRunEvent } from '../../services/metricsService';
+import { useProjectStore } from '../../store/useProjectStore';
 import { CompileAllProgress } from './CompileAllProgress';
 import type { BoardCompileStatus } from './CompileAllProgress';
 import { LibraryManagerModal } from '../simulator/LibraryManagerModal';
@@ -76,6 +78,20 @@ export const EditorToolbar = ({
   } = useSimulatorStore();
 
   const activeBoard = boards.find((b) => b.id === activeBoardId) ?? boards[0];
+  const currentProject = useProjectStore((s) => s.currentProject);
+
+  // Helper: report a Run event to the backend for analytics. Resolves the
+  // FQBN from the board kind so the backend can group by family/fqbn.
+  const reportRun = useCallback(
+    (boardKind: BoardKind | undefined) => {
+      const fqbn = boardKind ? BOARD_KIND_FQBN[boardKind] : null;
+      void reportRunEvent({
+        project_id: currentProject?.id ?? null,
+        board_fqbn: fqbn ?? null,
+      });
+    },
+    [currentProject],
+  );
   const [compiling, setCompiling] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [libManagerOpen, setLibManagerOpen] = useState(false);
@@ -186,7 +202,7 @@ export const EditorToolbar = ({
         name: f.name,
         content: f.content,
       }));
-      const result = await compileCode(sketchFiles, fqbn);
+      const result = await compileCode(sketchFiles, fqbn, currentProject?.id ?? null);
 
       const resultLogs = parseCompileResult(result, boardLabel);
       setCompileLogs((prev: CompilationLog[]) => [...prev, ...resultLogs]);
@@ -230,6 +246,7 @@ export const EditorToolbar = ({
       // MicroPython mode: stop any running session first, then reload firmware + start
       if (board?.languageMode === 'micropython') {
         trackRunSimulation(board.boardKind);
+        reportRun(board.boardKind);
 
         // Always stop the current session so the new run gets a clean QEMU boot.
         // This also prevents the double start_esp32 that occurs when the bridge
@@ -285,6 +302,7 @@ export const EditorToolbar = ({
           if (autoRunAfterCompile.current && updatedBoard?.compiledProgram) {
             autoRunAfterCompile.current = false;
             trackRunSimulation(updatedBoard.boardKind);
+            reportRun(updatedBoard.boardKind);
             startBoard(activeBoardId);
             setMessage(null);
           } else {
@@ -293,6 +311,7 @@ export const EditorToolbar = ({
           return;
         }
         trackRunSimulation(board?.boardKind);
+        reportRun(board?.boardKind);
         startBoard(activeBoardId);
         setMessage(null);
         return;
@@ -309,6 +328,7 @@ export const EditorToolbar = ({
         if (autoRunAfterCompile.current && updatedBoard?.compiledProgram) {
           autoRunAfterCompile.current = false;
           trackRunSimulation(updatedBoard.boardKind);
+          reportRun(updatedBoard.boardKind);
           startBoard(activeBoardId);
           setMessage(null);
         } else {
@@ -318,6 +338,7 @@ export const EditorToolbar = ({
       }
 
       trackRunSimulation(board?.boardKind);
+      reportRun(board?.boardKind);
       startBoard(activeBoardId);
       setMessage(null);
       return;
@@ -331,6 +352,7 @@ export const EditorToolbar = ({
       if (autoRunAfterCompile.current && hex) {
         autoRunAfterCompile.current = false;
         trackRunSimulation();
+        reportRun(undefined);
         startSimulation();
         setMessage(null);
       } else {
@@ -338,6 +360,7 @@ export const EditorToolbar = ({
       }
     } else {
       trackRunSimulation();
+      reportRun(undefined);
       startSimulation();
       setMessage(null);
     }
@@ -391,7 +414,7 @@ export const EditorToolbar = ({
       try {
         const groupFiles = useEditorStore.getState().getGroupFiles(board.activeFileGroupId);
         const sketchFiles = groupFiles.map((f) => ({ name: f.name, content: f.content }));
-        const result = await compileCode(sketchFiles, fqbn);
+        const result = await compileCode(sketchFiles, fqbn, currentProject?.id ?? null);
 
         if (result.success) {
           const program = result.hex_content ?? result.binary_content ?? null;
@@ -425,6 +448,7 @@ export const EditorToolbar = ({
         board.boardKind === 'esp32' ||
         board.boardKind === 'esp32-s3';
       if (!board.running && (isQemu || board.compiledProgram)) {
+        reportRun(board.boardKind);
         startBoard(board.id);
       }
     }

@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.responses import RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +12,7 @@ from app.core.security import create_access_token, hash_password, verify_passwor
 from app.database.session import get_db
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RegisterRequest, UserResponse
+from app.utils.geo import country_from_request
 
 router = APIRouter()
 
@@ -28,7 +29,12 @@ def _set_auth_cookie(response: Response, token: str) -> None:
 
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, response: Response, db: AsyncSession = Depends(get_db)):
+async def register(
+    body: RegisterRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     # Check uniqueness
     existing = await db.execute(
         select(User).where((User.email == body.email) | (User.username == body.username))
@@ -36,10 +42,13 @@ async def register(body: RegisterRequest, response: Response, db: AsyncSession =
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email or username already taken.")
 
+    country = country_from_request(request)
     user = User(
         username=body.username,
         email=body.email,
         hashed_password=hash_password(body.password),
+        signup_country=country,
+        last_country=country,
     )
     db.add(user)
     await db.commit()
@@ -51,13 +60,23 @@ async def register(body: RegisterRequest, response: Response, db: AsyncSession =
 
 
 @router.post("/login", response_model=UserResponse)
-async def login(body: LoginRequest, response: Response, db: AsyncSession = Depends(get_db)):
+async def login(
+    body: LoginRequest,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     result = await db.execute(select(User).where(User.email == body.email))
     user = result.scalar_one_or_none()
     if not user or not user.hashed_password or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account is disabled.")
+
+    country = country_from_request(request)
+    if country:
+        user.last_country = country
+        await db.commit()
 
     token = create_access_token({"sub": user.id})
     _set_auth_cookie(response, token)
@@ -101,7 +120,12 @@ async def google_login():
 
 
 @router.get("/google/callback")
-async def google_callback(code: str, response: Response, db: AsyncSession = Depends(get_db)):
+async def google_callback(
+    code: str,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
     if not settings.GOOGLE_CLIENT_ID:
         raise HTTPException(status_code=501, detail="Google OAuth not configured.")
 
@@ -129,6 +153,7 @@ async def google_callback(code: str, response: Response, db: AsyncSession = Depe
     google_id: str = userinfo["sub"]
     email: str = userinfo.get("email", "")
     avatar_url: str | None = userinfo.get("picture")
+    country = country_from_request(request)
 
     # Upsert user by google_id
     result = await db.execute(select(User).where(User.google_id == google_id))
@@ -161,8 +186,13 @@ async def google_callback(code: str, response: Response, db: AsyncSession = Depe
                 email=email,
                 google_id=google_id,
                 avatar_url=avatar_url,
+                signup_country=country,
+                last_country=country,
             )
             db.add(user)
+
+    if country:
+        user.last_country = country
 
     await db.commit()
     await db.refresh(user)

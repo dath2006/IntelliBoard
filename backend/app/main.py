@@ -17,6 +17,7 @@ from sqlalchemy import text
 from app.api.routes import compile, libraries
 from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
+from app.api.routes.metrics import router as metrics_router
 from app.api.routes.projects import router as projects_router
 from app.core.config import settings
 from app.database.session import Base, async_engine
@@ -24,6 +25,7 @@ from app.database.session import Base, async_engine
 # Import models so SQLAlchemy registers them before create_all
 import app.models.user  # noqa: F401
 import app.models.project  # noqa: F401
+import app.models.usage_event  # noqa: F401
 
 
 logger = logging.getLogger(__name__)
@@ -51,11 +53,31 @@ async def lifespan(_app: FastAPI):
     asyncio.get_event_loop().set_exception_handler(_asyncio_exception_handler)
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
-        # Add is_admin column to existing databases that predate this feature
-        try:
-            await conn.execute(text("ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0"))
-        except Exception:
-            pass  # Column already exists
+        # Lightweight auto-migrations for legacy DBs. Each statement is wrapped
+        # in try/except so re-runs after the column already exists are no-ops.
+        legacy_migrations = [
+            "ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT 0",
+            # Phase: usage metrics
+            "ALTER TABLE users ADD COLUMN total_compiles INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN total_compile_errors INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN total_runs INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE users ADD COLUMN last_active_at DATETIME",
+            "ALTER TABLE projects ADD COLUMN compile_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE projects ADD COLUMN compile_error_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE projects ADD COLUMN run_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE projects ADD COLUMN update_count INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE projects ADD COLUMN last_compiled_at DATETIME",
+            "ALTER TABLE projects ADD COLUMN last_run_at DATETIME",
+            # Country tracking (CF-IPCountry)
+            "ALTER TABLE users ADD COLUMN signup_country VARCHAR(2)",
+            "ALTER TABLE users ADD COLUMN last_country VARCHAR(2)",
+            "ALTER TABLE usage_events ADD COLUMN country VARCHAR(2)",
+        ]
+        for stmt in legacy_migrations:
+            try:
+                await conn.execute(text(stmt))
+            except Exception:
+                pass  # Column already exists
     yield
 
 
@@ -90,6 +112,7 @@ app.include_router(compile.router, prefix="/api/compile", tags=["compilation"])
 app.include_router(libraries.router, prefix="/api/libraries", tags=["libraries"])
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(projects_router, prefix="/api", tags=["projects"])
+app.include_router(metrics_router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 
 # WebSockets

@@ -13,6 +13,14 @@ export interface AdminUserResponse {
   is_admin: boolean;
   created_at: string;
   project_count: number;
+  // Usage metrics
+  total_compiles: number;
+  total_compile_errors: number;
+  total_runs: number;
+  last_active_at: string | null;
+  boards_used: string[];
+  signup_country: string | null;
+  last_country: string | null;
 }
 
 export interface AdminUserUpdateRequest {
@@ -34,6 +42,13 @@ export interface AdminProjectResponse {
   owner_id: string;
   created_at: string;
   updated_at: string;
+  // Usage metrics
+  compile_count: number;
+  compile_error_count: number;
+  run_count: number;
+  update_count: number;
+  last_compiled_at: string | null;
+  last_run_at: string | null;
 }
 
 export async function getAdminSetupStatus(): Promise<{ has_admin: boolean }> {
