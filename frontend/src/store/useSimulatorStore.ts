@@ -418,6 +418,7 @@ interface SimulatorState {
   setLastAgentAction: (action: AgentAction | null) => void;
   setAgentContextWindow: (updates: Partial<AgentContextWindow>) => void;
   applyAgentCircuitUpdate: (circuit: {
+    board_fqbn?: string;
     components?: Array<{
       id: string;
       type: string;
@@ -427,6 +428,13 @@ interface SimulatorState {
       attrs?: Record<string, unknown>;
     }>;
     wires?: Wire[];
+    connections?: Array<{
+      from_part: string;
+      from_pin: string;
+      to_part: string;
+      to_pin: string;
+      color?: string;
+    }>;
   }) => void;
   applyAgentCodeUpdate: (
     files: Array<{ name: string; content: string }>,
@@ -1837,6 +1845,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     },
 
     applyAgentCircuitUpdate: (circuit: {
+      board_fqbn?: string;
       components?: Array<{
         id: string;
         type?: string;
@@ -1857,6 +1866,55 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     }) => {
       const warnings: string[] = [];
 
+      // ── FQBN → BoardKind mapping for board type switching ─────────────────
+      // Accepts both full FQBNs AND board kind shortnames so the switch fires
+      // even when the agent omits the full FQBN (e.g. passes "esp32" directly).
+      const FQBN_TO_BOARD_KIND: Record<string, BoardKind> = {
+        // Full FQBNs
+        "arduino:avr:uno": "arduino-uno",
+        "arduino:avr:mega": "arduino-mega",
+        "arduino:avr:nano:cpu=atmega328": "arduino-nano",
+        "arduino:avr:nano": "arduino-nano",
+        "rp2040:rp2040:rpipico": "raspberry-pi-pico",
+        "rp2040:rp2040:rpipicow": "pi-pico-w",
+        "esp32:esp32:esp32": "esp32",
+        "esp32:esp32:esp32s3": "esp32-s3",
+        "esp32:esp32:esp32c3": "esp32-c3",
+        "esp32:esp32:esp32cam": "esp32-cam",
+        // Board kind shortnames (agent may use these directly)
+        "arduino-uno": "arduino-uno",
+        "arduino-mega": "arduino-mega",
+        "arduino-nano": "arduino-nano",
+        "raspberry-pi-pico": "raspberry-pi-pico",
+        "pi-pico-w": "pi-pico-w",
+        "esp32": "esp32",
+        "esp32-s3": "esp32-s3",
+        "esp32-c3": "esp32-c3",
+        "esp32-cam": "esp32-cam",
+        "esp32-devkit-c-v4": "esp32",
+        "attiny85": "attiny85",
+      };
+
+      // ── Board component detection: id/type → is this a board? ────────────
+      // Uses both an exact-set lookup AND keyword-based detection so the agent
+      // cannot accidentally leak a board component through by using an
+      // unexpected type name (e.g. "board-esp32", "wokwi-esp32-devkit-v1").
+      const BOARD_ID_SET = new Set([
+        "arduino-uno", "arduino-mega", "arduino-nano", "attiny85",
+        "raspberry-pi-pico", "pi-pico", "pi-pico-w",
+        "esp32", "esp32-devkit-c-v4", "esp32-devkit-v1", "esp32-cam", "wemos-lolin32-lite",
+        "esp32-s3", "xiao-esp32-s3", "arduino-nano-esp32",
+        "esp32-c3", "xiao-esp32-c3", "aitewinrobot-esp32c3-supermini",
+        "raspberry-pi-3",
+      ]);
+      const BOARD_KEYWORDS = ["arduino", "esp32", "rp2040", "raspberry-pi", "pico", "attiny"];
+
+      const isBoardId = (idOrMetaId: string): boolean => {
+        if (BOARD_ID_SET.has(idOrMetaId)) return true;
+        const lower = idOrMetaId.toLowerCase();
+        return BOARD_KEYWORDS.some((k) => lower.includes(k));
+      };
+
       const normalizeMetaId = (comp: {
         type?: string;
         metadataId?: string;
@@ -1870,6 +1928,39 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         return "";
       };
 
+      // ── Step 1: Board type switching ──────────────────────────────────────
+      // If the agent specified a board_fqbn that differs from the current board,
+      // swap it out BEFORE processing components/wires. We capture the resulting
+      // active board id so wires can be remapped to it.
+      const requestedFqbn = typeof circuit.board_fqbn === "string"
+        ? circuit.board_fqbn.trim()
+        : "";
+
+      let activeBoardIdAfterSwitch: string | null = get().activeBoardId;
+
+      if (requestedFqbn) {
+        const targetKind = FQBN_TO_BOARD_KIND[requestedFqbn];
+        const currentState = get();
+        const activeBoard =
+          currentState.boards.find((b) => b.id === currentState.activeBoardId) ??
+          currentState.boards[0];
+
+        if (targetKind && activeBoard && activeBoard.boardKind !== targetKind) {
+          const { x, y } = activeBoard;
+          const oldId = activeBoard.id;
+          // Remove ALL boards of the old kind to guarantee a clean canvas
+          get().removeBoard(oldId);
+          const newId = get().addBoard(targetKind, x, y);
+          get().setActiveBoardId(newId);
+          activeBoardIdAfterSwitch = newId;
+          console.log(`[Agent] Switched board from ${activeBoard.boardKind} → ${targetKind} (id: ${newId})`);
+        } else if (targetKind && activeBoard && activeBoard.boardKind === targetKind) {
+          // Same kind — no swap needed but ensure we have the current id for remap
+          activeBoardIdAfterSwitch = activeBoard.id;
+        }
+      }
+
+      // ── Step 2: Filter components — strip out any board the agent included ─
       const nextComponents = Array.isArray(circuit.components)
         ? circuit.components
             .map((comp, index) => {
@@ -1881,12 +1972,11 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
                 );
                 return null;
               }
-              // Skip board components (boards are tracked separately in the boards array)
-              const BOARD_METADATA_IDS = ["arduino-uno", "arduino-mega", "arduino-nano", "pi-pico", "esp32", "esp32-c3", "raspberry-pi-3"];
-              if (BOARD_METADATA_IDS.includes(metadataId)) {
+              // Filter boards via both exact set AND keyword heuristic.
+              // This catches non-standard type names the LLM might use.
+              if (isBoardId(metadataId) || isBoardId(comp.id)) {
                 return null;
               }
-              
               return {
                 id: comp.id,
                 metadataId,
@@ -1897,6 +1987,20 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
             })
             .filter((comp): comp is Component => comp !== null)
         : get().components;
+
+      // ── Step 3: Build wires and remap board endpoint IDs ─────────────────
+      // The agent references the board by whatever id it chose (e.g. "esp32",
+      // "arduino-uno-1", "board"). We normalise those to the ACTUAL board id
+      // currently in the store so the rendered wires physically connect.
+      const remapPartId = (partId: string): string => {
+        if (!partId) return partId;
+        // If partId looks like a board (by id/keyword check), point it at the
+        // live active board so pin-position lookups succeed.
+        if (isBoardId(partId) && activeBoardIdAfterSwitch) {
+          return activeBoardIdAfterSwitch;
+        }
+        return partId;
+      };
 
       const wiresFromConnections = Array.isArray(circuit.connections)
         ? circuit.connections
@@ -1917,13 +2021,13 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               const wire: Wire = {
                 id: `wire-${Date.now()}-${index}`,
                 start: {
-                  componentId: conn.from_part,
+                  componentId: remapPartId(conn.from_part),
                   pinName: conn.from_pin,
                   x: 0,
                   y: 0,
                 },
                 end: {
-                  componentId: conn.to_part,
+                  componentId: remapPartId(conn.to_part),
                   pinName: conn.to_pin,
                   x: 0,
                   y: 0,
@@ -1938,7 +2042,12 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         : [];
 
       const nextWires = Array.isArray(circuit.wires)
-        ? circuit.wires.map((w) => ({ ...w, waypoints: [] }))
+        ? circuit.wires.map((w) => ({
+            ...w,
+            waypoints: [],
+            start: { ...w.start, componentId: remapPartId(w.start.componentId) },
+            end:   { ...w.end,   componentId: remapPartId(w.end.componentId) },
+          }))
         : wiresFromConnections.length > 0
           ? wiresFromConnections
           : get().wires;

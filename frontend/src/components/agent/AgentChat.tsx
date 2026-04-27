@@ -287,6 +287,7 @@ const FileArtifactsDetails: React.FC<{
 
 export const AgentChat: React.FC<AgentChatProps> = ({ projectId }) => {
   const [prompt, setPrompt] = useState("");
+  const promptRef = useRef<string>("");
   const [selectedSessionId, setSelectedSessionId] = useState<string>("");
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -602,8 +603,14 @@ export const AgentChat: React.FC<AgentChatProps> = ({ projectId }) => {
     [isLoading, projectId, prompt],
   );
 
+  // Sync promptRef whenever prompt state changes so handleSend always
+  // reads the latest value even before a re-render.
+  useEffect(() => {
+    promptRef.current = prompt;
+  }, [prompt]);
+
   const handleSend = async () => {
-    const base = prompt.trim();
+    const base = (textareaRef.current?.value ?? promptRef.current).trim();
     if (!base) return;
 
     let finalPrompt = base;
@@ -620,8 +627,9 @@ export const AgentChat: React.FC<AgentChatProps> = ({ projectId }) => {
         : undefined,
     });
     setPrompt("");
-    // Reset height synchronously after clearing the prompt.
+    promptRef.current = "";
     if (textareaRef.current) {
+      textareaRef.current.value = "";
       textareaRef.current.style.height = "auto";
     }
   };
@@ -943,9 +951,14 @@ export const AgentChat: React.FC<AgentChatProps> = ({ projectId }) => {
               ? "Describe the circuit/code change you want... (Enter to send, Shift+Enter for newline)"
               : "Save the project first to chat with the agent"
           }
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onInput={(e) => adjustTextareaHeight(e.currentTarget)}
+          defaultValue=""
+          onChange={(e) => {
+            // Update both ref and state. Ref update is synchronous (no lag);
+            // state update drives the canSend memo.
+            promptRef.current = e.target.value;
+            setPrompt(e.target.value);
+            adjustTextareaHeight(e.currentTarget);
+          }}
           onKeyDown={handleKeyDown}
           rows={2}
           disabled={!projectId || isLoading}

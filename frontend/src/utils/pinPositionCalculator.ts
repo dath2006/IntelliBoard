@@ -27,45 +27,44 @@ export function calculatePinPosition(
   componentX: number,
   componentY: number
 ): { x: number; y: number } | null {
-  // Get the DOM element
   const element = document.getElementById(componentId);
   if (!element) {
     console.warn(`[pinPositionCalculator] Component ${componentId} not found in DOM`);
     return null;
   }
 
-  // Access the pinInfo property (all wokwi-elements expose this)
   const pinInfo = (element as any).pinInfo;
   if (!pinInfo || !Array.isArray(pinInfo)) {
     console.warn(`[pinPositionCalculator] Component ${componentId} does not have pinInfo`);
     return null;
   }
 
-  // Find the specific pin
-  let pin = pinInfo.find((p: any) => p.name === pinName);
-  // Fallback: try numbered variant (e.g. GND → GND.1) for pins that have suffix variants
-  if (!pin && !pinName.includes('.')) {
-    pin = pinInfo.find((p: any) => p.name === `${pinName}.1`);
-  }
-  // Fallback: GP-prefix → match description field (e.g. 'GP15' → description 'GPIO15')
-  // Needed for Nano RP2040 Connect which uses D-prefix pin names but GPIO descriptions
-  if (!pin && pinName.startsWith('GP')) {
-    const gpioNum = parseInt(pinName.substring(2), 10);
-    if (!isNaN(gpioNum)) {
-      pin = pinInfo.find((p: any) => p.description === `GPIO${gpioNum}`);
-    }
-  }
+  const byName = (name: string) => pinInfo.find((p: any) => p.name === name);
+
+  let pin =
+    // 1. Exact match (covers D4, D23, GND.1, A0, GP0, etc.)
+    byName(pinName) ??
+    // 2. Suffix variant: bare "GND" → "GND.1" (power pins with numeric suffix)
+    (!pinName.includes('.') ? byName(`${pinName}.1`) : undefined) ??
+    // 3. GP-prefix → GPIO description (RP2040: 'GP15' → description 'GPIO15')
+    (pinName.startsWith('GP') && !pinName.startsWith('GPIO')
+      ? (() => {
+          const n = parseInt(pinName.substring(2), 10);
+          return isNaN(n) ? undefined : pinInfo.find((p: any) => p.description === `GPIO${n}`);
+        })()
+      : undefined) ??
+    // 4. Bare number → D-prefix (e.g. '4' → 'D4' for Arduino/ESP32 DevKit V1)
+    (/^\d+$/.test(pinName) ? byName(`D${pinName}`) : undefined) ??
+    // 5. Bare number → exact (some elements store bare numbers directly)
+    (/^\d+$/.test(pinName) ? byName(pinName) : undefined);
+
   if (!pin) {
     console.warn(`[pinPositionCalculator] Pin ${pinName} not found on component ${componentId}`);
     console.warn(`Available pins:`, pinInfo.map((p: any) => p.name));
     return null;
   }
 
-  // Pin coordinates are already in CSS pixels, just add component position
-  const pinX = componentX + pin.x;
-  const pinY = componentY + pin.y;
-
-  return { x: pinX, y: pinY };
+  return { x: componentX + pin.x, y: componentY + pin.y };
 }
 
 /**

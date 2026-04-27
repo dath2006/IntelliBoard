@@ -921,6 +921,24 @@ async def apply_circuit_modification(
             "errors": ["circuit must be a JSON object"],
         }
 
+    # Normalize board_fqbn shortnames → full FQBNs immediately so the output
+    # always carries a valid FQBN the frontend can act on.
+    _SHORTNAME_TO_FQBN: dict[str, str] = {
+        "arduino-uno":       "arduino:avr:uno",
+        "arduino-mega":      "arduino:avr:mega",
+        "arduino-nano":      "arduino:avr:nano:cpu=atmega328",
+        "raspberry-pi-pico": "rp2040:rp2040:rpipico",
+        "pi-pico-w":         "rp2040:rp2040:rpipicow",
+        "esp32":             "esp32:esp32:esp32",
+        "esp32-devkit-c-v4": "esp32:esp32:esp32",
+        "esp32-devkit-v1":   "esp32:esp32:esp32",
+        "esp32-s3":          "esp32:esp32:esp32s3",
+        "esp32-c3":          "esp32:esp32:esp32c3",
+        "esp32-cam":         "esp32:esp32:esp32cam",
+    }
+    _raw_fqbn = str(modified_circuit.get("board_fqbn") or "arduino:avr:uno").strip()
+    modified_circuit["board_fqbn"] = _SHORTNAME_TO_FQBN.get(_raw_fqbn, _raw_fqbn)
+
     modified_circuit.setdefault("components", [])
     modified_circuit.setdefault("connections", [])
 
@@ -960,8 +978,13 @@ async def apply_circuit_modification(
             "arduino:avr:uno": "arduino-uno",
             "arduino:avr:mega": "arduino-mega",
             "arduino:avr:nano": "arduino-nano",
+            "arduino:avr:nano:cpu=atmega328": "arduino-nano",
             "rp2040:rp2040:rpipico": "raspberry-pi-pico",
+            "rp2040:rp2040:rpipicow": "pi-pico-w",
             "esp32:esp32:esp32": "esp32",
+            "esp32:esp32:esp32s3": "esp32-s3",
+            "esp32:esp32:esp32c3": "esp32-c3",
+            "esp32:esp32:esp32cam": "esp32-cam",
         }
 
     def _resolve_primary_board_id() -> str | None:
@@ -989,6 +1012,8 @@ async def apply_circuit_modification(
         if raw in ids:
             return raw
 
+        # Canonical alias table — covers board short-names AND FQBN strings
+        primary_board = _resolve_primary_board_id() or ""
         aliases = {
             "uno": "arduino-uno",
             "mega": "arduino-mega",
@@ -996,11 +1021,27 @@ async def apply_circuit_modification(
             "pico": "raspberry-pi-pico",
             "rp2040": "raspberry-pi-pico",
             "esp32": "esp32",
-            "board": _resolve_primary_board_id() or "",
+            "esp32-devkit-c-v4": "esp32",
+            "esp32-cam": "esp32-cam",
+            "esp32-s3": "esp32-s3",
+            "esp32-c3": "esp32-c3",
+            "board": primary_board,
+            # Allow the agent to use the FQBN as a part id too
+            "arduino:avr:uno": "arduino-uno",
+            "arduino:avr:mega": "arduino-mega",
+            "arduino:avr:nano": "arduino-nano",
+            "esp32:esp32:esp32": "esp32",
+            "esp32:esp32:esp32s3": "esp32-s3",
+            "esp32:esp32:esp32c3": "esp32-c3",
+            "rp2040:rp2040:rpipico": "raspberry-pi-pico",
         }
-        normalized = aliases.get(raw.lower(), raw)
+        normalized = aliases.get(raw.lower(), aliases.get(raw, raw))
         if normalized in ids:
             return normalized
+        # Last resort: if the raw name is any recognized board root, return primary board
+        board_keywords = ("arduino", "esp32", "rp2040", "raspberry-pi", "pico", "attiny")
+        if any(kw in raw.lower() for kw in board_keywords) and primary_board:
+            return primary_board
         return raw
 
     def _is_board_endpoint(part: str) -> bool:
@@ -1451,6 +1492,25 @@ async def create_circuit(
     board_fqbn: str = "arduino:avr:uno"
 ) -> dict[str, Any]:
     """Create circuit object from components and connections."""
+    # Normalize shortname board IDs to full FQBNs so the frontend
+    # board-switch logic always finds a match.
+    SHORTNAME_TO_FQBN: dict[str, str] = {
+        "arduino-uno":        "arduino:avr:uno",
+        "arduino-mega":       "arduino:avr:mega",
+        "arduino-nano":       "arduino:avr:nano:cpu=atmega328",
+        "raspberry-pi-pico":  "rp2040:rp2040:rpipico",
+        "pi-pico-w":          "rp2040:rp2040:rpipicow",
+        "esp32":              "esp32:esp32:esp32",
+        "esp32-devkit-c-v4":  "esp32:esp32:esp32",
+        "esp32-devkit-v1":    "esp32:esp32:esp32",
+        "esp32-s3":           "esp32:esp32:esp32s3",
+        "esp32-c3":           "esp32:esp32:esp32c3",
+        "esp32-cam":          "esp32:esp32:esp32cam",
+        "attiny85":           "ATTinyCore:avr:attinyx5:chip=85,clock=internal16mhz",
+    }
+    raw_fqbn = str(board_fqbn or "arduino:avr:uno").strip()
+    normalized_fqbn = SHORTNAME_TO_FQBN.get(raw_fqbn, raw_fqbn)
+
     normalized_components: list[dict[str, Any]] = []
     for i, comp in enumerate(components or []):
         if not isinstance(comp, dict):
@@ -1500,7 +1560,7 @@ async def create_circuit(
         )
 
     return {
-        "board_fqbn": str(board_fqbn or "arduino:avr:uno"),
+        "board_fqbn": normalized_fqbn,
         "components": normalized_components,
         "connections": normalized_connections,
         "version": 1,
@@ -1820,22 +1880,42 @@ def get_circuit_topology(
     """Get a token-efficient summary of the circuit."""
     if not isinstance(circuit, dict):
         return {"error": "circuit must be a JSON object."}
-        
+
+    board_fqbn = circuit.get("board_fqbn", "arduino:avr:uno")
     components = circuit.get("components", [])
     connections = circuit.get("connections", [])
-    
+
+    # Derive the canonical board canvas ID from the FQBN so the agent can use
+    # it verbatim as from_part/to_part in connection calls.
+    FQBN_TO_BOARD_ID = {
+        "arduino:avr:uno": "arduino-uno",
+        "arduino:avr:mega": "arduino-mega",
+        "arduino:avr:nano": "arduino-nano",
+        "arduino:avr:nano:cpu=atmega328": "arduino-nano",
+        "rp2040:rp2040:rpipico": "raspberry-pi-pico",
+        "rp2040:rp2040:rpipicow": "pi-pico-w",
+        "esp32:esp32:esp32": "esp32",
+        "esp32:esp32:esp32s3": "esp32-s3",
+        "esp32:esp32:esp32c3": "esp32-c3",
+        "esp32:esp32:esp32cam": "esp32-cam",
+    }
+    board_id = FQBN_TO_BOARD_ID.get(board_fqbn, board_fqbn)
+
     summary_components = [
         {"id": c.get("id"), "type": c.get("type")}
         for c in components
+        if isinstance(c, dict)
     ]
-    
+
     summary_connections = [
         f"{c.get('from_part')}:{c.get('from_pin')} <-> {c.get('to_part')}:{c.get('to_pin')} ({c.get('color', 'green')})"
         for c in connections
+        if isinstance(c, dict)
     ]
-    
+
     return {
-        "board_fqbn": circuit.get("board_fqbn", "arduino:avr:uno"),
+        "board_fqbn": board_fqbn,
+        "board_id": board_id,   # Use this exact string as from_part/to_part for board connections
         "components": summary_components,
-        "connections": summary_connections
+        "connections": summary_connections,
     }

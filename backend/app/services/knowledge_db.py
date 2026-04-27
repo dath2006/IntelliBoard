@@ -399,7 +399,19 @@ class KnowledgeDBService:
         if not self._initialized:
             await self.initialize()
 
-        return self._component_map.get(component_type)
+        ctype = component_type.strip()
+        # Direct lookup (key is tagName, e.g. "wokwi-7segment")
+        if ctype in self._component_map:
+            return self._component_map[ctype]
+        # Fallback: try with wokwi- prefix (agent may pass "7segment")
+        with_prefix = f"wokwi-{ctype}" if not ctype.startswith("wokwi-") else ctype
+        if with_prefix in self._component_map:
+            return self._component_map[with_prefix]
+        # Fallback: try without wokwi- prefix (agent may pass "wokwi-7segment")
+        without_prefix = ctype.removeprefix("wokwi-")
+        if without_prefix in self._component_map:
+            return self._component_map[without_prefix]
+        return None
 
     async def retrieve_example_circuit(self, pattern_name: str) -> dict[str, Any] | None:
         """Return a curated example circuit payload by pattern name."""

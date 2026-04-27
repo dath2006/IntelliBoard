@@ -24,7 +24,7 @@ import {
   isBoardComponent,
   boardPinToNumber,
 } from "../../utils/boardPinMapping";
-import { autoWireColor, WIRE_KEY_COLORS } from "../../utils/wireUtils";
+import { autoWireColor, WIRE_KEY_COLORS, generatePreviewPath } from "../../utils/wireUtils";
 import {
   findWireNearPoint,
   getRenderedPoints,
@@ -100,13 +100,15 @@ export const SimulatorCanvas = () => {
   const finishWireCreation = useSimulatorStore((s) => s.finishWireCreation);
   const cancelWireCreation = useSimulatorStore((s) => s.cancelWireCreation);
   const wireInProgress = useSimulatorStore((s) => s.wireInProgress);
+  const wireInProgressRef = useRef(wireInProgress);
+  wireInProgressRef.current = wireInProgress;
   const recalculateAllWirePositions = useSimulatorStore(
     (s) => s.recalculateAllWirePositions,
   );
   const selectedWireId = useSimulatorStore((s) => s.selectedWireId);
   const setSelectedWire = useSimulatorStore((s) => s.setSelectedWire);
   const removeWire = useSimulatorStore((s) => s.removeWire);
-  const updateWire = useSimulatorStore((s) => s.updateWire);
+  const updateWire = useSimulatorStore((s) => s.updateWire) ;
   const wires = useSimulatorStore((s) => s.wires);
 
   // Oscilloscope
@@ -182,6 +184,12 @@ export const SimulatorCanvas = () => {
   // Canvas ref for coordinate calculations
   const canvasRef = useRef<HTMLDivElement>(null);
 
+  // Ref mirror for draggedComponentId — lets mousemove read it without a closure over stale state
+  const draggedComponentIdRef = useRef<string | null>(null);
+  const dragOffsetRef = useRef({ x: 0, y: 0 });
+  // rAF handle for throttling wire-hover detection on mousemove
+  const hoverRafRef = useRef<number | null>(null);
+
   // Pan & zoom state
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
@@ -242,8 +250,6 @@ export const SimulatorCanvas = () => {
   const pinchStartPanRef = useRef({ x: 0, y: 0 });
 
   // Refs for touch-based wire creation, selection, and interactive passthrough
-  const wireInProgressRef = useRef(wireInProgress);
-  wireInProgressRef.current = wireInProgress;
   const selectedWireIdRef = useRef(selectedWireId);
   selectedWireIdRef.current = selectedWireId;
   const touchPassthroughRef = useRef(false);
@@ -372,9 +378,9 @@ export const SimulatorCanvas = () => {
       touchClickStartPosRef.current = { x: touch.clientX, y: touch.clientY };
 
       // ── 3. Wire in progress → track for waypoint, update preview ──
-      if (wireInProgressRef.current) {
+      if (useSimulatorStore.getState().wireInProgress) {
         const world = toWorld(touch.clientX, touch.clientY);
-        useSimulatorStore.getState().updateWireInProgress(world.x, world.y);
+        updateWirePreviewDOM(world.x, world.y);
         // Don't start pan/drag — let touchmove update wire preview, touchend add waypoint
         return;
       }
@@ -507,7 +513,7 @@ export const SimulatorCanvas = () => {
         !touchDraggedComponentIdRef.current
       ) {
         const world = toWorld(touch.clientX, touch.clientY);
-        useSimulatorStore.getState().updateWireInProgress(world.x, world.y);
+        updateWirePreviewDOM(world.x, world.y);
         return;
       }
 
@@ -719,6 +725,15 @@ export const SimulatorCanvas = () => {
     return () => clearTimeout(timer);
   }, [recalculateAllWirePositions]);
 
+  // Cancel any pending hover rAF on unmount
+  useEffect(() => {
+    return () => {
+      if (hoverRafRef.current !== null) {
+        cancelAnimationFrame(hoverRafRef.current);
+      }
+    };
+  }, []);
+
   // Connect components to pin manager
   useEffect(() => {
     const unsubscribers: (() => void)[] = [];
@@ -872,7 +887,6 @@ export const SimulatorCanvas = () => {
       switch (board.boardKind) {
         case "raspberry-pi-pico":
         case "pi-pico-w":
-        case "nano-rp2040":
           ledPin = 25; // GPIO25
           break;
         default:
@@ -1046,15 +1060,43 @@ export const SimulatorCanvas = () => {
     setClickStartPos({ x: e.clientX, y: e.clientY });
 
     const world = toWorld(e.clientX, e.clientY);
+    const offset = { x: world.x - component.x, y: world.y - component.y };
+    draggedComponentIdRef.current = componentId;
+    dragOffsetRef.current = offset;
     setDraggedComponentId(componentId);
-    setDragOffset({
-      x: world.x - component.x,
-      y: world.y - component.y,
-    });
+    setDragOffset(offset);
     setSelectedComponentId(componentId);
   };
 
-  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+  const updateWirePreviewDOM = useCallback((worldX: number, worldY: number) => {
+    const state = useSimulatorStore.getState().wireInProgress;
+    if (!state) return;
+    
+    const wipMain = document.querySelector('.wip-main');
+    const wipOutline = document.querySelector('.wip-outline');
+    const wipDashed = document.querySelector('.wip-dashed');
+    const wipCursor = document.querySelector('.wip-cursor');
+    
+    if (wipMain && wipOutline && wipDashed && wipCursor) {
+      const path = generatePreviewPath(
+        { x: state.startEndpoint.x, y: state.startEndpoint.y },
+        state.waypoints,
+        worldX,
+        worldY
+      );
+      if (path) {
+        wipMain.setAttribute('d', path);
+        wipOutline.setAttribute('d', path);
+        wipDashed.setAttribute('d', path);
+      }
+      wipCursor.setAttribute('cx', String(worldX));
+      wipCursor.setAttribute('cy', String(worldY));
+    } else {
+      useSimulatorStore.getState().updateWireInProgress(worldX, worldY);
+    }
+  }, []);
+
+  const handleCanvasMouseMove = useCallback((e: React.MouseEvent) => {
     // Handle active panning (ref-based, no setState lag)
     if (isPanningRef.current) {
       const dx = e.clientX - panStartRef.current.mouseX;
@@ -1074,42 +1116,45 @@ export const SimulatorCanvas = () => {
       return;
     }
 
-    // Handle component/board dragging
-    if (draggedComponentId) {
-      const world = toWorld(e.clientX, e.clientY);
-      if (draggedComponentId.startsWith("__board__:")) {
-        const boardId = draggedComponentId.slice("__board__:".length);
+    // Handle component/board dragging — read from ref to avoid stale closure
+    const activeDragId = draggedComponentIdRef.current;
+    if (activeDragId) {
+      const worldCoord = toWorld(e.clientX, e.clientY);
+      const offset = dragOffsetRef.current;
+      if (activeDragId.startsWith("__board__:")) {
+        const boardId = activeDragId.slice("__board__:".length);
         setBoardPosition(
-          { x: world.x - dragOffset.x, y: world.y - dragOffset.y },
+          { x: worldCoord.x - offset.x, y: worldCoord.y - offset.y },
           boardId,
         );
-      } else if (draggedComponentId === "__board__") {
-        // legacy fallback
+      } else if (activeDragId === "__board__") {
         setBoardPosition({
-          x: world.x - dragOffset.x,
-          y: world.y - dragOffset.y,
+          x: worldCoord.x - offset.x,
+          y: worldCoord.y - offset.y,
         });
       } else {
-        updateComponent(draggedComponentId, {
-          x: world.x - dragOffset.x,
-          y: world.y - dragOffset.y,
+        updateComponent(activeDragId, {
+          x: worldCoord.x - offset.x,
+          y: worldCoord.y - offset.y,
         } as any);
       }
+      // Skip hover detection while dragging
+      return;
     }
 
     // Handle wire creation preview
-    if (wireInProgress) {
-      const world = toWorld(e.clientX, e.clientY);
-      updateWireInProgress(world.x, world.y);
+    if (useSimulatorStore.getState().wireInProgress) {
+      const worldCoord = toWorld(e.clientX, e.clientY);
+      updateWirePreviewDOM(worldCoord.x, worldCoord.y);
       return;
     }
 
     // Handle segment handle dragging
     if (segmentDragRef.current) {
-      const world = toWorld(e.clientX, e.clientY);
+      const worldCoord = toWorld(e.clientX, e.clientY);
       const sd = segmentDragRef.current;
       sd.isDragging = true;
-      const newValue = sd.axis === "horizontal" ? world.y : world.x;
+      const newValue = sd.axis === "horizontal" ? worldCoord.y : worldCoord.x;
       const newPts = moveSegment(
         sd.renderedPts,
         sd.segIndex,
@@ -1121,19 +1166,24 @@ export const SimulatorCanvas = () => {
       return;
     }
 
-    // Wire hover detection (when not dragging anything)
-    if (!draggedComponentId) {
-      const world = toWorld(e.clientX, e.clientY);
+    // Wire hover detection — throttled to one rAF per frame so it doesn't
+    // saturate the render queue during fast mouse sweeps.
+    const cx = e.clientX;
+    const cy = e.clientY;
+    if (hoverRafRef.current !== null) return; // already scheduled this frame
+    hoverRafRef.current = requestAnimationFrame(() => {
+      hoverRafRef.current = null;
+      const worldCoord = toWorld(cx, cy);
       const threshold = 8 / zoomRef.current;
       const wire = findWireNearPoint(
         wiresRef.current,
-        world.x,
-        world.y,
+        worldCoord.x,
+        worldCoord.y,
         threshold,
       );
       setHoveredWireId(wire ? wire.id : null);
-    }
-  };
+    });
+  }, [toWorld, setBoardPosition, updateComponent, updateWirePreviewDOM]);
 
   const handleCanvasMouseUp = (e: React.MouseEvent) => {
     // Finish panning — commit ref value to state so React knows the final pan
@@ -1198,6 +1248,7 @@ export const SimulatorCanvas = () => {
       }
 
       recalculateAllWirePositions();
+      draggedComponentIdRef.current = null;
       setDraggedComponentId(null);
     }
   };
@@ -1305,7 +1356,7 @@ export const SimulatorCanvas = () => {
       setShowPropertyDialog(false);
     }
 
-    if (wireInProgress) {
+    if (useSimulatorStore.getState().wireInProgress) {
       // Finish wire: connect to this pin
       finishWireCreation({ componentId, pinName, x, y });
       trackCreateWire();
@@ -1319,7 +1370,7 @@ export const SimulatorCanvas = () => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Escape → cancel in-progress wire
-      if (e.key === "Escape" && wireInProgress) {
+      if (e.key === "Escape" && useSimulatorStore.getState().wireInProgress) {
         cancelWireCreation();
         return;
       }
@@ -1331,7 +1382,7 @@ export const SimulatorCanvas = () => {
       // Color shortcuts (0-9, c, l, m, p, y) — Wokwi style
       const key = e.key.toLowerCase();
       if (key in WIRE_KEY_COLORS) {
-        if (wireInProgress) {
+        if (useSimulatorStore.getState().wireInProgress) {
           setWireInProgressColor(WIRE_KEY_COLORS[key]);
         } else if (selectedWireId) {
           updateWire(selectedWireId, { color: WIRE_KEY_COLORS[key] });
@@ -1770,6 +1821,7 @@ export const SimulatorCanvas = () => {
           onMouseLeave={() => {
             isPanningRef.current = false;
             setPan({ ...panRef.current });
+            draggedComponentIdRef.current = null;
             setDraggedComponentId(null);
           }}
           onContextMenu={(e) => {
@@ -1873,8 +1925,12 @@ export const SimulatorCanvas = () => {
                   setClickStartTime(Date.now());
                   setClickStartPos({ x: e.clientX, y: e.clientY });
                   const world = toWorld(e.clientX, e.clientY);
-                  setDraggedComponentId(`__board__:${board.id}`);
-                  setDragOffset({ x: world.x - board.x, y: world.y - board.y });
+                  const boardDragId = `__board__:${board.id}`;
+                  const boardOffset = { x: world.x - board.x, y: world.y - board.y };
+                  draggedComponentIdRef.current = boardDragId;
+                  dragOffsetRef.current = boardOffset;
+                  setDraggedComponentId(boardDragId);
+                  setDragOffset(boardOffset);
                 }}
                 onContextMenu={(e) => {
                   e.preventDefault();
@@ -1897,12 +1953,7 @@ export const SimulatorCanvas = () => {
           </div>
 
           {/* Wire creation mode banner — visible on both desktop and mobile */}
-          {wireInProgress && (
-            <div className="wire-mode-banner">
-              <span>Tap a pin to connect — tap canvas for waypoints</span>
-              <button onClick={() => cancelWireCreation()}>Cancel</button>
-            </div>
-          )}
+        
         </div>
       </div>
 
