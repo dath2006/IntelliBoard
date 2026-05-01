@@ -90,6 +90,7 @@ interface ParsedComponent {
     defaultValue?: any;
   }>;
   pinCount: number;
+  pinNames: string[];
 }
 
 class MetadataGenerator {
@@ -298,6 +299,7 @@ class MetadataGenerator {
       })),
       defaultValues: this.extractDefaultValues(parsed.properties),
       pinCount: parsed.pinCount,
+      pinNames: parsed.pinNames.length > 0 ? parsed.pinNames : undefined,
       tags: this.generateTags(id, storiesMetadata?.name || ''),
     };
   }
@@ -310,6 +312,7 @@ class MetadataGenerator {
     let className = '';
     const properties: ParsedComponent['properties'] = [];
     let pinCount = 0;
+    const pinNames: string[] = [];
 
     const visit = (node: ts.Node) => {
       // Find @customElement decorator
@@ -358,6 +361,33 @@ class MetadataGenerator {
                 defaultValue: resolvedDefault,
               });
             }
+
+            // Pins declared as a class field:
+            //   readonly pinInfo: ElementPin[] = [ { name: '1.l', ... }, ... ]
+            // Many wokwi-elements use this form (e.g. pushbutton) instead of a getter.
+            const memberName = member.name.getText();
+            if (memberName === 'pinInfo' && member.initializer && ts.isArrayLiteralExpression(member.initializer)) {
+              const arr = member.initializer;
+              const seen = new Set<string>();
+              let count = 0;
+              for (const el of arr.elements) {
+                if (!ts.isObjectLiteralExpression(el)) continue;
+                count++;
+                for (const prop of el.properties) {
+                  if (!ts.isPropertyAssignment(prop)) continue;
+                  const key = prop.name.getText(sourceFile).replace(/['"]/g, '');
+                  if (key !== 'name') continue;
+                  if (ts.isStringLiteral(prop.initializer) || ts.isNoSubstitutionTemplateLiteral(prop.initializer)) {
+                    const n = prop.initializer.text;
+                    if (!seen.has(n)) {
+                      seen.add(n);
+                      pinNames.push(n);
+                    }
+                  }
+                }
+              }
+              if (count > 0) pinCount = Math.max(pinCount, count);
+            }
           }
 
           // Count pins from pinInfo getter
@@ -365,11 +395,27 @@ class MetadataGenerator {
             const accessorName = member.name.getText();
             if (accessorName === 'pinInfo') {
               const bodyText = member.body?.getText() || '';
-              // Count array elements in return statement
-              const matches = bodyText.match(/\{[^}]+\}/g);
-              if (matches) {
-                pinCount = matches.length;
+              // Extract pin names from object literals: { name: 'A', ... }
+              const nameRegex = /name:\s*['"]([^'"]+)['"]/g;
+              const seen = new Set<string>();
+              let m: RegExpExecArray | null;
+              while ((m = nameRegex.exec(bodyText)) !== null) {
+                const name = m[1];
+                if (!seen.has(name)) {
+                  seen.add(name);
+                  pinNames.push(name);
+                }
               }
+
+              // Compute a more accurate pinCount:
+              // take the maximum number of name entries across each `return [ ... ]` branch.
+              const returnBlocks = bodyText.match(/return\s*\[[\s\S]*?\];/g) ?? [];
+              let maxPins = 0;
+              for (const block of returnBlocks) {
+                const namesInBlock = block.match(/name:\s*['"][^'"]+['"]/g) ?? [];
+                maxPins = Math.max(maxPins, namesInBlock.length);
+              }
+              if (maxPins > 0) pinCount = maxPins;
             }
           }
         });
@@ -382,7 +428,7 @@ class MetadataGenerator {
 
     if (!tagName || !className) return null;
 
-    return { tagName, className, properties, pinCount };
+    return { tagName, className, properties, pinCount, pinNames };
   }
 
   /**

@@ -21,6 +21,7 @@ class Project(Base):
     code: Mapped[str] = mapped_column(Text, default="")
     components_json: Mapped[str] = mapped_column(Text, default="[]")
     wires_json: Mapped[str] = mapped_column(Text, default="[]")
+    snapshot_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=lambda: datetime.now(timezone.utc)
     )

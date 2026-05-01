@@ -98,6 +98,11 @@ export const SimulatorCanvas = () => {
   const updateWire = useSimulatorStore((s) => s.updateWire);
   const wires = useSimulatorStore((s) => s.wires);
 
+  // Recalculate when the wire set changes (agent snapshots can add wires without
+  // touching components, leaving start/end x/y undefined until we resolve pinInfo).
+  // Use a stable key based on IDs to avoid infinite loops when we only update x/y.
+  const wireIdKey = React.useMemo(() => wires.map((w) => w.id).join('|'), [wires]);
+
   // Oscilloscope
   const oscilloscopeOpen = useOscilloscopeStore((s) => s.open);
   const toggleOscilloscope = useOscilloscopeStore((s) => s.toggleOscilloscope);
@@ -1246,6 +1251,16 @@ export const SimulatorCanvas = () => {
 
     return () => timers.forEach((t) => clearTimeout(t));
   }, [components, recalculateAllWirePositions]);
+
+  // Recalculate wire positions when wires are added/removed via snapshots/imports.
+  // This fixes invisible wires when endpoints have no x/y yet.
+  useEffect(() => {
+    if (!wireIdKey) return;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    timers.push(setTimeout(() => recalculateAllWirePositions(), 0));
+    timers.push(setTimeout(() => recalculateAllWirePositions(), 120));
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, [wireIdKey, recalculateAllWirePositions]);
 
   // Auto-pan to keep the board and all components visible after a project import/load.
   // We track the previous component count and only re-center when the count

@@ -18,6 +18,7 @@ class ProjectCreateRequest(BaseModel):
     code: str = ""  # legacy single-file fallback
     components_json: str = "[]"
     wires_json: str = "[]"
+    snapshot_json: str | None = None
 
 
 class ProjectUpdateRequest(BaseModel):
@@ -29,6 +30,7 @@ class ProjectUpdateRequest(BaseModel):
     code: str | None = None  # legacy
     components_json: str | None = None
     wires_json: str | None = None
+    snapshot_json: str | None = None
 
 
 class ProjectResponse(BaseModel):
@@ -44,6 +46,7 @@ class ProjectResponse(BaseModel):
     code: str
     components_json: str
     wires_json: str
+    snapshot_json: str | None = None
     owner_username: str
     created_at: datetime
     updated_at: datetime

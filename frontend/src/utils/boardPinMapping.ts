@@ -216,6 +216,7 @@ export const BOARD_COMPONENT_IDS = [
   'raspberry-pi-pico',
   'pi-pico-w',
   'esp32',
+  'esp32-devkit-v1',
   'esp32-devkit-c-v4',
   'esp32-cam',
   'wemos-lolin32-lite',
@@ -232,7 +233,52 @@ export const BOARD_COMPONENT_IDS = [
  * Check whether a componentId represents a board (not an external component).
  */
 export function isBoardComponent(componentId: string): boolean {
-  return BOARD_COMPONENT_IDS.some((id) => componentId === id || componentId.startsWith(id));
+  const cid = (componentId || '').toLowerCase();
+  if (!cid) return false;
+  if (BOARD_COMPONENT_IDS.some((id) => cid === id || cid.startsWith(`${id}-`) || cid.startsWith(id))) {
+    return true;
+  }
+  // Generic families to avoid brittle hardcoded lists for future board ids.
+  if (cid.startsWith('esp32') || cid.startsWith('wokwi-esp32')) return true;
+  if (cid.startsWith('arduino-')) return true;
+  if (cid.startsWith('raspberry-pi-') || cid.startsWith('pi-pico')) return true;
+  if (cid.includes('attiny')) return true;
+  return false;
+}
+
+/**
+ * Normalizes board pin aliases into canonical names used by simulation helpers.
+ * Keeps behavior conservative: only applies obvious, lossless alias rewrites.
+ */
+export function normalizeBoardPinName(boardId: string, pinName: string): string {
+  const raw = pinName.trim();
+  if (!raw) return raw;
+
+  // Common power-pin aliases used in snapshot/tool output (e.g. GND1 -> GND.1)
+  const dottedPower = raw.match(/^(GND|VCC|VIN|3V3|5V)(\d+)$/i);
+  if (dottedPower) {
+    return `${dottedPower[1].toUpperCase()}.${dottedPower[2]}`;
+  }
+
+  // Arduino boards often come as D13 while runtime wiring often stores "13".
+  if (
+    (boardId === 'arduino-uno' || boardId === 'arduino-nano' || boardId === 'arduino-mega') &&
+    /^D\d+$/i.test(raw)
+  ) {
+    return String(parseInt(raw.substring(1), 10));
+  }
+
+  // RP2040 aliases sometimes arrive as GPIOx, while mapping expects GPx.
+  if ((boardId === 'raspberry-pi-pico' || boardId === 'pi-pico-w' || boardId === 'nano-rp2040') && /^GPIO\d+$/i.test(raw)) {
+    return `GP${parseInt(raw.substring(4), 10)}`;
+  }
+
+  // ATtiny pins should remain PBn.
+  if ((boardId === 'attiny85' || boardId.startsWith('attiny85')) && /^PB\d+$/i.test(raw)) {
+    return `PB${parseInt(raw.substring(2), 10)}`;
+  }
+
+  return raw;
 }
 
 /**
@@ -244,6 +290,8 @@ export function isBoardComponent(componentId: string): boolean {
  * @returns Numeric pin/GPIO number, or null if unmapped
  */
 export function boardPinToNumber(boardId: string, pinName: string): number | null {
+  pinName = normalizeBoardPinName(boardId, pinName);
+
   if (boardId === 'arduino-uno' || boardId === 'arduino-nano') {
     // Power / GND pins — not real GPIOs, skip silently
     if (/^(GND|VCC|VIN|IOREF|AREF|RESET|3\.3V|3V3|5V|3V)/.test(pinName)) return -1;

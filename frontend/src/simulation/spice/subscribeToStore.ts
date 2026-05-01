@@ -181,7 +181,7 @@ function collectPinStates(
   return result;
 }
 
-const SPICE_DEBUG = true;
+const SPICE_DEBUG = false;
 const spiceLog = (...a: unknown[]) => {
   if (SPICE_DEBUG) console.log('[spice]', ...a);
 };

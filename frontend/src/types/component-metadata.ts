@@ -40,6 +40,8 @@ export interface ComponentMetadata {
   properties: PropertyDescriptor[];
   defaultValues: Record<string, any>;
   pinCount: number;
+  /** Optional explicit pin names for editor/agent resolution */
+  pinNames?: string[];
   tags: string[]; // For search functionality
 }
 

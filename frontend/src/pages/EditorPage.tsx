@@ -9,6 +9,8 @@ import { CodeEditor } from '../components/editor/CodeEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { FileTabs } from '../components/editor/FileTabs';
 import { FileExplorer } from '../components/editor/FileExplorer';
+import { AgentPanel } from '../components/agent/AgentPanel';
+import { AgentPanelToggle } from '../components/agent/AgentPanelToggle';
 
 // Lazy-load Pi workspace so xterm.js isn't in the main bundle
 const RaspberryPiWorkspace = lazy(() =>
@@ -27,6 +29,7 @@ import { GitHubStarBanner } from '../components/layout/GitHubStarBanner';
 import { useSimulatorStore } from '../store/useSimulatorStore';
 import { useOscilloscopeStore } from '../store/useOscilloscopeStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { agentPanelBounds, useAgentStore } from '../store/useAgentStore';
 import type { CompilationLog } from '../utils/compilationLogger';
 import '../App.css';
 
@@ -126,6 +129,10 @@ export const EditorPage: React.FC = () => {
   // Default to 'code' on mobile — show the editor so users can write/view code
   const [mobileView, setMobileView] = useState<'code' | 'circuit'>('code');
   const user = useAuthStore((s) => s.user);
+  const agentPanelOpen = useAgentStore((s) => s.panelOpen);
+  const agentPanelWidth = useAgentStore((s) => s.panelWidth);
+  const setAgentPanelWidth = useAgentStore((s) => s.setPanelWidth);
+  const toggleAgentPanel = useAgentStore((s) => s.togglePanel);
 
   const handleSaveClick = useCallback(() => {
     if (!user) {
@@ -248,6 +255,34 @@ export const EditorPage: React.FC = () => {
     [explorerWidth],
   );
 
+  const handleAgentPanelResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      const startX = e.clientX;
+      const startWidth = agentPanelWidth;
+
+      const onMove = (ev: MouseEvent) => {
+        const delta = startX - ev.clientX;
+        const next = Math.max(
+          agentPanelBounds.min,
+          Math.min(agentPanelBounds.max, startWidth + delta),
+        );
+        setAgentPanelWidth(next);
+      };
+      const onUp = () => {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+      };
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    },
+    [agentPanelWidth, setAgentPanelWidth],
+  );
+
   return (
     <div className="app">
       <AppHeader />
@@ -355,6 +390,7 @@ export const EditorPage: React.FC = () => {
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
                 </svg>
               </button>
+              <AgentPanelToggle open={agentPanelOpen} onToggle={toggleAgentPanel} />
               <div style={{ flex: 1 }}>
                 <EditorToolbar
                   consoleOpen={consoleOpen}
@@ -450,6 +486,17 @@ export const EditorPage: React.FC = () => {
             </>
           )}
         </div>
+
+        {!isMobile && agentPanelOpen && (
+          <>
+            <div className="agent-panel-resize-handle" onMouseDown={handleAgentPanelResizeMouseDown}>
+              <div className="resize-handle-grip" />
+            </div>
+            <div className="agent-panel-shell" style={{ width: agentPanelWidth }}>
+              <AgentPanel />
+            </div>
+          </>
+        )}
       </div>
 
       {saveModalOpen && <SaveProjectModal onClose={() => setSaveModalOpen(false)} />}

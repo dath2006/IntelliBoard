@@ -52,6 +52,7 @@ class ESPIDFCompiler:
         # Try common locations on Windows dev machines
         if not self.idf_path:
             for candidate in [
+                r'C:\esp\.espressif\v5.5.4\esp-idf',
                 r'C:\Espressif\frameworks\esp-idf-v4.4.7',
                 r'C:\esp\esp-idf',
                 '/opt/esp-idf',

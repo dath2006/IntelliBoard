@@ -23,6 +23,7 @@ import { isBoardComponent, boardPinToNumber } from '../utils/boardPinMapping';
 // <velxio-instr-voltmeter>) that don't exist upstream.
 import '@wokwi/elements';
 import '../velxio-elements';
+import { reportPinInfoObservation } from '../services/agentPinCatalog';
 
 interface DynamicComponentProps {
   id: string;
@@ -131,6 +132,40 @@ export const DynamicComponent: React.FC<DynamicComponentProps> = ({
       clearTimeout(timeout);
     };
   }, [onPinInfoReady]);
+
+  /**
+   * Report runtime pinInfo to backend agent catalog (best effort).
+   * This lets the agent learn real pin names from live web components instead
+   * of relying only on static metadata.
+   */
+  useEffect(() => {
+    if (!elementRef.current) return;
+
+    const tryReport = () => {
+      const pinInfo = (elementRef.current as any)?.pinInfo as Array<{ name?: string }> | undefined;
+      if (!pinInfo || !Array.isArray(pinInfo) || pinInfo.length === 0) return false;
+      const pinNames = pinInfo.map((p) => String(p?.name ?? '')).filter(Boolean);
+      if (pinNames.length === 0) return false;
+
+      const signature = Object.entries(properties)
+        .filter(([, v]) => ['string', 'number', 'boolean'].includes(typeof v))
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([k, v]) => `${k}=${String(v)}`)
+        .join(';');
+
+      void reportPinInfoObservation({
+        metadataId: metadata.id,
+        tagName: metadata.tagName,
+        pinNames,
+        propertySignature: signature || undefined,
+      });
+      return true;
+    };
+
+    if (tryReport()) return;
+    const t = setTimeout(tryReport, 120);
+    return () => clearTimeout(t);
+  }, [metadata.id, metadata.tagName, properties]);
 
   /**
    * Handle mouse events

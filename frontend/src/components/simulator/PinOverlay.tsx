@@ -72,10 +72,14 @@ export const PinOverlay: React.FC<PinOverlayProps> = ({
     return null;
   }
 
-  // On touch devices, compute world-space size so the pin is at least
-  // TOUCH_MIN_SCREEN_PX on screen.  On desktop, keep the original 12px.
-  const pinSize = isTouchDevice ? Math.max(PIN_VISUAL, TOUCH_MIN_SCREEN_PX / zoom) : PIN_VISUAL;
-  const pinHalf = pinSize / 2;
+  // hitTargetSize is the invisible touch area. On touch devices, we scale it up 
+  // inversely to zoom so the screen-space tap area stays at least TOUCH_MIN_SCREEN_PX.
+  const hitTargetSize = isTouchDevice ? Math.max(PIN_VISUAL, TOUCH_MIN_SCREEN_PX / zoom) : PIN_VISUAL;
+  const hitTargetHalf = hitTargetSize / 2;
+
+  // visualSize is the visible dot. We keep it fixed in world pixels so it 
+  // correctly "resizes" (scales) with the component as the user zooms.
+  const visualSize = Math.min(PIN_VISUAL, 10);
 
   return (
     <div
@@ -116,28 +120,48 @@ export const PinOverlay: React.FC<PinOverlayProps> = ({
             }}
             style={{
               position: 'absolute',
-              left: `${pinX - pinHalf}px`,
-              top: `${pinY - pinHalf}px`,
-              width: `${pinSize}px`,
-              height: `${pinSize}px`,
-              borderRadius: '3px',
-              backgroundColor: 'rgba(0, 200, 255, 0.8)',
-              border: '1.5px solid white',
+              left: `${pinX - hitTargetHalf}px`,
+              top: `${pinY - hitTargetHalf}px`,
+              width: `${hitTargetSize}px`,
+              height: `${hitTargetSize}px`,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               cursor: 'crosshair',
               pointerEvents: 'all',
-              transition: 'all 0.15s',
               touchAction: 'none',
+              background: 'transparent',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(0, 255, 100, 1)';
-              e.currentTarget.style.transform = 'scale(1.4)';
+              const indicator = e.currentTarget.querySelector('.pin-visual-indicator') as HTMLElement;
+              if (indicator) {
+                indicator.style.backgroundColor = 'rgba(0, 255, 100, 1)';
+                indicator.style.transform = 'scale(1.4)';
+              }
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(0, 200, 255, 0.8)';
-              e.currentTarget.style.transform = 'scale(1)';
+              const indicator = e.currentTarget.querySelector('.pin-visual-indicator') as HTMLElement;
+              if (indicator) {
+                indicator.style.backgroundColor = 'rgba(0, 200, 255, 0.8)';
+                indicator.style.transform = 'scale(1)';
+              }
             }}
             title={pin.name}
-          />
+          >
+            <div
+              className="pin-visual-indicator"
+              style={{
+                width: `${visualSize}px`,
+                height: `${visualSize}px`,
+                borderRadius: '50%',
+                backgroundColor: 'rgba(0, 200, 255, 0.8)',
+                border: '1.5px solid white',
+                boxShadow: '0 0 4px rgba(0, 0, 0, 0.2)',
+                transition: 'all 0.15s ease-out',
+                pointerEvents: 'none',
+              }}
+            />
+          </div>
         );
       })}
     </div>

@@ -2,8 +2,14 @@ import logging
 import sys
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s %(name)s: %(message)s')
+
+# Load environment variables from .env file
+from dotenv import load_dotenv
+backend_dir = Path(__file__).parent.parent
+load_dotenv(backend_dir / '.env')
 
 # On Windows, asyncio defaults to SelectorEventLoop which does NOT support
 # create_subprocess_exec (raises NotImplementedError). Force ProactorEventLoop.
@@ -19,6 +25,7 @@ from app.api.routes.admin import router as admin_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.metrics import router as metrics_router
 from app.api.routes.projects import router as projects_router
+from app.api.routes.agent_sessions import router as agent_sessions_router
 from app.core.config import settings
 from app.database.session import Base, async_engine
 
@@ -26,6 +33,8 @@ from app.database.session import Base, async_engine
 import app.models.user  # noqa: F401
 import app.models.project  # noqa: F401
 import app.models.usage_event  # noqa: F401
+import app.models.agent_session  # noqa: F401
+import app.models.agent_session_event  # noqa: F401
 
 
 logger = logging.getLogger(__name__)
@@ -68,10 +77,23 @@ async def lifespan(_app: FastAPI):
             "ALTER TABLE projects ADD COLUMN update_count INTEGER NOT NULL DEFAULT 0",
             "ALTER TABLE projects ADD COLUMN last_compiled_at DATETIME",
             "ALTER TABLE projects ADD COLUMN last_run_at DATETIME",
+            "ALTER TABLE projects ADD COLUMN snapshot_json TEXT",
             # Country tracking (CF-IPCountry)
             "ALTER TABLE users ADD COLUMN signup_country VARCHAR(2)",
             "ALTER TABLE users ADD COLUMN last_country VARCHAR(2)",
             "ALTER TABLE usage_events ADD COLUMN country VARCHAR(2)",
+            # Agent sessions
+            "ALTER TABLE agent_sessions ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'queued'",
+            "ALTER TABLE agent_sessions ADD COLUMN model_name VARCHAR(120) NOT NULL DEFAULT 'openai:gpt-5.4-mini'",
+            "ALTER TABLE agent_sessions ADD COLUMN base_snapshot_json TEXT NOT NULL DEFAULT '{}'",
+            "ALTER TABLE agent_sessions ADD COLUMN draft_snapshot_json TEXT NOT NULL DEFAULT '{}'",
+            "ALTER TABLE agent_sessions ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE agent_sessions ADD COLUMN updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            "ALTER TABLE agent_session_events ADD COLUMN session_id VARCHAR NOT NULL DEFAULT ''",
+            "ALTER TABLE agent_session_events ADD COLUMN seq INTEGER NOT NULL DEFAULT 0",
+            "ALTER TABLE agent_session_events ADD COLUMN event_type VARCHAR(80) NOT NULL DEFAULT ''",
+            "ALTER TABLE agent_session_events ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}'",
+            "ALTER TABLE agent_session_events ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
         ]
         for stmt in legacy_migrations:
             try:
@@ -112,6 +134,7 @@ app.include_router(compile.router, prefix="/api/compile", tags=["compilation"])
 app.include_router(libraries.router, prefix="/api/libraries", tags=["libraries"])
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(projects_router, prefix="/api", tags=["projects"])
+app.include_router(agent_sessions_router, prefix="/api/agent", tags=["agent"])
 app.include_router(metrics_router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 

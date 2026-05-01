@@ -273,6 +273,22 @@ const ESP32_RISCV_KINDS = new Set<BoardKind>([
   'aitewinrobot-esp32c3-supermini',
 ]);
 
+function normalizeBoardKind(kind: string): BoardKind {
+  const raw = String(kind ?? '').trim().toLowerCase();
+  if (!raw) return 'arduino-uno';
+  if (raw === 'esp32-devkit-v1' || raw === 'wokwi-esp32-devkit-v1') return 'esp32';
+  if (raw === 'wokwi-esp32-s3') return 'esp32-s3';
+  if (raw === 'wokwi-esp32-c3') return 'esp32-c3';
+  if (raw === 'wokwi-pi-pico') return 'raspberry-pi-pico';
+  if (raw === 'wokwi-pi-pico-w') return 'pi-pico-w';
+  if (raw === 'wokwi-arduino-uno') return 'arduino-uno';
+  if (raw === 'wokwi-arduino-nano') return 'arduino-nano';
+  if (raw === 'wokwi-arduino-mega') return 'arduino-mega';
+  // Generic family fallback for unknown ESP32 variants
+  if (raw.startsWith('esp32')) return 'esp32';
+  return raw as BoardKind;
+}
+
 function isEsp32Kind(kind: BoardKind): boolean {
   return ESP32_KINDS.has(kind) || ESP32_RISCV_KINDS.has(kind);
 }
@@ -296,8 +312,19 @@ interface SimulatorState {
   boards: BoardInstance[];
   activeBoardId: string | null;
 
-  addBoard: (boardKind: BoardKind, x: number, y: number) => string;
+  addBoard: (boardKind: BoardKind, x: number, y: number, preferredId?: string) => string;
   removeBoard: (boardId: string) => void;
+  hydrateBoardsFromSnapshot: (
+    boards: Array<{
+      id: string;
+      boardKind: BoardKind;
+      x: number;
+      y: number;
+      languageMode?: LanguageMode;
+      activeFileGroupId?: string;
+    }>,
+    activeBoardId?: string | null,
+  ) => void;
   updateBoard: (boardId: string, updates: Partial<BoardInstance>) => void;
   setBoardPosition: (pos: { x: number; y: number }, boardId?: string) => void;
   setActiveBoardId: (boardId: string) => void;
@@ -493,9 +520,21 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     boards: [INITIAL_BOARD],
     activeBoardId: INITIAL_BOARD_ID,
 
-    addBoard: (boardKind: BoardKind, x: number, y: number) => {
+    addBoard: (boardKind: BoardKind, x: number, y: number, preferredId?: string) => {
+      boardKind = normalizeBoardKind(boardKind);
       const existing = get().boards.filter((b) => b.boardKind === boardKind);
-      const id = existing.length === 0 ? boardKind : `${boardKind}-${existing.length + 1}`;
+      let id = preferredId ?? (existing.length === 0 ? boardKind : `${boardKind}-${existing.length + 1}`);
+      if (get().boards.some((b) => b.id === id)) {
+        if (preferredId) {
+          let suffix = 2;
+          while (get().boards.some((b) => b.id === `${preferredId}-${suffix}`)) suffix += 1;
+          id = `${preferredId}-${suffix}`;
+        } else {
+          let suffix = existing.length + 2;
+          while (get().boards.some((b) => b.id === `${boardKind}-${suffix}`)) suffix += 1;
+          id = `${boardKind}-${suffix}`;
+        }
+      }
 
       const pm = new PinManager();
       pinManagerMap.set(id, pm);
@@ -600,6 +639,56 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       icBindBoard(id, boardKind);
       icUpdateWires(get().wires);
       return id;
+    },
+
+    hydrateBoardsFromSnapshot: (incomingBoards, incomingActiveBoardId = null) => {
+      const desiredIds = new Set(incomingBoards.map((b) => b.id));
+      const currentBoards = get().boards;
+
+      // Remove boards that no longer exist in the snapshot.
+      for (const board of currentBoards) {
+        if (!desiredIds.has(board.id)) {
+          get().removeBoard(board.id);
+        }
+      }
+
+      // Add missing boards and recreate boards whose kind changed.
+      for (const desired of incomingBoards) {
+        const desiredKind = normalizeBoardKind(desired.boardKind);
+        const existing = get().boards.find((b) => b.id === desired.id);
+        if (!existing) {
+          get().addBoard(desiredKind, desired.x, desired.y, desired.id);
+          continue;
+        }
+        if (existing.boardKind !== desiredKind) {
+          get().removeBoard(existing.id);
+          get().addBoard(desiredKind, desired.x, desired.y, desired.id);
+        }
+      }
+
+      // Apply positions and board metadata.
+      for (const desired of incomingBoards) {
+        const live = get().boards.find((b) => b.id === desired.id);
+        if (!live) continue;
+        const targetGroupId = desired.activeFileGroupId ?? `group-${desired.id}`;
+        get().updateBoard(desired.id, {
+          x: desired.x,
+          y: desired.y,
+          activeFileGroupId: targetGroupId,
+        });
+
+        if (desired.languageMode && desired.languageMode !== live.languageMode) {
+          get().setBoardLanguageMode(desired.id, desired.languageMode);
+        }
+      }
+
+      const nextActive =
+        (incomingActiveBoardId && get().boards.some((b) => b.id === incomingActiveBoardId)
+          ? incomingActiveBoardId
+          : incomingBoards[0]?.id) ?? null;
+      if (nextActive) {
+        get().setActiveBoardId(nextActive);
+      }
     },
 
     removeBoard: (boardId: string) => {
@@ -1439,11 +1528,23 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         const updatedWires = state.wires.map((wire) => {
           const updated = { ...wire };
           if (wire.start.componentId === componentId) {
-            const pos = calculatePinPosition(componentId, wire.start.pinName, compX, compY);
+            const pos = calculatePinPosition(
+              componentId,
+              wire.start.pinName,
+              compX,
+              compY,
+              board?.boardKind,
+            );
             if (pos) updated.start = { ...wire.start, x: pos.x, y: pos.y };
           }
           if (wire.end.componentId === componentId) {
-            const pos = calculatePinPosition(componentId, wire.end.pinName, compX, compY);
+            const pos = calculatePinPosition(
+              componentId,
+              wire.end.pinName,
+              compX,
+              compY,
+              board?.boardKind,
+            );
             if (pos) updated.end = { ...wire.end, x: pos.x, y: pos.y };
           }
           return updated;
@@ -1475,6 +1576,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           wire.start.pinName,
           startX,
           startY,
+          startBoard?.boardKind,
         );
         updated.start = startPos
           ? { ...wire.start, x: startPos.x, y: startPos.y }
@@ -1485,7 +1587,13 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         const endBoard = state.boards.find((b) => b.id === wire.end.componentId);
         const endX = endComp ? endComp.x + 4 : endBoard ? endBoard.x : state.boardPosition.x;
         const endY = endComp ? endComp.y + 6 : endBoard ? endBoard.y : state.boardPosition.y;
-        const endPos = calculatePinPosition(wire.end.componentId, wire.end.pinName, endX, endY);
+        const endPos = calculatePinPosition(
+          wire.end.componentId,
+          wire.end.pinName,
+          endX,
+          endY,
+          endBoard?.boardKind,
+        );
         updated.end = endPos
           ? { ...wire.end, x: endPos.x, y: endPos.y }
           : { ...wire.end, x: endX, y: endY };

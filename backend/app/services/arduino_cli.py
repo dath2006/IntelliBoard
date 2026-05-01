@@ -356,6 +356,23 @@ class ArduinoCLIService:
 
                         print(f"[ESP32] Build dir contents: {[f.name for f in build_dir.iterdir()]}")
 
+                        # Newer core versions may emit different filenames.
+                        if not bin_file.exists():
+                            app_candidates = [
+                                p for p in build_dir.glob("*.bin")
+                                if "bootloader" not in p.name and "partition" not in p.name and "merged" not in p.name
+                            ]
+                            if app_candidates:
+                                bin_file = app_candidates[0]
+                        if not bootloader_file.exists():
+                            boot_candidates = list(build_dir.glob("*.bootloader.bin"))
+                            if boot_candidates:
+                                bootloader_file = boot_candidates[0]
+                        if not partitions_file.exists():
+                            part_candidates = list(build_dir.glob("*.partitions.bin")) + list(build_dir.glob("*partition*.bin"))
+                            if part_candidates:
+                                partitions_file = part_candidates[0]
+
                         # Merge individual .bin files into a single 4MB flash image in pure Python.
                         # Flash layout differs by chip:
                         #   ESP32 / ESP32-S3 (Xtensa): 0x1000 bootloader | 0x8000 partitions | 0x10000 app
@@ -377,9 +394,9 @@ class ArduinoCLIService:
                                 merged_file.write_bytes(bytes(flash))
                                 print(f"[ESP32] Merged image: {merged_file.stat().st_size} bytes (bootloader @ 0x{bootloader_offset:04X})")
                             except Exception as e:
-                                print(f"[ESP32] Merge failed: {e} — falling back to raw app binary")
+                                print(f"[ESP32] Merge failed: {e}")
 
-                        target_file = merged_file if merged_file.exists() else (bin_file if bin_file.exists() else None)
+                        target_file = merged_file if merged_file.exists() else None
 
                         if target_file:
                             raw_bytes = target_file.read_bytes()
@@ -395,11 +412,15 @@ class ArduinoCLIService:
                                 "stderr": result.stderr
                             }
                         else:
-                            print(f"[ESP32] Binary file not found. Files: {list(build_dir.iterdir())}")
-                            print("=== ESP32 Compilation failed: binary not found ===\n")
+                            print(
+                                "[ESP32] Required merged image missing. "
+                                f"app={bin_file.exists()} bootloader={bootloader_file.exists()} "
+                                f"partitions={partitions_file.exists()} merged={merged_file.exists()}"
+                            )
+                            print("=== ESP32 Compilation failed: merged flash image not produced ===\n")
                             return {
                                 "success": False,
-                                "error": "ESP32 binary (.bin) not found after compilation",
+                                "error": "ESP32 merged flash image not produced (cannot boot in simulator)",
                                 "stdout": result.stdout,
                                 "stderr": result.stderr
                             }

@@ -12,6 +12,8 @@
  * Note: wokwi-elements pinInfo x/y are already in CSS pixels.
  */
 
+import { boardPinToNumber } from './boardPinMapping';
+
 /**
  * Calculates the absolute canvas position of a specific pin.
  *
@@ -26,6 +28,7 @@ export function calculatePinPosition(
   pinName: string,
   componentX: number,
   componentY: number,
+  boardKind?: string,
 ): { x: number; y: number } | null {
   // Get the DOM element
   const element = document.getElementById(componentId);
@@ -47,6 +50,16 @@ export function calculatePinPosition(
   if (!pin && !pinName.includes('.')) {
     pin = pinInfo.find((p: any) => p.name === `${pinName}.1`);
   }
+  // Fallback: case-insensitive match (agents frequently use lowercase pin names like
+  // "a".."g" / "dp" for 7-segment displays, while wokwi-elements expose "A".."G" / "DP")
+  if (!pin) {
+    const target = pinName.trim().toLowerCase();
+    pin = pinInfo.find((p: any) => String(p.name ?? '').trim().toLowerCase() === target);
+  }
+  if (!pin && !pinName.includes('.')) {
+    const target = `${pinName}.1`.trim().toLowerCase();
+    pin = pinInfo.find((p: any) => String(p.name ?? '').trim().toLowerCase() === target);
+  }
   // Fallback: GP-prefix → match description field (e.g. 'GP15' → description 'GPIO15')
   // Needed for Nano RP2040 Connect which uses D-prefix pin names but GPIO descriptions
   if (!pin && pinName.startsWith('GP')) {
@@ -55,6 +68,38 @@ export function calculatePinPosition(
       pin = pinInfo.find((p: any) => p.description === `GPIO${gpioNum}`);
     }
   }
+  if (!pin) {
+    // Fallback for board pins: resolve by electrical equivalence rather than
+    // raw pin label. This handles catalog/agent labels (e.g. "D2", "GND.1")
+    // when the rendered board element exposes a different naming style
+    // (e.g. "2", "GND", "GPIO2").
+    const lookupBoard = boardKind ?? componentId;
+    const targetNum = boardPinToNumber(lookupBoard, pinName);
+    if (targetNum !== null) {
+      // For GPIO pins, find a candidate that maps to the same numeric pin.
+      if (targetNum >= 0) {
+        pin = pinInfo.find((p: any) => {
+          const n = String(p?.name ?? '').trim();
+          if (!n) return false;
+          return boardPinToNumber(lookupBoard, n) === targetNum;
+        });
+      } else {
+        // Power/ground rails map to -1. Prefer same family (GND/3V3/5V/VIN/VCC),
+        // then pick first available rail pin as a graceful fallback.
+        const family = inferPowerFamily(pinName);
+        pin =
+          pinInfo.find((p: any) => {
+            const n = String(p?.name ?? '').trim();
+            return inferPowerFamily(n) === family;
+          }) ??
+          pinInfo.find((p: any) => {
+            const n = String(p?.name ?? '').trim();
+            return boardPinToNumber(lookupBoard, n) === -1;
+          });
+      }
+    }
+  }
+
   if (!pin) {
     console.warn(`[pinPositionCalculator] Pin ${pinName} not found on component ${componentId}`);
     console.warn(
@@ -69,6 +114,16 @@ export function calculatePinPosition(
   const pinY = componentY + pin.y;
 
   return { x: pinX, y: pinY };
+}
+
+function inferPowerFamily(pinName: string): 'gnd' | 'vcc' | 'vin' | '3v3' | '5v' | 'other' {
+  const n = String(pinName ?? '').trim().toUpperCase();
+  if (n.startsWith('GND')) return 'gnd';
+  if (n.startsWith('VCC') || n.startsWith('VDD')) return 'vcc';
+  if (n.startsWith('VIN')) return 'vin';
+  if (n.startsWith('3V3') || n.startsWith('3.3V')) return '3v3';
+  if (n.startsWith('5V')) return '5v';
+  return 'other';
 }
 
 /**

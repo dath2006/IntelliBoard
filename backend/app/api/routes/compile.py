@@ -87,44 +87,7 @@ async def compile_sketch(
     started = time.monotonic()
     response: CompileResponse
     try:
-        # ESP32 targets: use ESP-IDF compiler for QEMU-compatible output
-        if request.board_fqbn.startswith("esp32:") and espidf_compiler.available:
-            logger.info(f"[compile] Using ESP-IDF for {request.board_fqbn}")
-            result = await espidf_compiler.compile(files, request.board_fqbn)
-            response = CompileResponse(
-                success=result["success"],
-                hex_content=result.get("hex_content"),
-                binary_content=result.get("binary_content"),
-                binary_type=result.get("binary_type"),
-                has_wifi=result.get("has_wifi", False),
-                stdout=result.get("stdout", ""),
-                stderr=result.get("stderr", ""),
-                error=result.get("error"),
-            )
-        else:
-            # AVR, RP2040, and ESP32 fallback: use arduino-cli
-            core_status = await arduino_cli.ensure_core_for_board(request.board_fqbn)
-            core_log = core_status.get("log", "")
-
-            if core_status.get("needed") and not core_status.get("installed"):
-                response = CompileResponse(
-                    success=False,
-                    stdout="",
-                    stderr=core_log,
-                    error=f"Failed to install required core: {core_status.get('core_id')}",
-                )
-            else:
-                result = await arduino_cli.compile(files, request.board_fqbn)
-                response = CompileResponse(
-                    success=result["success"],
-                    hex_content=result.get("hex_content"),
-                    binary_content=result.get("binary_content"),
-                    binary_type=result.get("binary_type"),
-                    stdout=result.get("stdout", ""),
-                    stderr=result.get("stderr", ""),
-                    error=result.get("error"),
-                    core_install_log=core_log if core_log else None,
-                )
+        response = await compile_files(files, request.board_fqbn)
     except Exception as e:
         # Even on hard failure we want the metric.
         await record_compile(
@@ -154,6 +117,48 @@ async def compile_sketch(
         request=http_request,
     )
     return response
+
+
+async def compile_files(files: list[dict[str, str]], board_fqbn: str) -> CompileResponse:
+    """Compile files without metrics or HTTP concerns; shared by API and agent tools."""
+    # ESP32 targets: use ESP-IDF compiler for QEMU-compatible output
+    if board_fqbn.startswith("esp32:") and espidf_compiler.available:
+        logger.info(f"[compile] Using ESP-IDF for {board_fqbn}")
+        result = await espidf_compiler.compile(files, board_fqbn)
+        return CompileResponse(
+            success=result["success"],
+            hex_content=result.get("hex_content"),
+            binary_content=result.get("binary_content"),
+            binary_type=result.get("binary_type"),
+            has_wifi=result.get("has_wifi", False),
+            stdout=result.get("stdout", ""),
+            stderr=result.get("stderr", ""),
+            error=result.get("error"),
+        )
+
+    # AVR, RP2040, and ESP32 fallback: use arduino-cli
+    core_status = await arduino_cli.ensure_core_for_board(board_fqbn)
+    core_log = core_status.get("log", "")
+
+    if core_status.get("needed") and not core_status.get("installed"):
+        return CompileResponse(
+            success=False,
+            stdout="",
+            stderr=core_log,
+            error=f"Failed to install required core: {core_status.get('core_id')}",
+        )
+
+    result = await arduino_cli.compile(files, board_fqbn)
+    return CompileResponse(
+        success=result["success"],
+        hex_content=result.get("hex_content"),
+        binary_content=result.get("binary_content"),
+        binary_type=result.get("binary_type"),
+        stdout=result.get("stdout", ""),
+        stderr=result.get("stderr", ""),
+        error=result.get("error"),
+        core_install_log=core_log if core_log else None,
+    )
 
 
 @router.get("/setup-status")

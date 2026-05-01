@@ -638,7 +638,94 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
+      "pinCount": 85,
+      "pinNames": [
+        "SCL",
+        "SDA",
+        "AREF",
+        "GND.1",
+        "13",
+        "12",
+        "11",
+        "10",
+        "9",
+        "8",
+        "7",
+        "6",
+        "5",
+        "4",
+        "3",
+        "2",
+        "1",
+        "0",
+        "14",
+        "15",
+        "16",
+        "17",
+        "18",
+        "19",
+        "20",
+        "21",
+        "5V.1",
+        "5V.2",
+        "22",
+        "23",
+        "24",
+        "25",
+        "26",
+        "27",
+        "28",
+        "29",
+        "30",
+        "31",
+        "32",
+        "33",
+        "34",
+        "35",
+        "36",
+        "37",
+        "38",
+        "39",
+        "40",
+        "41",
+        "42",
+        "43",
+        "44",
+        "45",
+        "46",
+        "47",
+        "48",
+        "49",
+        "50",
+        "51",
+        "52",
+        "53",
+        "GND.4",
+        "GND.5",
+        "IOREF",
+        "RESET",
+        "3.3V",
+        "5V",
+        "GND.2",
+        "GND.3",
+        "VIN",
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "A11",
+        "A12",
+        "A13",
+        "A14",
+        "A15"
+      ],
       "tags": [
         "arduino-mega",
         "arduino mega",
@@ -691,7 +778,45 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
+      "pinCount": 36,
+      "pinNames": [
+        "12",
+        "11",
+        "10",
+        "9",
+        "8",
+        "7",
+        "6",
+        "5",
+        "4",
+        "3",
+        "2",
+        "GND.2",
+        "RESET.2",
+        "0",
+        "1",
+        "13",
+        "3.3V",
+        "AREF",
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "5V",
+        "RESET",
+        "GND.1",
+        "VIN",
+        "12.2",
+        "5V.2",
+        "13.2",
+        "11.2",
+        "RESET.3",
+        "GND.3"
+      ],
       "tags": [
         "arduino-nano",
         "arduino nano",
@@ -744,7 +869,40 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
+      "pinCount": 31,
+      "pinNames": [
+        "A5.2",
+        "A4.2",
+        "AREF",
+        "GND.1",
+        "13",
+        "12",
+        "11",
+        "10",
+        "9",
+        "8",
+        "7",
+        "6",
+        "5",
+        "4",
+        "3",
+        "2",
+        "1",
+        "0",
+        "IOREF",
+        "RESET",
+        "3.3V",
+        "5V",
+        "GND.2",
+        "GND.3",
+        "VIN",
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
       "tags": [
         "arduino-uno",
         "arduino uno",
@@ -776,7 +934,39 @@
         "led1": false,
         "ledPower": false
       },
-      "pinCount": 0,
+      "pinCount": 30,
+      "pinNames": [
+        "VIN",
+        "GND.2",
+        "D13",
+        "D12",
+        "D14",
+        "D27",
+        "D26",
+        "D25",
+        "D33",
+        "D32",
+        "D35",
+        "D34",
+        "VN",
+        "VP",
+        "EN",
+        "3V3",
+        "GND.1",
+        "D15",
+        "D2",
+        "D4",
+        "RX2",
+        "TX2",
+        "D5",
+        "D18",
+        "D19",
+        "D21",
+        "RX0",
+        "TX0",
+        "D22",
+        "D23"
+      ],
       "tags": [
         "esp32-devkit-v1",
         "esp32 devkit v1",
@@ -809,7 +999,18 @@
         "flipHorizontal": false,
         "flipVertical": false
       },
-      "pinCount": 0,
+      "pinCount": 9,
+      "pinNames": [
+        "VCC",
+        "GND",
+        "CS",
+        "RST",
+        "D/C",
+        "MOSI",
+        "SCK",
+        "LED",
+        "MISO"
+      ],
       "tags": [
         "ili9341"
       ]
@@ -965,7 +1166,29 @@
         "pins": "full",
         "screenOnly": false
       },
-      "pinCount": 21,
+      "pinCount": 16,
+      "pinNames": [
+        "GND",
+        "VCC",
+        "SDA",
+        "SCL",
+        "VSS",
+        "VDD",
+        "V0",
+        "RS",
+        "RW",
+        "E",
+        "D0",
+        "D1",
+        "D2",
+        "D3",
+        "D4",
+        "D5",
+        "D6",
+        "D7",
+        "A",
+        "K"
+      ],
       "tags": [
         "lcd1602"
       ]
@@ -1010,7 +1233,17 @@
       "defaultValues": {
         "protocol": "i2c"
       },
-      "pinCount": 0,
+      "pinCount": 8,
+      "pinNames": [
+        "DATA",
+        "CLK",
+        "DC",
+        "RST",
+        "CS",
+        "3V3",
+        "VIN",
+        "GND"
+      ],
       "tags": [
         "ssd1306"
       ]
@@ -1120,7 +1353,25 @@
           0
         ]
       },
-      "pinCount": 0,
+      "pinCount": 16,
+      "pinNames": [
+        "1a",
+        "2a",
+        "3a",
+        "4a",
+        "5a",
+        "6a",
+        "7a",
+        "8a",
+        "8b",
+        "7b",
+        "6b",
+        "5b",
+        "4b",
+        "3b",
+        "2b",
+        "1b"
+      ],
       "tags": [
         "dip-switch-8",
         "dip switch 8",
@@ -1194,7 +1445,17 @@
           "D"
         ]
       },
-      "pinCount": 15,
+      "pinCount": 8,
+      "pinNames": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ],
       "tags": [
         "membrane-keypad",
         "membrane keypad",
@@ -1254,7 +1515,12 @@
         "startDegree": -135,
         "endDegree": 135
       },
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "GND",
+        "SIG",
+        "VCC"
+      ],
       "tags": [
         "potentiometer"
       ]
@@ -1297,7 +1563,13 @@
         "label": "",
         "xray": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "1.l",
+        "2.l",
+        "1.r",
+        "2.r"
+      ],
       "tags": [
         "pushbutton"
       ]
@@ -1319,7 +1591,12 @@
       "defaultValues": {
         "value": 0
       },
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "1",
+        "2",
+        "3"
+      ],
       "tags": [
         "slide-switch",
         "slide switch",
@@ -1858,7 +2135,17 @@
         "innerHandColor": "silver",
         "innerHandShape": "plain"
       },
-      "pinCount": 9,
+      "pinCount": 8,
+      "pinNames": [
+        "A1-",
+        "A1+",
+        "B1+",
+        "B1-",
+        "A2-",
+        "A2+",
+        "B2+",
+        "B2-"
+      ],
       "tags": [
         "biaxial-stepper",
         "biaxial stepper",
@@ -1898,7 +2185,12 @@
         "horn": "single",
         "hornColor": "#ccc"
       },
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "GND",
+        "V+",
+        "PWM"
+      ],
       "tags": [
         "servo"
       ]
@@ -1946,7 +2238,13 @@
         "value": "",
         "units": ""
       },
-      "pinCount": 4,
+      "pinCount": 0,
+      "pinNames": [
+        "A-",
+        "A+",
+        "B+",
+        "B-"
+      ],
       "tags": [
         "stepper-motor",
         "stepper motor",
@@ -2038,7 +2336,25 @@
           0
         ]
       },
-      "pinCount": 47,
+      "pinCount": 14,
+      "pinNames": [
+        "A",
+        "B",
+        "C",
+        "D",
+        "E",
+        "F",
+        "G",
+        "DP",
+        "DIG1",
+        "DIG2",
+        "DIG3",
+        "DIG4",
+        "COM",
+        "CLN",
+        "COM.1",
+        "COM.2"
+      ],
       "tags": [
         "7segment",
         "7 segment",
@@ -2077,7 +2393,14 @@
         "yValue": 0,
         "pressed": false
       },
-      "pinCount": 0,
+      "pinCount": 5,
+      "pinNames": [
+        "VCC",
+        "VERT",
+        "HORZ",
+        "SEL",
+        "GND"
+      ],
       "tags": [
         "analog-joystick",
         "analog joystick",
@@ -2109,7 +2432,13 @@
         "led1": false,
         "led2": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "AOUT",
+        "GND",
+        "VCC",
+        "DOUT"
+      ],
       "tags": [
         "big-sound-sensor",
         "big sound sensor",
@@ -2126,7 +2455,14 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DS1307\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 5,
+      "pinNames": [
+        "GND",
+        "5V",
+        "SDA",
+        "SCL",
+        "SQW"
+      ],
       "tags": [
         "ds1307"
       ]
@@ -2155,7 +2491,13 @@
         "ledPower": false,
         "ledSignal": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "VCC",
+        "GND",
+        "DOUT",
+        "AOUT"
+      ],
       "tags": [
         "flame-sensor",
         "flame sensor",
@@ -2187,7 +2529,13 @@
         "ledPower": false,
         "ledD0": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "AOUT",
+        "DOUT",
+        "GND",
+        "VCC"
+      ],
       "tags": [
         "gas-sensor",
         "gas sensor",
@@ -2203,7 +2551,12 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        HEART-BEAT-SENSOR\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "GND",
+        "VCC",
+        "OUT"
+      ],
       "tags": [
         "heart-beat-sensor",
         "heart beat sensor",
@@ -2226,7 +2579,13 @@
         }
       ],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "VCC",
+        "DT",
+        "SCK",
+        "GND"
+      ],
       "tags": [
         "hx711"
       ]
@@ -2239,7 +2598,17 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        KS2E-M-DC5\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 8,
+      "pinNames": [
+        "NO2",
+        "NC2",
+        "P2",
+        "COIL2",
+        "NO1",
+        "NC1",
+        "P1",
+        "COIL1"
+      ],
       "tags": [
         "ks2e-m-dc5",
         "ks2e",
@@ -2278,7 +2647,14 @@
         "stepSize": 18,
         "pressed": false
       },
-      "pinCount": 0,
+      "pinCount": 5,
+      "pinNames": [
+        "CLK",
+        "DT",
+        "SW",
+        "VCC",
+        "GND"
+      ],
       "tags": [
         "ky-040",
         "ky040",
@@ -2324,7 +2700,13 @@
         "background": "#363",
         "animation": false
       },
-      "pinCount": 5,
+      "pinCount": 4,
+      "pinNames": [
+        "GND",
+        "VCC",
+        "DIN",
+        "DOUT"
+      ],
       "tags": [
         "led-ring",
         "led ring",
@@ -2340,7 +2722,16 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        MICROSD-CARD\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 7,
+      "pinNames": [
+        "CD",
+        "DO",
+        "GND",
+        "SCK",
+        "VCC",
+        "DI",
+        "CS"
+      ],
       "tags": [
         "microsd-card",
         "microsd card",
@@ -2393,7 +2784,39 @@
         "ledBuiltIn": false,
         "ledPower": false
       },
-      "pinCount": 0,
+      "pinCount": 30,
+      "pinNames": [
+        "D12",
+        "D11",
+        "D10",
+        "D9",
+        "D8",
+        "D7",
+        "D6",
+        "D5",
+        "D4",
+        "D3",
+        "D2",
+        "GND.1",
+        "RESET",
+        "RX",
+        "TX",
+        "D13",
+        "3.3V",
+        "AREF",
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "5V",
+        "RESET.2",
+        "GND.2",
+        "VIN"
+      ],
       "tags": [
         "nano-rp2040-connect",
         "nano rp2040 connect",
@@ -2454,7 +2877,13 @@
         "blurLight": false,
         "animation": false
       },
-      "pinCount": 5,
+      "pinCount": 4,
+      "pinNames": [
+        "GND",
+        "VCC",
+        "DIN",
+        "DOUT"
+      ],
       "tags": [
         "neopixel-matrix",
         "neopixel matrix",
@@ -2500,7 +2929,13 @@
         "label": "",
         "xray": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "1.l",
+        "2.l",
+        "1.r",
+        "2.r"
+      ],
       "tags": [
         "pushbutton-6mm",
         "pushbutton 6mm",
@@ -2516,7 +2951,12 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        ROTARY-DIALER\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "GND",
+        "DIAL",
+        "PULSE"
+      ],
       "tags": [
         "rotary-dialer",
         "",
@@ -2570,6 +3010,11 @@
         "step": 2
       },
       "pinCount": 3,
+      "pinNames": [
+        "VCC",
+        "SIG",
+        "GND"
+      ],
       "tags": [
         "slide-potentiometer",
         "slide potentiometer",
@@ -2601,7 +3046,13 @@
         "ledPower": false,
         "ledSignal": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "AOUT",
+        "GND",
+        "VCC",
+        "DOUT"
+      ],
       "tags": [
         "small-sound-sensor",
         "small sound sensor",
@@ -2618,7 +3069,12 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        TILT-SWITCH\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "GND",
+        "VCC",
+        "OUT"
+      ],
       "tags": [
         "tilt-switch",
         "tilt switch",
@@ -2644,7 +3100,11 @@
       "defaultValues": {
         "hasSignal": false
       },
-      "pinCount": 0,
+      "pinCount": 2,
+      "pinNames": [
+        "1",
+        "2"
+      ],
       "tags": [
         "buzzer"
       ]
@@ -2711,6 +3171,10 @@
         "flip": false
       },
       "pinCount": 2,
+      "pinNames": [
+        "A",
+        "C"
+      ],
       "tags": [
         "led"
       ]
@@ -2768,7 +3232,29 @@
           0
         ]
       },
-      "pinCount": 0,
+      "pinCount": 20,
+      "pinNames": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "C1",
+        "C2",
+        "C3",
+        "C4",
+        "C5",
+        "C6",
+        "C7",
+        "C8",
+        "C9",
+        "C10"
+      ],
       "tags": [
         "led-bar-graph",
         "led bar graph",
@@ -2808,7 +3294,13 @@
         "g": 0,
         "b": 0
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "VDD",
+        "DOUT",
+        "VSS",
+        "DIN"
+      ],
       "tags": [
         "neopixel"
       ]
@@ -2844,7 +3336,13 @@
         "ledGreen": 0,
         "ledBlue": 0
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "R",
+        "COM",
+        "G",
+        "B"
+      ],
       "tags": [
         "rgb-led",
         "rgb led",
@@ -3263,7 +3761,20 @@
         "ledPower": false,
         "resetPressed": false
       },
-      "pinCount": 0,
+      "pinCount": 11,
+      "pinNames": [
+        "GND.1",
+        "VCC.1",
+        "PB4",
+        "PB5",
+        "PB3",
+        "PB2",
+        "PB1",
+        "PB0",
+        "VIN",
+        "GND.2",
+        "VCC.2"
+      ],
       "tags": [
         "franzininho"
       ]
@@ -3371,7 +3882,12 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        IR-RECEIVER\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "GND",
+        "VCC",
+        "DAT"
+      ],
       "tags": [
         "ir-receiver",
         "ir receiver",
@@ -3412,7 +3928,11 @@
       "defaultValues": {
         "value": "1000"
       },
-      "pinCount": 0,
+      "pinCount": 2,
+      "pinNames": [
+        "1",
+        "2"
+      ],
       "tags": [
         "resistor"
       ]
@@ -3689,7 +4209,13 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        DHT22\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "VCC",
+        "SDA",
+        "NC",
+        "GND"
+      ],
       "tags": [
         "dht22"
       ]
@@ -3702,7 +4228,13 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        HC-SR04\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "VCC",
+        "TRIG",
+        "ECHO",
+        "GND"
+      ],
       "tags": [
         "hc-sr04",
         "hc",
@@ -3726,7 +4258,17 @@
       "defaultValues": {
         "led1": false
       },
-      "pinCount": 0,
+      "pinCount": 8,
+      "pinNames": [
+        "INT",
+        "AD0",
+        "XCL",
+        "XDA",
+        "SDA",
+        "SCL",
+        "GND",
+        "VCC"
+      ],
       "tags": [
         "mpu6050"
       ]
@@ -3739,7 +4281,12 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        NTC-TEMPERATURE-SENSOR\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "GND",
+        "VCC",
+        "OUT"
+      ],
       "tags": [
         "ntc-temperature-sensor",
         "ntc temperature sensor",
@@ -3802,7 +4349,13 @@
         "ledDO": false,
         "ledPower": false
       },
-      "pinCount": 0,
+      "pinCount": 4,
+      "pinNames": [
+        "VCC",
+        "GND",
+        "DO",
+        "AO"
+      ],
       "tags": [
         "photoresistor-sensor",
         "photoresistor sensor",
@@ -3818,7 +4371,12 @@
       "thumbnail": "<svg width=\"64\" height=\"64\" xmlns=\"http://www.w3.org/2000/svg\">\n      <rect width=\"64\" height=\"64\" fill=\"#e0e0e0\" rx=\"4\"/>\n      <text x=\"50%\" y=\"50%\" text-anchor=\"middle\" dy=\".3em\" font-size=\"10\" fill=\"#666\">\n        PIR-MOTION-SENSOR\n      </text>\n    </svg>",
       "properties": [],
       "defaultValues": {},
-      "pinCount": 0,
+      "pinCount": 3,
+      "pinNames": [
+        "VCC",
+        "OUT",
+        "GND"
+      ],
       "tags": [
         "pir-motion-sensor",
         "pir motion sensor",

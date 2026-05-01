@@ -4,6 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agent.snapshot_compat import (
+    dump_snapshot_json,
+    legacy_to_snapshot_v2,
+    load_snapshot_json,
+    snapshot_v2_to_legacy,
+)
 from app.core.dependencies import get_current_user, require_auth
 from app.database.session import get_db
 from app.models.project import Project
@@ -18,6 +24,12 @@ router = APIRouter()
 
 def _files_for_project(project: Project) -> list[SketchFile]:
     """Load files from disk; fall back to legacy code field if disk is empty."""
+    if project.snapshot_json:
+        try:
+            legacy = snapshot_v2_to_legacy(load_snapshot_json(project.snapshot_json))
+            return [SketchFile(**f) for f in legacy["files"]]
+        except Exception:
+            pass
     disk = read_files(project.id)
     if disk:
         return [SketchFile(name=f["name"], content=f["content"]) for f in disk]
@@ -28,17 +40,24 @@ def _files_for_project(project: Project) -> list[SketchFile]:
 
 
 def _to_response(project: Project, owner_username: str) -> ProjectResponse:
+    legacy = None
+    if project.snapshot_json:
+        try:
+            legacy = snapshot_v2_to_legacy(load_snapshot_json(project.snapshot_json))
+        except Exception:
+            legacy = None
     return ProjectResponse(
         id=project.id,
         name=project.name,
         slug=project.slug,
         description=project.description,
         is_public=project.is_public,
-        board_type=project.board_type,
+        board_type=legacy["board_type"] if legacy else project.board_type,
         files=_files_for_project(project),
-        code=project.code,
-        components_json=project.components_json,
-        wires_json=project.wires_json,
+        code=legacy["code"] if legacy else project.code,
+        components_json=legacy["components_json"] if legacy else project.components_json,
+        wires_json=legacy["wires_json"] if legacy else project.wires_json,
+        snapshot_json=project.snapshot_json,
         owner_username=owner_username,
         created_at=project.created_at,
         updated_at=project.updated_at,
@@ -49,6 +68,51 @@ def _to_response(project: Project, owner_username: str) -> ProjectResponse:
         last_compiled_at=project.last_compiled_at,
         last_run_at=project.last_run_at,
     )
+
+
+def _snapshot_from_create_body(body: ProjectCreateRequest) -> tuple[str, dict]:
+    if body.snapshot_json:
+        snapshot = load_snapshot_json(body.snapshot_json)
+    else:
+        files = [f.model_dump() for f in body.files] if body.files is not None else None
+        snapshot = legacy_to_snapshot_v2(
+            board_type=body.board_type,
+            files=files,
+            code=body.code,
+            components_json=body.components_json,
+            wires_json=body.wires_json,
+        )
+    return dump_snapshot_json(snapshot), snapshot_v2_to_legacy(snapshot)
+
+
+def _snapshot_from_update_body(project: Project, body: ProjectUpdateRequest) -> tuple[str | None, dict | None]:
+    if body.snapshot_json:
+        snapshot = load_snapshot_json(body.snapshot_json)
+        return dump_snapshot_json(snapshot), snapshot_v2_to_legacy(snapshot)
+
+    legacy_fields_changed = any(
+        field in body.model_fields_set
+        for field in ("board_type", "files", "code", "components_json", "wires_json")
+    )
+    if not legacy_fields_changed and project.snapshot_json:
+        return None, None
+
+    existing_files = _files_for_project(project)
+    files = (
+        [f.model_dump() for f in body.files]
+        if body.files is not None
+        else [f.model_dump() for f in existing_files]
+    )
+    snapshot = legacy_to_snapshot_v2(
+        board_type=body.board_type if body.board_type is not None else project.board_type,
+        files=files,
+        code=body.code if body.code is not None else project.code,
+        components_json=(
+            body.components_json if body.components_json is not None else project.components_json
+        ),
+        wires_json=body.wires_json if body.wires_json is not None else project.wires_json,
+    )
+    return dump_snapshot_json(snapshot), snapshot_v2_to_legacy(snapshot)
 
 
 async def _unique_slug(db: AsyncSession, user_id: str, base_slug: str) -> str:
@@ -118,6 +182,7 @@ async def create_project(
 ):
     base_slug = slugify(body.name) or "project"
     slug = await _unique_slug(db, user.id, base_slug)
+    snapshot_json, legacy = _snapshot_from_create_body(body)
 
     project = Project(
         user_id=user.id,
@@ -125,17 +190,18 @@ async def create_project(
         slug=slug,
         description=body.description,
         is_public=body.is_public,
-        board_type=body.board_type,
-        code=body.code,
-        components_json=body.components_json,
-        wires_json=body.wires_json,
+        board_type=legacy["board_type"],
+        code=legacy["code"],
+        components_json=legacy["components_json"],
+        wires_json=legacy["wires_json"],
+        snapshot_json=snapshot_json,
     )
     db.add(project)
     await db.commit()
     await db.refresh(project)
 
     # Write sketch files to volume
-    files = body.files or ([SketchFile(name="sketch.ino", content=body.code)] if body.code else [])
+    files = [SketchFile(**f) for f in legacy["files"]]
     if files:
         write_files(project.id, [f.model_dump() for f in files])
 
@@ -169,21 +235,32 @@ async def update_project(
         project.description = body.description
     if body.is_public is not None:
         project.is_public = body.is_public
-    if body.board_type is not None:
-        project.board_type = body.board_type
-    if body.code is not None:
-        project.code = body.code
-    if body.components_json is not None:
-        project.components_json = body.components_json
-    if body.wires_json is not None:
-        project.wires_json = body.wires_json
+
+    snapshot_json, legacy = _snapshot_from_update_body(project, body)
+    if snapshot_json is not None and legacy is not None:
+        project.snapshot_json = snapshot_json
+        project.board_type = legacy["board_type"]
+        project.code = legacy["code"]
+        project.components_json = legacy["components_json"]
+        project.wires_json = legacy["wires_json"]
+    else:
+        if body.board_type is not None:
+            project.board_type = body.board_type
+        if body.code is not None:
+            project.code = body.code
+        if body.components_json is not None:
+            project.components_json = body.components_json
+        if body.wires_json is not None:
+            project.wires_json = body.wires_json
 
     project.updated_at = datetime.now(timezone.utc)
     await db.commit()
     await db.refresh(project)
 
     # Write updated files to volume
-    if body.files is not None:
+    if legacy is not None:
+        write_files(project.id, legacy["files"])
+    elif body.files is not None:
         write_files(project.id, [f.model_dump() for f in body.files])
     elif body.code is not None:
         # Legacy: update sketch.ino from code field only if no files were sent
