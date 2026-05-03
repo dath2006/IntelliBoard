@@ -34,7 +34,9 @@ export interface InstalledLibrary {
 }
 
 export async function searchLibraries(query: string): Promise<ArduinoLibrary[]> {
-  const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+  // An empty query is rejected by the backend (required field) — return empty list immediately.
+  if (!query.trim()) return [];
+  const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query.trim())}`);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
     throw new Error(err.detail || 'Failed to search libraries');
@@ -49,7 +51,10 @@ export async function installLibrary(name: string): Promise<{ success: boolean; 
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ name }),
   });
-  const data = await res.json();
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.detail || data.error || `Server error ${res.status}`);
+  }
   return data;
 }
 

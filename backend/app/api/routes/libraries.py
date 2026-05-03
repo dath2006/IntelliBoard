@@ -18,10 +18,13 @@ class InstallResponse(BaseModel):
     error: str | None = None
 
 @router.get("/search", response_model=SearchResponse)
-async def search_libraries(q: str = Query(..., description="Search query for library")):
+async def search_libraries(q: str = Query(default="", description="Search query for library")):
     """
     Search for Arduino libraries by name or topic.
+    Returns an empty list for blank queries so the client doesn't get a 422.
     """
+    if not q.strip():
+        return SearchResponse(success=True, libraries=[])
     try:
         result = await arduino_cli.search_libraries(q)
         if not result["success"]:

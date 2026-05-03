@@ -16,6 +16,7 @@ export class ComponentRegistry {
   private metadata: Map<string, ComponentMetadata> = new Map();
   private categories: Map<ComponentCategory, ComponentMetadata[]> = new Map();
   private allComponents: ComponentMetadata[] = [];
+  private lookupByNormalizedKey: Map<string, ComponentMetadata> = new Map();
   private loaded = false;
   private _loadPromise: Promise<void> | null = null;
 
@@ -129,10 +130,17 @@ export class ComponentRegistry {
     this.allComponents = components;
     this.metadata.clear();
     this.categories.clear();
+    this.lookupByNormalizedKey.clear();
 
     // Index by ID
     components.forEach((component) => {
       this.metadata.set(component.id, component);
+      this.indexLookup(component.id, component);
+      this.indexLookup(component.tagName, component);
+      this.indexLookup(component.name, component);
+      for (const tag of component.tags || []) {
+        this.indexLookup(tag, component);
+      }
 
       // Group by category
       const categoryComponents = this.categories.get(component.category) || [];
@@ -160,6 +168,15 @@ export class ComponentRegistry {
    */
   getById(id: string): ComponentMetadata | undefined {
     return this.metadata.get(id);
+  }
+
+  /**
+   * Resolve by id/tag/name/tags with normalization for robust imports/aliases.
+   */
+  getByRef(ref: string): ComponentMetadata | undefined {
+    const exact = this.metadata.get(ref);
+    if (exact) return exact;
+    return this.lookupByNormalizedKey.get(this.normalizeLookupKey(ref));
   }
 
   /**
@@ -222,6 +239,22 @@ export class ComponentRegistry {
       other: 'Other',
     };
     return displayNames[category] || category;
+  }
+
+  private normalizeLookupKey(value: string): string {
+    return String(value ?? '')
+      .trim()
+      .toLowerCase()
+      .replace('wokwi-', '')
+      .replace(/[^a-z0-9]/g, '');
+  }
+
+  private indexLookup(key: string, component: ComponentMetadata): void {
+    const normalized = this.normalizeLookupKey(key);
+    if (!normalized) return;
+    if (!this.lookupByNormalizedKey.has(normalized)) {
+      this.lookupByNormalizedKey.set(normalized, component);
+    }
   }
 }
 

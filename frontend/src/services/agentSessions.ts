@@ -106,6 +106,30 @@ export async function getAgentSessionSnapshot(sessionId: string): Promise<Projec
   return data;
 }
 
+export interface PinObservationPayload {
+  metadataId: string;
+  tagName?: string | null;
+  pinNames: string[];
+  propertySignature?: string | null;
+}
+
+/**
+ * Send live runtime pin observations to the backend.
+ * The backend stores these in an in-memory catalog so the agent gets
+ * accurate pin names from the actual wokwi element instead of the
+ * potentially stale components-metadata.json.
+ *
+ * Fire-and-forget — failures are silently ignored to never block the UI.
+ */
+export async function reportPinObservation(payload: PinObservationPayload): Promise<void> {
+  await api.post('/agent/pin-observations', {
+    metadataId: payload.metadataId,
+    tagName: payload.tagName ?? null,
+    pinNames: payload.pinNames,
+    propertySignature: payload.propertySignature ?? null,
+  });
+}
+
 export async function listAgentSessionEvents(
   sessionId: string,
   after: number = 0,

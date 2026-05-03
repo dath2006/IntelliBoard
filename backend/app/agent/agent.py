@@ -90,12 +90,18 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "You are the Velxio backend agent. Use tools to inspect or mutate the draft snapshot. "
         "Never replace the full snapshot; use operation tools for changes. "
         "Prefer minimal edits and return concise status updates. "
-        "When wiring components, ALWAYS call get_component_schema(metadataId) and use the returned pinNames EXACTLY "
-        "(including casing and suffixes like .1). Do not invent pin names. "
-        "Use pinDetails.role to understand intent: power/ground/common/signal. "
-        "Connect power/ground/common rails first when required, then connect signal pins. "
-        "If a component has pins like VCC/GND/COM (power/common), ensure they are connected to appropriate board rails "
-        "when the circuit requires power, and explain your assumption (e.g. common-cathode vs common-anode) if applicable."
+        "MANDATORY WIRING PROTOCOL: "
+        "After every add_component or add_board, you MUST call get_canvas_runtime_pins(instance_id) "
+        "with the exact id you just placed, BEFORE calling connect_pins. "
+        "The pinNames list in that response comes directly from the live DOM canvas — "
+        "it is the only correct source; do NOT use any other source for pin names. "
+        "The tool automatically waits up to 2 s for the canvas to render the element and send its pinInfo. "
+        "If available is still False after that wait the canvas has genuinely not rendered it — "
+        "stop and tell the user to open/view the canvas so the component becomes visible, then retry. "
+        "Never invent or normalize pin names. Use each pinName exactly as returned. "
+        "Connect power/ground rails first, then signal pins. "
+        "If a component has power/ground pins (e.g. VCC, GND), connect them to board rails as needed "
+        "and explain your assumption (e.g. common-cathode vs common-anode) when applicable."
     )
     agent = Agent(
         model_name or settings.AGENT_MODEL,
@@ -146,6 +152,28 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
     async def get_component_schema(ctx: RunContext[AgentDeps], component_id: str) -> dict[str, Any]:
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(ctx, "get_component_schema", lambda: agent_tools.get_component_schema(component_id))
+
+    @agent.tool
+    async def get_canvas_runtime_pins(ctx: RunContext[AgentDeps], instance_id: str) -> dict[str, Any]:
+        """Get the exact pin names for a board or component from the live canvas DOM.
+
+        Pass the instance id (e.g. 'led1', 'esp32-1') that was returned by
+        add_component or add_board.  Returns pinNames read directly from the
+        rendered wokwi element's pinInfo — no overrides, no normalization.
+
+        MUST be called after every add_component / add_board and before wiring.
+
+        The tool automatically retries up to 4 times (2 s total) while the
+        frontend canvas renders and reports the element's pinInfo.  If available
+        is still False after retries the canvas has genuinely not rendered it —
+        stop and tell the user to open the canvas so the component is visible.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "get_canvas_runtime_pins",
+            lambda: agent_tools.get_canvas_runtime_pins(ctx.deps.snapshot, instance_id),
+        )
 
     @agent.tool
     async def list_component_schema_gaps(ctx: RunContext[AgentDeps], limit: int = 20) -> dict[str, Any]:
@@ -551,20 +579,16 @@ async def run_agent_session(
         log_event("run.started", session_id=session_id)
 
         agent = build_agent(session.model_name, defer_model_check=model_override is not None)
+        run_kwargs: dict[str, Any] = {"deps": deps}
+        run_params = inspect.signature(agent.run).parameters
+        if "event_stream_handler" in run_params:
+            run_kwargs["event_stream_handler"] = _event_stream_handler
         try:
             if model_override is not None:
                 with agent.override(model=model_override):
-                    result = await agent.run(
-                        contextual_prompt,
-                        deps=deps,
-                        event_stream_handler=_event_stream_handler,
-                    )
+                    result = await agent.run(contextual_prompt, **run_kwargs)
             else:
-                result = await agent.run(
-                    contextual_prompt,
-                    deps=deps,
-                    event_stream_handler=_event_stream_handler,
-                )
+                result = await agent.run(contextual_prompt, **run_kwargs)
         except asyncio.CancelledError:
             await append_event(db, session_id=session_id, event_type="run.cancelled", payload={})
             await set_session_status(db, session_id=session_id, user_id=user_id, status="stopped")
@@ -634,21 +658,76 @@ def _unique_id(base: str, existing: set[str]) -> str:
     return f"{base}-{index}"
 
 
+def _jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonable(v) for v in value]
+    if hasattr(value, "model_dump"):
+        try:
+            return _jsonable(value.model_dump())
+        except Exception:
+            pass
+    try:
+        json.dumps(value)
+        return value
+    except Exception:
+        return str(value)
+
+
+def _extract_tool_call_input(event: FunctionToolCallEvent) -> Any:
+    part = event.part
+    # Different pydantic-ai versions expose args in slightly different shapes.
+    for attr in ("args", "arguments", "args_dict", "kwargs"):
+        if hasattr(part, attr):
+            value = getattr(part, attr)
+            if value is not None:
+                return _jsonable(value)
+    for attr in ("args_json", "arguments_json", "json_args"):
+        if hasattr(part, attr):
+            raw = getattr(part, attr)
+            if isinstance(raw, str) and raw.strip():
+                try:
+                    return _jsonable(json.loads(raw))
+                except Exception:
+                    return raw
+    return None
+
+
+def _extract_tool_call_output(event: FunctionToolResultEvent) -> Any:
+    result = event.result
+    for attr in ("content", "output", "result", "return_value", "value"):
+        if hasattr(result, attr):
+            value = getattr(result, attr)
+            if value is not None:
+                return _jsonable(value)
+    return _jsonable(result)
+
+
 async def _event_stream_handler(ctx: RunContext[AgentDeps], events: AsyncIterable[AgentStreamEvent]) -> None:
     async for event in events:
         if isinstance(event, FunctionToolCallEvent):
+            tool_input = _extract_tool_call_input(event)
             await ctx.deps.emit_event(
                 "tool.call.started",
-                {"tool": event.part.tool_name, "toolCallId": event.tool_call_id},
+                {"tool": event.part.tool_name, "toolCallId": event.tool_call_id, "input": tool_input},
             )
-            log_event("tool.call.started", session_id=ctx.deps.session_id, tool=event.part.tool_name)
+            log_event(
+                "tool.call.started",
+                session_id=ctx.deps.session_id,
+                tool=event.part.tool_name,
+                input=tool_input,
+            )
         elif isinstance(event, FunctionToolResultEvent):
             tool_name = getattr(event.result, "tool_name", None)
+            tool_output = _extract_tool_call_output(event)
             await ctx.deps.emit_event(
                 "tool.call.result",
-                {"tool": tool_name, "toolCallId": event.tool_call_id},
+                {"tool": tool_name, "toolCallId": event.tool_call_id, "output": tool_output},
             )
-            log_event("tool.call.result", session_id=ctx.deps.session_id, tool=tool_name)
+            log_event("tool.call.result", session_id=ctx.deps.session_id, tool=tool_name, output=tool_output)
         elif isinstance(event, PartStartEvent) and isinstance(event.part, TextPart):
             if event.part.content:
                 await ctx.deps.emit_event(

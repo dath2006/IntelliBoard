@@ -2,17 +2,12 @@ from __future__ import annotations
 
 import json
 import re
+import os
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from app.agent.runtime_pin_catalog import get_observed_pin_names
-
-_PIN_OVERRIDES: dict[str, list[str]] = {
-    "led": ["A", "C"],
-    "rgb-led": ["R", "G", "B", "COM"],
-    "resistor": ["1", "2"],
-}
 
 _COMPONENT_ID_ALIASES: dict[str, str] = {
     # Common board aliases used by models/users.
@@ -24,12 +19,28 @@ _COMPONENT_ID_ALIASES: dict[str, str] = {
 @lru_cache(maxsize=1)
 def load_component_catalog() -> list[dict[str, Any]]:
     root = Path(__file__).resolve().parents[3]
-    path = root / "frontend" / "public" / "components-metadata.json"
-    if not path.exists():
-        return []
-    data = json.loads(path.read_text(encoding="utf-8"))
-    components = data.get("components", [])
-    return components if isinstance(components, list) else []
+    candidates: list[Path] = []
+    configured = (os.getenv("COMPONENT_CATALOG_PATH") or "").strip()
+    if configured:
+        candidates.append(Path(configured))
+    candidates.extend(
+        [
+            # Local repo/dev path.
+            root / "frontend" / "public" / "components-metadata.json",
+            # Frontend build output path in some local setups.
+            root / "frontend" / "dist" / "components-metadata.json",
+            # Docker image path where frontend static assets are copied.
+            Path("/usr/share/nginx/html/components-metadata.json"),
+        ]
+    )
+    for path in candidates:
+        if not path.exists():
+            continue
+        data = json.loads(path.read_text(encoding="utf-8"))
+        components = data.get("components", [])
+        if isinstance(components, list):
+            return components
+    return []
 
 
 def search_component_catalog(
@@ -68,10 +79,14 @@ def search_component_catalog(
 
 
 def get_component_schema(component_id: str) -> dict[str, Any]:
+    """Return catalog metadata for a component type.
+
+    NOTE: pinNames here come from static metadata only — they may be incomplete
+    or wrong for some components.  Always prefer get_canvas_runtime_pins() for
+    wiring decisions; use this only for properties / description / category.
+    """
     component = _find_component(component_id)
     if component is None:
-        # Return a structured "missing schema" payload instead of raising so a
-        # single lookup miss does not abort the full agent run.
         return {
             "id": component_id,
             "tagName": None,
@@ -79,45 +94,11 @@ def get_component_schema(component_id: str) -> dict[str, Any]:
             "category": None,
             "description": None,
             "pinCount": 0,
-            "pinNames": [],
-            "pinDetails": [],
             "properties": [],
             "defaultValues": {},
-            "missing": ["component"],
-            "pinNamesSource": "missing",
             "ok": False,
             "error": f"component not found: {component_id}",
         }
-
-    metadata_pin_names = component.get("pinNames") or []
-    override_pin_names = _PIN_OVERRIDES.get(component.get("id", "")) or []
-    observed_pin_names = get_observed_pin_names(str(component.get("id", "")))
-    pin_names = _merge_pin_names(observed_pin_names, metadata_pin_names, override_pin_names)
-    if observed_pin_names:
-        pin_names_source = "runtime+catalog"
-    elif metadata_pin_names:
-        pin_names_source = "metadata"
-    elif override_pin_names:
-        pin_names_source = "override"
-    else:
-        pin_names_source = "missing"
-    missing: list[str] = []
-    pin_count = int(component.get("pinCount", 0) or 0)
-    if pin_count > 0 and not pin_names:
-        # Broad fallback for components that declare pinCount but not explicit names
-        # (common in custom catalog entries). This avoids "blind guessing" by the
-        # agent and gives it a deterministic canonical pin namespace.
-        pin_names = [str(i) for i in range(1, pin_count + 1)]
-        pin_names_source = "inferred_sequential"
-        missing.append("pinNames")
-
-    pin_details = [
-        {
-            "name": name,
-            "role": _infer_pin_role(name),
-        }
-        for name in (pin_names or [])
-    ]
 
     return {
         "id": component.get("id"),
@@ -125,13 +106,31 @@ def get_component_schema(component_id: str) -> dict[str, Any]:
         "name": component.get("name"),
         "category": component.get("category"),
         "description": component.get("description"),
-        "pinCount": pin_count,
-        "pinNames": pin_names,
-        "pinDetails": pin_details,
+        "pinCount": int(component.get("pinCount", 0) or 0),
         "properties": component.get("properties", []),
         "defaultValues": component.get("defaultValues", {}),
-        "missing": missing,
-        "pinNamesSource": pin_names_source,
+    }
+
+
+def get_canvas_runtime_pins(metadata_id: str) -> dict[str, Any]:
+    """Return ONLY the pin names observed from the live DOM canvas.
+
+    These are posted by the frontend after reading element.pinInfo directly
+    from the rendered wokwi custom elements — the ground truth for what pin
+    names connect_pins actually accepts.  No normalization, no fallbacks,
+    no guessing.  If the canvas has not rendered the component yet (i.e. the
+    frontend observation has not arrived), pinNames will be empty and
+    available will be False.
+    """
+    mid = (metadata_id or "").strip().lower()
+    if not mid:
+        return {"metadataId": metadata_id, "available": False, "pinNames": []}
+
+    pin_names = get_observed_pin_names(mid)
+    return {
+        "metadataId": mid,
+        "available": bool(pin_names),
+        "pinNames": pin_names,
     }
 
 
@@ -140,7 +139,7 @@ def list_component_schema_gaps(limit: int = 20) -> dict[str, Any]:
     missing_pin_names: list[str] = []
     for component in components:
         pin_count = component.get("pinCount", 0) or 0
-        if pin_count > 0 and not component.get("pinNames") and component.get("id") not in _PIN_OVERRIDES:
+        if pin_count > 0 and not component.get("pinNames"):
             missing_pin_names.append(component.get("id", ""))
 
     return {
@@ -268,6 +267,10 @@ def _infer_pin_role(pin_name: str) -> str:
 
 
 def _merge_pin_names(*sources: list[str]) -> list[str]:
+    return _clean_pin_names(*sources)
+
+
+def _clean_pin_names(*sources: list[str]) -> list[str]:
     merged: list[str] = []
     seen: set[str] = set()
     for source in sources:

@@ -30,6 +30,7 @@ import { useSimulatorStore } from '../store/useSimulatorStore';
 import { useOscilloscopeStore } from '../store/useOscilloscopeStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { agentPanelBounds, useAgentStore } from '../store/useAgentStore';
+import { scanAndReportCanvasPins, clearPinObservationCache } from '../utils/canvasPinScanner';
 import type { CompilationLog } from '../utils/compilationLogger';
 import '../App.css';
 
@@ -65,6 +66,9 @@ export const EditorPage: React.FC = () => {
   const resizingRef = useRef(false);
   const serialMonitorOpen = useSimulatorStore((s) => s.serialMonitorOpen);
   const activeBoardId = useSimulatorStore((s) => s.activeBoardId);
+  const boards = useSimulatorStore((s) => s.boards);
+  const components = useSimulatorStore((s) => s.components);
+  const wires = useSimulatorStore((s) => s.wires);
   const activeBoardKind = useSimulatorStore(
     (s) => s.boards.find((b) => b.id === s.activeBoardId)?.boardKind,
   );
@@ -82,6 +86,53 @@ export const EditorPage: React.FC = () => {
     const unsub = wireElectricalSolver();
     return unsub;
   }, []);
+
+  // ── Debug: log full enriched canvas snapshot ──────────────────────────────
+  const logSnapshot = useCallback(() => {
+    const enrichedBoards = boards.map((board) => {
+      const el = document.getElementById(board.id);
+      const pinInfo = (el as any)?.pinInfo as Array<{ name?: string }> | undefined;
+      const pinNames = pinInfo
+        ? pinInfo.map((p) => String(p?.name ?? '').trim()).filter((n) => n.length > 0)
+        : [];
+      return { ...board, pinNames };
+    });
+    const enrichedComponents = components.map((comp) => {
+      const el = document.getElementById(comp.id);
+      const pinInfo = (el as any)?.pinInfo as Array<{ name?: string }> | undefined;
+      const pinNames = pinInfo
+        ? pinInfo.map((p) => String(p?.name ?? '').trim()).filter((n) => n.length > 0)
+        : [];
+      return { ...comp, pinNames };
+    });
+    const snapshot = { activeBoardId, boards: enrichedBoards, components: enrichedComponents, wires };
+    console.log('[DEBUG] Canvas Snapshot', JSON.stringify(snapshot, null, 2));
+  }, [activeBoardId, boards, components, wires]);
+
+  // ── Runtime pin observation reporter ─────────────────────────────────────
+  // Reads live `pinInfo` from DOM-rendered wokwi custom elements and POSTs
+  // them to the backend's in-memory pin catalog so the agent gets accurate
+  // pin names instead of potentially stale data from components-metadata.json.
+  //
+  // The actual scan logic lives in canvasPinScanner.ts so AgentPanel can also
+  // call it eagerly right after applySnapshotToStores() — ensuring that a
+  // freshly-added component's pins are observable before the agent's next
+  // get_canvas_runtime_pins call fires.
+  useEffect(() => {
+    // Clear the dedup cache on project reset so new elements are always
+    // reported, even if their metadataId was seen in a previous project.
+    clearPinObservationCache();
+  }, []);
+
+  useEffect(() => {
+    // Reactive scan: fires whenever boards/components change in the store.
+    // Uses a 300 ms delay so wokwi custom elements have time to upgrade.
+    const timer = setTimeout(() => {
+      void scanAndReportCanvasPins({ boards, components, upgradeDelayMs: 0 });
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [boards, components]);
+
 
   // ── GitHub star prompt (show once: 2nd visit OR after 3 min) ──────────────
   useEffect(() => {
@@ -460,6 +511,29 @@ export const EditorPage: React.FC = () => {
         >
           <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 }}>
             <SimulatorCanvas />
+            {/* ── Debug snapshot button ── */}
+            <button
+              onClick={logSnapshot}
+              title="Log canvas snapshot to console"
+              style={{
+                position: 'absolute',
+                bottom: 8,
+                left: 8,
+                zIndex: 999,
+                padding: '2px 7px',
+                fontSize: 10,
+                fontFamily: 'monospace',
+                background: 'rgba(30,30,30,0.82)',
+                color: '#7dd3fc',
+                border: '1px solid #334155',
+                borderRadius: 4,
+                cursor: 'pointer',
+                opacity: 0.7,
+                lineHeight: '16px',
+              }}
+            >
+              dbg
+            </button>
           </div>
           {serialMonitorOpen && (
             <>
@@ -489,7 +563,10 @@ export const EditorPage: React.FC = () => {
 
         {!isMobile && agentPanelOpen && (
           <>
-            <div className="agent-panel-resize-handle" onMouseDown={handleAgentPanelResizeMouseDown}>
+            <div
+              className="agent-panel-resize-handle"
+              onMouseDown={handleAgentPanelResizeMouseDown}
+            >
               <div className="resize-handle-grip" />
             </div>
             <div className="agent-panel-shell" style={{ width: agentPanelWidth }}>

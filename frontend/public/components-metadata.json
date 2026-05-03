@@ -1245,7 +1245,10 @@
         "GND"
       ],
       "tags": [
-        "ssd1306"
+        "ssd1306",
+        "oled",
+        "display",
+        "screen"
       ]
     },
     {

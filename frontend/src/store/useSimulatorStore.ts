@@ -18,6 +18,11 @@ import { useVfsStore } from './useVfsStore';
 import { boardPinToNumber, isBoardComponent } from '../utils/boardPinMapping';
 import { createSerialBatcher } from './serialBatcher';
 import {
+  isEsp32BoardKind,
+  isRiscVEsp32BoardKind,
+  resolveBoardKind,
+} from '../utils/boardResolver';
+import {
   bindBoard as icBindBoard,
   unbindBoard as icUnbindBoard,
   updateWires as icUpdateWires,
@@ -254,47 +259,12 @@ export const getBoardPinManager = (id: string) => pinManagerMap.get(id);
 export const getBoardBridge = (id: string) => bridgeMap.get(id);
 export const getEsp32Bridge = (id: string) => esp32BridgeMap.get(id);
 
-// Xtensa-based ESP32 boards — use QEMU bridge (backend)
-const ESP32_KINDS = new Set<BoardKind>([
-  'esp32',
-  'esp32-devkit-c-v4',
-  'esp32-cam',
-  'wemos-lolin32-lite',
-  'esp32-s3',
-  'xiao-esp32-s3',
-  'arduino-nano-esp32',
-]);
-
-// RISC-V ESP32 boards — also use QEMU bridge (qemu-system-riscv32 -M esp32c3)
-// The browser-side Esp32C3Simulator cannot handle the 150+ ROM functions ESP-IDF needs.
-const ESP32_RISCV_KINDS = new Set<BoardKind>([
-  'esp32-c3',
-  'xiao-esp32-c3',
-  'aitewinrobot-esp32c3-supermini',
-]);
-
-function normalizeBoardKind(kind: string): BoardKind {
-  const raw = String(kind ?? '').trim().toLowerCase();
-  if (!raw) return 'arduino-uno';
-  if (raw === 'esp32-devkit-v1' || raw === 'wokwi-esp32-devkit-v1') return 'esp32';
-  if (raw === 'wokwi-esp32-s3') return 'esp32-s3';
-  if (raw === 'wokwi-esp32-c3') return 'esp32-c3';
-  if (raw === 'wokwi-pi-pico') return 'raspberry-pi-pico';
-  if (raw === 'wokwi-pi-pico-w') return 'pi-pico-w';
-  if (raw === 'wokwi-arduino-uno') return 'arduino-uno';
-  if (raw === 'wokwi-arduino-nano') return 'arduino-nano';
-  if (raw === 'wokwi-arduino-mega') return 'arduino-mega';
-  // Generic family fallback for unknown ESP32 variants
-  if (raw.startsWith('esp32')) return 'esp32';
-  return raw as BoardKind;
-}
-
 function isEsp32Kind(kind: BoardKind): boolean {
-  return ESP32_KINDS.has(kind) || ESP32_RISCV_KINDS.has(kind);
+  return isEsp32BoardKind(kind);
 }
 
 function isRiscVEsp32Kind(kind: BoardKind): boolean {
-  return ESP32_RISCV_KINDS.has(kind);
+  return isRiscVEsp32BoardKind(kind);
 }
 
 // ── Component type ────────────────────────────────────────────────────────
@@ -521,7 +491,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     activeBoardId: INITIAL_BOARD_ID,
 
     addBoard: (boardKind: BoardKind, x: number, y: number, preferredId?: string) => {
-      boardKind = normalizeBoardKind(boardKind);
+      boardKind = resolveBoardKind(boardKind);
       const existing = get().boards.filter((b) => b.boardKind === boardKind);
       let id = preferredId ?? (existing.length === 0 ? boardKind : `${boardKind}-${existing.length + 1}`);
       if (get().boards.some((b) => b.id === id)) {
@@ -654,7 +624,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
       // Add missing boards and recreate boards whose kind changed.
       for (const desired of incomingBoards) {
-        const desiredKind = normalizeBoardKind(desired.boardKind);
+        const desiredKind = resolveBoardKind(desired.boardKind);
         const existing = get().boards.find((b) => b.id === desired.id);
         if (!existing) {
           get().addBoard(desiredKind, desired.x, desired.y, desired.id);

@@ -41,21 +41,10 @@ import {
   trackCreateWire,
   trackToggleSerialMonitor,
 } from '../../utils/analytics';
+import { isEsp32BoardKind } from '../../utils/boardResolver';
 import './SimulatorCanvas.css';
 
-/** Check if a board kind is an ESP32-family board. */
-function isEsp32Kind(kind: BoardKind): boolean {
-  return (
-    kind.startsWith('esp32') ||
-    kind === 'xiao-esp32-s3' ||
-    kind === 'xiao-esp32-c3' ||
-    kind === 'arduino-nano-esp32' ||
-    kind === 'aitewinrobot-esp32c3-supermini' ||
-    kind === 'esp32-cam' ||
-    kind === 'wemos-lolin32-lite' ||
-    kind === 'esp32-devkit-c-v4'
-  );
-}
+const isEsp32Kind = isEsp32BoardKind;
 
 export const SimulatorCanvas = () => {
   const {
@@ -80,7 +69,6 @@ export const SimulatorCanvas = () => {
   const activeBoard = boards.find((b) => b.id === activeBoardId) ?? null;
 
   // Legacy derived values for components that still use them
-  const boardType = useSimulatorStore((s) => s.boardType);
   const boardPosition = useSimulatorStore((s) => s.boardPosition);
 
   // Wire management from store
@@ -807,7 +795,6 @@ export const SimulatorCanvas = () => {
       switch (board.boardKind) {
         case 'raspberry-pi-pico':
         case 'pi-pico-w':
-        case 'nano-rp2040':
           ledPin = 25; // GPIO25
           break;
         default:
@@ -1336,10 +1323,20 @@ export const SimulatorCanvas = () => {
       );
     }
 
-    const metadata = registry.getById(component.metadataId);
+    let metadata = registry.getByRef(component.metadataId);
     if (!metadata) {
-      console.warn(`Metadata not found for component: ${component.metadataId}`);
-      return null;
+      // Fallback: fuzzy search — handles legacy/agent-generated IDs like
+      // "display-oled-128x64-i2c" that don't match any registry key directly.
+      const fallbackResults = registry.search(component.metadataId);
+      if (fallbackResults.length > 0) {
+        metadata = fallbackResults[0];
+        console.info(
+          `Metadata resolved via search fallback: ${component.metadataId} → ${metadata.id}`,
+        );
+      } else {
+        console.warn(`Metadata not found for component: ${component.metadataId}`);
+        return null;
+      }
     }
 
     const isSelected = selectedComponentId === component.id;
@@ -1737,7 +1734,7 @@ export const SimulatorCanvas = () => {
           {sensorControlComponentId &&
             sensorControlMetadataId &&
             (() => {
-              const meta = registry.getById(sensorControlMetadataId);
+              const meta = registry.getByRef(sensorControlMetadataId);
               return (
                 <SensorControlPanel
                   componentId={sensorControlComponentId}
@@ -1814,7 +1811,7 @@ export const SimulatorCanvas = () => {
         propertyDialogComponentId &&
         (() => {
           const component = components.find((c) => c.id === propertyDialogComponentId);
-          const metadata = component ? registry.getById(component.metadataId) : null;
+          const metadata = component ? registry.getByRef(component.metadataId) : null;
           if (!component || !metadata) return null;
 
           const element = document.getElementById(propertyDialogComponentId);

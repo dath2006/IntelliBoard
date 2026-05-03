@@ -121,3 +121,47 @@ def test_snapshot_json_round_trip():
     decoded = load_snapshot_json(encoded)
 
     assert decoded == snapshot
+
+
+def test_legacy_conversion_remaps_old_board_wire_endpoints_to_active_board():
+    snapshot = legacy_to_snapshot_v2(
+        board_type="esp32",
+        files=[{"name": "main.cpp", "content": "void setup(){}"}],
+        components_json=[
+            {"id": "led-builtin", "metadataId": "led", "x": 200, "y": 100},
+        ],
+        wires_json=[
+            {
+                "id": "wire-builtin-anode",
+                "start": {"componentId": "arduino-uno", "pinName": "13", "x": 0, "y": 0},
+                "end": {"componentId": "led-builtin", "pinName": "A", "x": 0, "y": 0},
+            }
+        ],
+    )
+
+    assert snapshot.activeBoardId == "esp32"
+    assert snapshot.wires[0].start.componentId == "esp32"
+
+
+def test_legacy_conversion_drops_dangling_wire_endpoints():
+    snapshot = legacy_to_snapshot_v2(
+        board_type="arduino-uno",
+        files=[{"name": "sketch.ino", "content": "void setup(){}"}],
+        components_json=[
+            {"id": "led-1", "metadataId": "led", "x": 100, "y": 100},
+        ],
+        wires_json=[
+            {
+                "id": "wire-valid",
+                "start": {"componentId": "arduino-uno", "pinName": "13", "x": 0, "y": 0},
+                "end": {"componentId": "led-1", "pinName": "A", "x": 0, "y": 0},
+            },
+            {
+                "id": "wire-dangling",
+                "start": {"componentId": "missing-component", "pinName": "1", "x": 0, "y": 0},
+                "end": {"componentId": "led-1", "pinName": "C", "x": 0, "y": 0},
+            },
+        ],
+    )
+
+    assert [w.id for w in snapshot.wires] == ["wire-valid"]

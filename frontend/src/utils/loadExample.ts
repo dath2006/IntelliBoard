@@ -64,8 +64,6 @@ export async function loadExample(
   const {
     setComponents,
     setWires,
-    setBoardType,
-    activeBoardId,
     boards,
     addBoard,
     removeBoard,
@@ -146,28 +144,20 @@ export async function loadExample(
     recalculateAllWirePositions();
   } else {
     // ── Single-board loading ─────────────────────────────────────────────
-    // Analog-only SPICE examples are board-less. Remove every existing board
-    // so the canvas opens with just the analog circuit (boards are now
-    // optional — you can have 0, 1, or many at any time).
+    // Re-read the live boards list right now (not the stale destructured snapshot)
+    // to ensure every existing board is actually removed.
     const isAnalogOnly = (example as any).boardFilter === 'analog';
-    if (isAnalogOnly) {
-      const currentIds = boards.map((b) => b.id);
-      currentIds.forEach((id) => removeBoard(id));
-    } else {
+    useSimulatorStore.getState().boards.map((b) => b.id).forEach((id) => removeBoard(id));
+
+    let newBoardId: string | null = null;
+    if (!isAnalogOnly) {
       const targetBoard = example.boardType || 'arduino-uno';
-      // If boards[] is empty (e.g. a previous analog example removed every
-      // board), setBoardType can't work — it only maps over existing entries.
-      // Add a fresh board instead.
-      if (useSimulatorStore.getState().boards.length === 0) {
-        const newId = addBoard(
-          targetBoard as BoardKind,
-          DEFAULT_BOARD_POSITION.x,
-          DEFAULT_BOARD_POSITION.y,
-        );
-        setActiveBoardId(newId);
-      } else {
-        setBoardType(targetBoard);
-      }
+      newBoardId = addBoard(
+        targetBoard as BoardKind,
+        DEFAULT_BOARD_POSITION.x,
+        DEFAULT_BOARD_POSITION.y,
+      );
+      setActiveBoardId(newBoardId);
     }
     useEditorStore.getState().setCode(example.code);
 
@@ -187,14 +177,20 @@ export async function loadExample(
       })),
     );
 
-    // After possibly removing every board, re-read activeBoardId.
-    const liveActiveBoardId = useSimulatorStore.getState().activeBoardId;
-    // For analog (board-less) examples we leave any 'arduino-uno' references
-    // in wires untouched — there shouldn't be any, but if there are we'd
-    // rather emit a dangling endpoint than silently graft them onto a board
-    // that no longer exists.
-    const remapBoardId = (id: string) =>
-      isBoardComponent(id) && liveActiveBoardId ? liveActiveBoardId : id;
+    // Remap wire board-component references to the actual board instance id.
+    // The example data uses the boardType string (e.g. "esp32", "arduino-uno")
+    // as the componentId in wire endpoints. After addBoard() the instance id
+    // equals boardKind for the first board (e.g. "esp32"), but we use the
+    // returned newBoardId directly so there's no ambiguity.
+    const boardType = (example.boardType || 'arduino-uno').toLowerCase();
+    const remapBoardId = (id: string): string => {
+      if (!newBoardId) return id; // analog-only: no board
+      // Match the boardType string used in example wire data (e.g. "esp32")
+      if (id.toLowerCase() === boardType) return newBoardId;
+      // Match any other board-component id (generic fallback)
+      if (isBoardComponent(id)) return newBoardId;
+      return id;
+    };
 
     setWires(
       example.wires.map((wire) => ({
@@ -217,4 +213,5 @@ export async function loadExample(
     );
     recalculateAllWirePositions();
   }
+
 }

@@ -21,6 +21,7 @@ import {
   trackResetSimulation,
   trackOpenLibraryManager,
 } from '../../utils/analytics';
+import { isEsp32BoardKind } from '../../utils/boardResolver';
 import './EditorToolbar.css';
 
 interface EditorToolbarProps {
@@ -288,8 +289,7 @@ export const EditorToolbar = ({
 
       const isQemuBoard =
         board?.boardKind === 'raspberry-pi-3' ||
-        board?.boardKind === 'esp32' ||
-        board?.boardKind === 'esp32-s3';
+        (board?.boardKind ? isEsp32BoardKind(board.boardKind) : false);
 
       // QEMU boards: auto-compile if no firmware available yet
       if (isQemuBoard) {
@@ -445,8 +445,7 @@ export const EditorToolbar = ({
     for (const board of boardsList) {
       const isQemu =
         board.boardKind === 'raspberry-pi-3' ||
-        board.boardKind === 'esp32' ||
-        board.boardKind === 'esp32-s3';
+        isEsp32BoardKind(board.boardKind);
       if (!board.running && (isQemu || board.compiledProgram)) {
         reportRun(board.boardKind);
         startBoard(board.id);

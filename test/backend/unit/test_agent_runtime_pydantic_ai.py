@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 import pytest
 import pytest_asyncio
 from pydantic_ai.messages import ToolReturnPart
@@ -114,3 +116,10 @@ async def test_run_agent_session_emits_tool_events(db_context, monkeypatch):
 
     assert "tool.call.started" in event_types
     assert "tool.call.result" in event_types
+    started = next(event for event in events if event.event_type == "tool.call.started")
+    result = next(event for event in events if event.event_type == "tool.call.result")
+    started_payload = json.loads(started.payload_json or "{}")
+    result_payload = json.loads(result.payload_json or "{}")
+    assert "input" in started_payload
+    assert started_payload.get("tool") == "get_project_outline"
+    assert "output" in result_payload

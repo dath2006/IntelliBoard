@@ -30,6 +30,7 @@
 import type { BoardKind } from '../types/board';
 import type { Wire } from '../types/wire';
 import { boardPinToNumber } from '../utils/boardPinMapping';
+import { isEsp32BoardKind } from '../utils/boardResolver';
 import { classifyPin, isUartWire } from '../utils/boardProtocols';
 
 // ── Bridge / sim runtime references ──────────────────────────────────────────
@@ -98,13 +99,7 @@ function isBrowserSim(boardKind: string): boolean {
 }
 
 function isEsp32Bridge(boardKind: string): boolean {
-  return (
-    boardKind === 'esp32' ||
-    boardKind === 'esp32-s3' ||
-    boardKind === 'esp32-devkit-c-v4' ||
-    boardKind === 'esp32-cam' ||
-    boardKind === 'wemos-lolin32-lite'
-  );
+  return isEsp32BoardKind(boardKind);
 }
 
 function isPi3Bridge(boardKind: string): boolean {

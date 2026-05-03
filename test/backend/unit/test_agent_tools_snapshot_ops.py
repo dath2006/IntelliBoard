@@ -57,6 +57,22 @@ def test_change_board_kind_keeps_board_id_stable():
     assert updated.compileState["arduino-uno"].reason == "board_kind_changed"
 
 
+def test_connect_pins_accepts_board_kind_alias_when_board_id_is_legacy():
+    snap, _ = change_board_kind(base_snapshot(), board_id="arduino-uno", board_kind="esp32")
+
+    updated, _ = connect_pins(
+        snap,
+        wire_id="wire-esp32-alias",
+        start_component_id="esp32",
+        start_pin="D13",
+        end_component_id="led-1",
+        end_pin="A",
+    )
+
+    wire = next(w for w in updated.wires if w.id == "wire-esp32-alias")
+    assert wire.start.componentId == "arduino-uno"
+
+
 def test_add_board_creates_unique_id_and_file_group():
     updated, result = add_board(base_snapshot(), board_kind="arduino-uno")
 

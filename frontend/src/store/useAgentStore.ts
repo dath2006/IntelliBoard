@@ -233,6 +233,23 @@ export const useAgentStore = create<AgentState>((set) => ({
           payload: event.payload ?? {},
           expanded: false,
         };
+      } else if (event.eventType === 'run.completed') {
+        const outputFromPayload =
+          typeof event.payload?.output === 'string' ? event.payload.output.trim() : '';
+        const finalText = (nextBufferedText || outputFromPayload).trim();
+        if (finalText) {
+          nextTrace = {
+            id: `trace-${sessionId}-${event.seq}`,
+            sessionId,
+            seq: event.seq,
+            eventType: 'model.output.final',
+            createdAt: event.createdAt,
+            compactText: finalText,
+            payload: event.payload ?? {},
+            expanded: false,
+          };
+        }
+        nextBufferedText = '';
       } else if (event.eventType === 'snapshot.updated') {
         const parts = [
           Array.isArray(event.payload?.changedBoardIds)

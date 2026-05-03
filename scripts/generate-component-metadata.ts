@@ -199,12 +199,12 @@ class MetadataGenerator {
         continue;
       }
       components.push({
+        ...custom,
         thumbnail: custom.thumbnail ?? this.generateThumbnailPlaceholder(custom.id),
         tags: custom.tags ?? this.generateTags(custom.id, custom.name || custom.id),
         properties: custom.properties ?? [],
         defaultValues: custom.defaultValues ?? {},
         pinCount: custom.pinCount ?? 0,
-        ...custom,
       });
       injected++;
       console.log(`  ➕ Injected custom component ${custom.id}`);

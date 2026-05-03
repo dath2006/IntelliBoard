@@ -63,12 +63,19 @@ def legacy_to_snapshot_v2(
         active_board_id = board_id
 
     file_groups = {group_id: [SnapshotFile(**f) for f in normalized_files]}
+    converted_components = [_component_from_legacy(c) for c in components if not _is_board_component(c)]
+    converted_wires = _normalize_legacy_wires(
+        wires=[_wire_from_legacy(w) for w in wires],
+        board_ids={b.id for b in boards},
+        component_ids={c.id for c in converted_components},
+        active_board_id=active_board_id,
+    )
 
     return ProjectSnapshotV2(
         boards=boards,
         activeBoardId=active_board_id,
-        components=[_component_from_legacy(c) for c in components if not _is_board_component(c)],
-        wires=[_wire_from_legacy(w) for w in wires],
+        components=converted_components,
+        wires=converted_wires,
         fileGroups=file_groups,
         activeGroupId=group_id,
     )
@@ -153,6 +160,70 @@ def _wire_from_legacy(raw: dict[str, Any]) -> SnapshotWire:
             "signalType": raw.get("signalType"),
         }
     )
+
+
+def _normalize_legacy_wires(
+    *,
+    wires: list[SnapshotWire],
+    board_ids: set[str],
+    component_ids: set[str],
+    active_board_id: str | None,
+) -> list[SnapshotWire]:
+    normalized: list[SnapshotWire] = []
+    for wire in wires:
+        start_id = _resolve_endpoint_component_id(
+            wire.start.componentId,
+            board_ids=board_ids,
+            component_ids=component_ids,
+            active_board_id=active_board_id,
+        )
+        end_id = _resolve_endpoint_component_id(
+            wire.end.componentId,
+            board_ids=board_ids,
+            component_ids=component_ids,
+            active_board_id=active_board_id,
+        )
+        if start_id is None or end_id is None:
+            # Drop dangling wires from legacy payloads to satisfy strict snapshot invariants.
+            continue
+        normalized.append(
+            wire.model_copy(
+                update={
+                    "start": wire.start.model_copy(update={"componentId": start_id}),
+                    "end": wire.end.model_copy(update={"componentId": end_id}),
+                }
+            )
+        )
+    return normalized
+
+
+def _resolve_endpoint_component_id(
+    raw_component_id: str,
+    *,
+    board_ids: set[str],
+    component_ids: set[str],
+    active_board_id: str | None,
+) -> str | None:
+    raw = (raw_component_id or "").strip()
+    if not raw:
+        return None
+    if raw in component_ids or raw in board_ids:
+        return raw
+
+    normalized = raw.removeprefix("wokwi-").removeprefix("velxio-")
+    if normalized in component_ids or normalized in board_ids:
+        return normalized
+
+    # When board kind changes in legacy payloads, wires can still reference the old
+    # board id (e.g. "arduino-uno"). Rebind those endpoints to the active board.
+    if active_board_id and _looks_like_board_id(normalized):
+        return active_board_id
+    return None
+
+
+def _looks_like_board_id(value: str) -> bool:
+    canonical = canonical_board_kind(value)
+    return value in BOARD_COMPONENT_IDS or canonical in BOARD_COMPONENT_IDS
 
 
 def _is_board_component(raw: dict[str, Any]) -> bool:

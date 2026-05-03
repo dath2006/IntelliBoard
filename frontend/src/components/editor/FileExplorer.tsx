@@ -3,6 +3,10 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import type { BoardKind } from '../../types/board';
 import { BOARD_KIND_LABELS } from '../../types/board';
+import { useAuthStore } from '../../store/useAuthStore';
+import { getMyProjects, type ProjectResponse } from '../../services/projectService';
+import { NewProjectModal } from '../layout/NewProjectModal';
+import { useNavigate } from 'react-router-dom';
 import './FileExplorer.css';
 
 // SVG icons — same style as EditorToolbar (stroke-based, 16x16)
@@ -75,6 +79,39 @@ const IcoSave = () => (
   </svg>
 );
 
+const IcoProjects = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M3 3h18v18H3z" />
+    <path d="M3 9h18" />
+    <path d="M9 21V9" />
+  </svg>
+);
+
+const IcoNewProject = () => (
+  <svg
+    width="22"
+    height="22"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+  >
+    <path d="M12 5v14" />
+    <path d="M5 12h14" />
+  </svg>
+);
+
 const IcoChevron = ({ open }: { open: boolean }) => (
   <svg
     width="12"
@@ -97,10 +134,19 @@ const BOARD_ICON: Record<BoardKind, string> = {
   'arduino-nano': '▪',
   'arduino-mega': '▬',
   'raspberry-pi-pico': '◆',
+  'pi-pico-w': '◆',
   'raspberry-pi-3': '⬛',
   esp32: '⬡',
+  'esp32-devkit-c-v4': '⬡',
+  'esp32-cam': '⬡',
+  'wemos-lolin32-lite': '⬡',
   'esp32-s3': '⬡',
+  'xiao-esp32-s3': '⬡',
+  'arduino-nano-esp32': '⬡',
   'esp32-c3': '⬡',
+  'xiao-esp32-c3': '⬡',
+  'aitewinrobot-esp32c3-supermini': '⬡',
+  attiny85: '▪',
 };
 
 // Color accent per board family
@@ -108,11 +154,20 @@ const BOARD_COLOR: Record<BoardKind, string> = {
   'arduino-uno': '#4fc3f7',
   'arduino-nano': '#4fc3f7',
   'arduino-mega': '#4fc3f7',
-  'raspberry-pi-pico': '#ce93d8',
-  'raspberry-pi-3': '#ef9a9a',
-  esp32: '#a5d6a7',
-  'esp32-s3': '#a5d6a7',
-  'esp32-c3': '#a5d6a7',
+  'raspberry-pi-pico': '#66bb6a',
+  'pi-pico-w': '#66bb6a',
+  'raspberry-pi-3': '#ef5350',
+  esp32: '#ffa726',
+  'esp32-devkit-c-v4': '#ffa726',
+  'esp32-cam': '#ffa726',
+  'wemos-lolin32-lite': '#ffa726',
+  'esp32-s3': '#ffa726',
+  'xiao-esp32-s3': '#ffa726',
+  'arduino-nano-esp32': '#ffa726',
+  'esp32-c3': '#ffa726',
+  'xiao-esp32-c3': '#ffa726',
+  'aitewinrobot-esp32c3-supermini': '#ffa726',
+  attiny85: '#4fc3f7',
 };
 
 function FileIcon({ name }: { name: string }) {
@@ -146,6 +201,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   const boards = useSimulatorStore((s) => s.boards);
   const activeBoardId = useSimulatorStore((s) => s.activeBoardId);
   const setActiveBoardId = useSimulatorStore((s) => s.setActiveBoardId);
+  const user = useAuthStore((s) => s.user);
+  const navigate = useNavigate();
+
+  const [showProjects, setShowProjects] = useState(false);
+  const [projects, setProjects] = useState<ProjectResponse[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
@@ -179,6 +241,16 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
   }, [contextMenu]);
+
+  useEffect(() => {
+    if (showProjects && user) {
+      setLoadingProjects(true);
+      getMyProjects()
+        .then((data) => setProjects(data))
+        .catch((err) => console.error('Failed to load projects:', err))
+        .finally(() => setLoadingProjects(false));
+    }
+  }, [showProjects, user]);
 
   const switchToBoard = useCallback(
     (boardId: string, groupId: string) => {
@@ -252,8 +324,23 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   return (
     <div className="file-explorer">
       <div className="file-explorer-header">
-        <span className="file-explorer-title">WORKSPACE</span>
+        <span className="file-explorer-title">{showProjects ? 'MY PROJECTS' : 'WORKSPACE'}</span>
         <div className="file-explorer-header-actions">
+          <button
+            className="file-explorer-save-btn"
+            title="Toggle Projects view"
+            onClick={() => setShowProjects((prev) => !prev)}
+            style={{ color: showProjects ? '#4fc3f7' : undefined }}
+          >
+            <IcoProjects />
+          </button>
+          <button
+            className="file-explorer-save-btn"
+            title="Create New Project"
+            onClick={() => setIsNewProjectModalOpen(true)}
+          >
+            <IcoNewProject />
+          </button>
           <button
             className="file-explorer-save-btn"
             title="Save project (Ctrl+S)"
@@ -265,7 +352,36 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
       </div>
 
       <div className="file-explorer-list">
-        {boards.map((board) => {
+        {showProjects ? (
+          <div className="fe-projects-view">
+            {!user ? (
+              <div style={{ color: '#666', fontSize: 12, padding: 12 }}>
+                Please log in to view your projects.
+              </div>
+            ) : loadingProjects ? (
+              <div style={{ color: '#666', fontSize: 12, padding: 12 }}>Loading projects...</div>
+            ) : projects.length === 0 ? (
+              <div style={{ color: '#666', fontSize: 12, padding: 12 }}>
+                No projects found. Create one to get started!
+              </div>
+            ) : (
+              projects.map((p) => (
+                <div
+                  key={p.id}
+                  className="file-explorer-item fe-file-item"
+                  onClick={() => navigate(`/project/${p.id}`)}
+                  title={p.description || p.name}
+                >
+                  <span className="file-explorer-icon">
+                    <IcoProjects />
+                  </span>
+                  <span className="file-explorer-name">{p.name}</span>
+                </div>
+              ))
+            )}
+          </div>
+        ) : (
+          boards.map((board) => {
           const groupId = board.activeFileGroupId;
           const groupFiles = fileGroups[groupId] ?? [];
           const isActiveBoard = board.id === activeBoardId;
@@ -399,10 +515,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
               )}
             </div>
           );
-        })}
+        }))}
 
         {/* Fallback: no boards yet */}
-        {boards.length === 0 && (
+        {!showProjects && boards.length === 0 && (
           <div style={{ color: '#666', fontSize: 11, padding: '12px 12px', lineHeight: 1.5 }}>
             Add a board to the canvas to start editing code.
           </div>
@@ -426,6 +542,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
             Delete
           </button>
         </div>
+      )}
+
+      {isNewProjectModalOpen && (
+        <NewProjectModal onClose={() => setIsNewProjectModalOpen(false)} />
       )}
     </div>
   );

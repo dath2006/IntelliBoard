@@ -18,8 +18,16 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import type { BoardKind } from '../../types/board';
 import type { WireSignalType } from '../../types/wire';
-import { boardPinToNumber, isBoardComponent, normalizeBoardPinName } from '../../utils/boardPinMapping';
+import {
+  boardPinToNumber,
+  isBoardComponent,
+  normalizeBoardPinName,
+} from '../../utils/boardPinMapping';
 import { getAllPinPositions } from '../../utils/pinPositionCalculator';
+import {
+  scanAndReportCanvasPins,
+  invalidatePinObservationCache,
+} from '../../utils/canvasPinScanner';
 
 type ChatRow = {
   id: string;
@@ -37,11 +45,7 @@ function renderInlineMarkdown(text: string): React.ReactNode[] {
   let match: RegExpExecArray | null = null;
   while ((match = boldRegex.exec(text)) !== null) {
     if (match.index > last) nodes.push(text.slice(last, match.index));
-    nodes.push(
-      <strong key={`b-${match.index}-${match[0].length}`}>
-        {match[1]}
-      </strong>,
-    );
+    nodes.push(<strong key={`b-${match.index}-${match[0].length}`}>{match[1]}</strong>);
     last = match.index + match[0].length;
   }
   if (last < text.length) nodes.push(text.slice(last));
@@ -74,13 +78,13 @@ function renderMarkdownLite(text: string): React.ReactNode {
       i += 1;
     }
     const para = paragraphLines.join(' ').trim();
-    blocks.push(
-      <p key={`p-${i}`}>
-        {renderInlineMarkdown(para)}
-      </p>,
-    );
+    blocks.push(<p key={`p-${i}`}>{renderInlineMarkdown(para)}</p>);
   }
   return <>{blocks}</>;
+}
+
+function prettyJson(value: unknown): string {
+  return JSON.stringify(value, null, 2);
 }
 
 const WIRE_SIGNAL_TYPES: ReadonlySet<WireSignalType> = new Set([
@@ -145,8 +149,10 @@ export const AgentPanel: React.FC = () => {
   );
   const hasProject = Boolean(currentProject?.id);
   const runIsActive = activeSession?.status === 'running' || activeSession?.status === 'queued';
-  const activeTraces = activeSessionId ? tracesBySession[activeSessionId] ?? [] : [];
-  const streamingAssistantText = activeSessionId ? bufferedTextBySession[activeSessionId] ?? '' : '';
+  const activeTraces = activeSessionId ? (tracesBySession[activeSessionId] ?? []) : [];
+  const streamingAssistantText = activeSessionId
+    ? (bufferedTextBySession[activeSessionId] ?? '')
+    : '';
   const actionBusy = isApplying || isDiscarding || isStopping || isSendingMessage;
 
   // Pending changes are derived from stream events:
@@ -170,12 +176,16 @@ export const AgentPanel: React.FC = () => {
   const pendingSummary = useMemo(() => {
     if (!lastSnapshotUpdatedTrace) return null;
     const payload = lastSnapshotUpdatedTrace.payload ?? {};
-    const changedBoards = Array.isArray(payload.changedBoardIds) ? payload.changedBoardIds.length : 0;
+    const changedBoards = Array.isArray(payload.changedBoardIds)
+      ? payload.changedBoardIds.length
+      : 0;
     const changedComponents = Array.isArray(payload.changedComponentIds)
       ? payload.changedComponentIds.length
       : 0;
     const changedWires = Array.isArray(payload.changedWireIds) ? payload.changedWireIds.length : 0;
-    const changedFiles = Array.isArray(payload.changedFileGroups) ? payload.changedFileGroups.length : 0;
+    const changedFiles = Array.isArray(payload.changedFileGroups)
+      ? payload.changedFileGroups.length
+      : 0;
     const tool = typeof payload.tool === 'string' ? payload.tool : undefined;
     return {
       tool,
@@ -204,8 +214,36 @@ export const AgentPanel: React.FC = () => {
     const warningMessages: string[] = [];
     const editorState = useEditorStore.getState();
     const simulatorState = useSimulatorStore.getState();
-    const boardKindById = new Map(snapshot.boards.map((board) => [board.id, board.boardKind as BoardKind]));
-    const componentById = new Map(snapshot.components.map((component) => [component.id, component]));
+    const boardKindById = new Map(
+      snapshot.boards.map((board) => [board.id, board.boardKind as BoardKind]),
+    );
+    // Reverse lookup: boardKind → board id. Used to resolve wires that
+    // reference a board by its boardKind string (e.g. "esp32") instead of its
+    // instance id (e.g. "arduino-uno" after change_board_kind).
+    const boardKindToId = new Map(
+      snapshot.boards.map((board) => [board.boardKind as string, board.id]),
+    );
+    /** Resolve a wire endpoint componentId to the actual board/component id. */
+    const resolveComponentId = (componentId: string): string => {
+      // Already a known board id.
+      if (boardKindById.has(componentId)) return componentId;
+      // It's a boardKind string — find the board instance id.
+      const resolvedId = boardKindToId.get(componentId);
+      if (resolvedId) return resolvedId;
+      // Not a board — return as-is (component id).
+      return componentId;
+    };
+    const resolveBoardKind = (componentId: string): BoardKind | undefined => {
+      // Direct lookup by board id.
+      const direct = boardKindById.get(componentId);
+      if (direct) return direct;
+      // The componentId is itself a boardKind.
+      if (boardKindToId.has(componentId)) return componentId as BoardKind;
+      return undefined;
+    };
+    const componentById = new Map(
+      snapshot.components.map((component) => [component.id, component]),
+    );
 
     simulatorState.hydrateBoardsFromSnapshot(
       (snapshot.boards ?? []).map((board) => ({
@@ -241,7 +279,9 @@ export const AgentPanel: React.FC = () => {
             content: snapFile.content,
             modified: false,
           });
-          warningMessages.push(`Kept local edits in ${snapFile.name}, wrote agent update to ${base}-agent${ext}.`);
+          warningMessages.push(
+            `Kept local edits in ${snapFile.name}, wrote agent update to ${base}-agent${ext}.`,
+          );
         } else {
           nextGroup.push({
             id: existing?.id ?? crypto.randomUUID(),
@@ -267,7 +307,7 @@ export const AgentPanel: React.FC = () => {
     const selectedGroupId =
       snapshot.activeGroupId && nextFileGroups[snapshot.activeGroupId]
         ? snapshot.activeGroupId
-        : Object.keys(nextFileGroups)[0] ?? editorState.activeGroupId;
+        : (Object.keys(nextFileGroups)[0] ?? editorState.activeGroupId);
     const selectedFiles = nextFileGroups[selectedGroupId] ?? [];
     useEditorStore.setState({
       fileGroups: nextFileGroups,
@@ -284,6 +324,11 @@ export const AgentPanel: React.FC = () => {
     const unresolvedComponentPins: string[] = [];
     simulatorState.setWires(
       (snapshot.wires ?? []).map((wire) => {
+        // Resolve componentIds that may be boardKind strings (e.g. "esp32") to
+        // the actual board instance id (e.g. "arduino-uno" after change_board_kind).
+        const startId = resolveComponentId(wire.start.componentId);
+        const endId = resolveComponentId(wire.end.componentId);
+
         const normalizeComponentPin = (componentId: string, rawPinName: string): string => {
           const comp = componentById.get(componentId);
           if (!comp) return rawPinName.trim();
@@ -302,28 +347,29 @@ export const AgentPanel: React.FC = () => {
           return rawPinName.trim();
         };
 
-        const normalizedStartPin = isBoardComponent(wire.start.componentId)
+        const normalizedStartPin = isBoardComponent(startId)
           ? normalizeBoardPinName(
-              boardKindById.get(wire.start.componentId) ?? wire.start.componentId,
+              resolveBoardKind(startId) ?? startId,
               wire.start.pinName,
             )
-          : normalizeComponentPin(wire.start.componentId, wire.start.pinName);
-        const normalizedEndPin = isBoardComponent(wire.end.componentId)
+          : normalizeComponentPin(startId, wire.start.pinName);
+        const normalizedEndPin = isBoardComponent(endId)
           ? normalizeBoardPinName(
-              boardKindById.get(wire.end.componentId) ?? wire.end.componentId,
+              resolveBoardKind(endId) ?? endId,
               wire.end.pinName,
             )
-          : normalizeComponentPin(wire.end.componentId, wire.end.pinName);
+          : normalizeComponentPin(endId, wire.end.pinName);
 
-        if (isBoardComponent(wire.start.componentId)) {
-          const boardId = boardKindById.get(wire.start.componentId) ?? wire.start.componentId;
-          if (boardPinToNumber(boardId, normalizedStartPin) === null) {
-            unresolvedBoardPins.push(`${wire.start.componentId}:${wire.start.pinName}`);
+
+        if (isBoardComponent(startId)) {
+          const boardKind = resolveBoardKind(startId) ?? startId;
+          if (boardPinToNumber(boardKind, normalizedStartPin) === null) {
+            unresolvedBoardPins.push(`${startId}:${wire.start.pinName}`);
           }
         } else {
-          const comp = componentById.get(wire.start.componentId);
+          const comp = componentById.get(startId);
           if (!comp) {
-            unresolvedComponentPins.push(`${wire.start.componentId}:${wire.start.pinName}`);
+            unresolvedComponentPins.push(`${startId}:${wire.start.pinName}`);
           } else {
             const pins = getAllPinPositions(comp.id, comp.x + 4, comp.y + 6);
             if (
@@ -340,20 +386,20 @@ export const AgentPanel: React.FC = () => {
                 );
               })
             ) {
-              unresolvedComponentPins.push(`${wire.start.componentId}:${wire.start.pinName}`);
+              unresolvedComponentPins.push(`${startId}:${wire.start.pinName}`);
             }
           }
         }
 
-        if (isBoardComponent(wire.end.componentId)) {
-          const boardId = boardKindById.get(wire.end.componentId) ?? wire.end.componentId;
-          if (boardPinToNumber(boardId, normalizedEndPin) === null) {
-            unresolvedBoardPins.push(`${wire.end.componentId}:${wire.end.pinName}`);
+        if (isBoardComponent(endId)) {
+          const boardKind = resolveBoardKind(endId) ?? endId;
+          if (boardPinToNumber(boardKind, normalizedEndPin) === null) {
+            unresolvedBoardPins.push(`${endId}:${wire.end.pinName}`);
           }
         } else {
-          const comp = componentById.get(wire.end.componentId);
+          const comp = componentById.get(endId);
           if (!comp) {
-            unresolvedComponentPins.push(`${wire.end.componentId}:${wire.end.pinName}`);
+            unresolvedComponentPins.push(`${endId}:${wire.end.pinName}`);
           } else {
             const pins = getAllPinPositions(comp.id, comp.x + 4, comp.y + 6);
             if (
@@ -370,15 +416,15 @@ export const AgentPanel: React.FC = () => {
                 );
               })
             ) {
-              unresolvedComponentPins.push(`${wire.end.componentId}:${wire.end.pinName}`);
+              unresolvedComponentPins.push(`${endId}:${wire.end.pinName}`);
             }
           }
         }
 
         return {
           ...wire,
-          start: { ...wire.start, pinName: normalizedStartPin },
-          end: { ...wire.end, pinName: normalizedEndPin },
+          start: { ...wire.start, componentId: startId, pinName: normalizedStartPin },
+          end: { ...wire.end, componentId: endId, pinName: normalizedEndPin },
           waypoints: wire.waypoints ?? [],
           color: wire.color ?? '#22c55e',
           signalType:
@@ -404,6 +450,30 @@ export const AgentPanel: React.FC = () => {
     setSyncWarning(warningMessages.length > 0 ? warningMessages.join(' ') : null);
   };
 
+  /**
+   * Eagerly flush a canvas pin scan after a snapshot has been applied.
+   *
+   * Called immediately after applySnapshotToStores() so that any newly-added
+   * board or component has its pinInfo POST-ed to the backend *before* the
+   * agent's next `get_canvas_runtime_pins` tool call resolves.
+   *
+   * `changedMetadataIds` — optional list of metadataId strings whose cache
+   * entries should be invalidated first (forces a re-POST even if the pin
+   * set hasn't changed, e.g. after add_component with a fresh instance).
+   */
+  const flushCanvasPins = (changedMetadataIds?: string[]) => {
+    const { boards, components } = useSimulatorStore.getState();
+    // Invalidate stale dedup cache for any metadata IDs that just changed so
+    // their new DOM elements are always reported.
+    if (changedMetadataIds) {
+      for (const mid of changedMetadataIds) {
+        invalidatePinObservationCache(mid);
+      }
+    }
+    // Fire eagerly — no awaiting so the caller isn't blocked.
+    void scanAndReportCanvasPins({ boards, components, upgradeDelayMs: 250 });
+  };
+
   const reconcileEvents = async (sessionId: string, fromSeq: number) => {
     if (reconcilingRef.current) return;
     reconcilingRef.current = true;
@@ -414,7 +484,8 @@ export const AgentPanel: React.FC = () => {
       for (const ev of sorted) {
         ingestEvent(sessionId, ev);
         if (ev.eventType === 'run.started') bumpSessionStatus(sessionId, 'running', ev.createdAt);
-        if (ev.eventType === 'run.completed') bumpSessionStatus(sessionId, 'completed', ev.createdAt);
+        if (ev.eventType === 'run.completed')
+          bumpSessionStatus(sessionId, 'completed', ev.createdAt);
         if (ev.eventType === 'run.failed') bumpSessionStatus(sessionId, 'failed', ev.createdAt);
         if (ev.eventType === 'run.cancelled') bumpSessionStatus(sessionId, 'stopped', ev.createdAt);
       }
@@ -422,6 +493,9 @@ export const AgentPanel: React.FC = () => {
         const snapshot = await getAgentSessionSnapshot(sessionId);
         applySnapshotToStores(snapshot);
         markSnapshotSynced(sessionId);
+        // Flush pin observations so the agent's next get_canvas_runtime_pins
+        // call sees live data from the freshly-rendered canvas.
+        flushCanvasPins();
       }
       setStreamRecoveryWarning(null);
     } catch (err: unknown) {
@@ -468,46 +542,95 @@ export const AgentPanel: React.FC = () => {
       return;
     }
     streamRef.current?.stop();
-    const stream = new AgentEventStream(activeSessionId, useAgentStore.getState().lastSeqBySession[activeSessionId] ?? 0, {
-      onStatus: (status) => setStreamStatus(status),
-      onError: (msg) => setError(msg),
-      onGap: async (expectedNextSeq, actualSeq) => {
-        setStreamRecoveryWarning(
-          `Stream gap detected (expected ${expectedNextSeq}, got ${actualSeq}). Replaying...`,
-        );
-        await reconcileEvents(activeSessionId, expectedNextSeq);
-      },
-      onEvent: async (event) => {
-        ingestEvent(activeSessionId, event);
-        if (event.eventType === 'run.started') bumpSessionStatus(activeSessionId, 'running', event.createdAt);
-        if (event.eventType === 'run.completed') bumpSessionStatus(activeSessionId, 'completed', event.createdAt);
-        if (event.eventType === 'run.failed') bumpSessionStatus(activeSessionId, 'failed', event.createdAt);
-        if (event.eventType === 'run.cancelled') bumpSessionStatus(activeSessionId, 'stopped', event.createdAt);
-        if (event.eventType === 'run.completed' || event.eventType === 'run.failed' || event.eventType === 'run.cancelled') {
-          try {
-            await refreshSessionsForProject(currentProject?.id);
-          } catch {
-            // noop
+    const stream = new AgentEventStream(
+      activeSessionId,
+      useAgentStore.getState().lastSeqBySession[activeSessionId] ?? 0,
+      {
+        onStatus: (status) => setStreamStatus(status),
+        onError: (msg) => setError(msg),
+        onGap: async (expectedNextSeq, actualSeq) => {
+          setStreamRecoveryWarning(
+            `Stream gap detected (expected ${expectedNextSeq}, got ${actualSeq}). Replaying...`,
+          );
+          await reconcileEvents(activeSessionId, expectedNextSeq);
+        },
+        onEvent: async (event) => {
+          ingestEvent(activeSessionId, event);
+          if (event.eventType === 'run.started')
+            bumpSessionStatus(activeSessionId, 'running', event.createdAt);
+          if (event.eventType === 'run.completed')
+            bumpSessionStatus(activeSessionId, 'completed', event.createdAt);
+          if (event.eventType === 'run.failed')
+            bumpSessionStatus(activeSessionId, 'failed', event.createdAt);
+          if (event.eventType === 'run.cancelled')
+            bumpSessionStatus(activeSessionId, 'stopped', event.createdAt);
+          if (
+            event.eventType === 'run.completed' ||
+            event.eventType === 'run.failed' ||
+            event.eventType === 'run.cancelled'
+          ) {
+            try {
+              await refreshSessionsForProject(currentProject?.id);
+            } catch {
+              // noop
+            }
           }
-        }
-        if (event.eventType === 'snapshot.updated') {
-          try {
-            const snapshot = await getAgentSessionSnapshot(activeSessionId);
-            applySnapshotToStores(snapshot);
-            markSnapshotSynced(activeSessionId);
-          } catch (err: unknown) {
-            setSyncWarning(err instanceof Error ? `Snapshot refresh failed: ${err.message}` : 'Snapshot refresh failed.');
+          if (event.eventType === 'snapshot.updated') {
+            try {
+              const snapshot = await getAgentSessionSnapshot(activeSessionId);
+              applySnapshotToStores(snapshot);
+              markSnapshotSynced(activeSessionId);
+              // Derive which metadataIds changed so we can bust their cache
+              // entries and force a fresh pinInfo report to the backend.
+              const payload = event.payload ?? {};
+              const changedComponentIds: string[] = Array.isArray(payload.changedComponentIds)
+                ? (payload.changedComponentIds as string[])
+                : [];
+              const changedBoardIds: string[] = Array.isArray(payload.changedBoardIds)
+                ? (payload.changedBoardIds as string[])
+                : [];
+              const { components: storeComponents, boards: storeBoards } =
+                useSimulatorStore.getState();
+              const changedMetadataIds = [
+                ...changedComponentIds.flatMap((cid) => {
+                  const c = storeComponents.find((c) => c.id === cid);
+                  return c ? [c.metadataId] : [];
+                }),
+                ...changedBoardIds.flatMap((bid) => {
+                  const b = storeBoards.find((b) => b.id === bid);
+                  return b ? [b.boardKind] : [];
+                }),
+              ];
+              // Eagerly scan & report — resolves before the agent can call
+              // get_canvas_runtime_pins again.
+              flushCanvasPins(changedMetadataIds.length > 0 ? changedMetadataIds : undefined);
+            } catch (err: unknown) {
+              setSyncWarning(
+                err instanceof Error
+                  ? `Snapshot refresh failed: ${err.message}`
+                  : 'Snapshot refresh failed.',
+              );
+            }
           }
-        }
+        },
       },
-    });
+    );
     streamRef.current = stream;
     stream.start();
     return () => {
       stream.stop();
       if (streamRef.current === stream) streamRef.current = null;
     };
-  }, [activeSessionId, currentProject?.id, ingestEvent, markSnapshotSynced, setError, setSessions, setStreamStatus, setSyncWarning]);
+  }, [
+    activeSessionId,
+    currentProject?.id,
+    ingestEvent,
+    markSnapshotSynced,
+    setError,
+    setSessions,
+    setStreamStatus,
+    setSyncWarning,
+  ]);
 
   const sendPrompt = async (prompt: string) => {
     if (!prompt.trim()) return;
@@ -521,7 +644,10 @@ export const AgentPanel: React.FC = () => {
     try {
       let sessionId = activeSessionId;
       if (!sessionId) {
-        const created = await createAgentSession({ projectId: currentProject.id, modelName: defaultModelName || undefined });
+        const created = await createAgentSession({
+          projectId: currentProject.id,
+          modelName: defaultModelName || undefined,
+        });
         upsertSession(created);
         sessionId = created.id;
       }
@@ -702,7 +828,9 @@ export const AgentPanel: React.FC = () => {
         <div className="agent-panel__title-wrap">
           <h3 className="agent-panel__title">Agent</h3>
           {activeSession?.status && (
-            <span className={`agent-status-badge ${statusClass(activeSession.status)}`}>{activeSession.status}</span>
+            <span className={`agent-status-badge ${statusClass(activeSession.status)}`}>
+              {activeSession.status}
+            </span>
           )}
           {hasPendingChanges && <span className="agent-draft-badge">Draft changes</span>}
         </div>
@@ -710,7 +838,10 @@ export const AgentPanel: React.FC = () => {
           className="agent-panel__new-btn"
           onClick={async () => {
             if (!currentProject?.id) return;
-            const created = await createAgentSession({ projectId: currentProject.id, modelName: defaultModelName || undefined });
+            const created = await createAgentSession({
+              projectId: currentProject.id,
+              modelName: defaultModelName || undefined,
+            });
             upsertSession(created);
           }}
           disabled={!hasProject || actionBusy}
@@ -744,24 +875,39 @@ export const AgentPanel: React.FC = () => {
           <div className="agent-draft-banner">
             <div className="agent-draft-banner__title">
               Draft changes ready to apply
-              {pendingSummary.tool ? <span className="agent-draft-banner__tool">via {pendingSummary.tool}</span> : null}
+              {pendingSummary.tool ? (
+                <span className="agent-draft-banner__tool">via {pendingSummary.tool}</span>
+              ) : null}
             </div>
             <div className="agent-draft-banner__meta">
-              {pendingSummary.changedFiles > 0 ? `${pendingSummary.changedFiles} file group(s)` : null}
-              {pendingSummary.changedComponents > 0 ? ` · ${pendingSummary.changedComponents} component(s)` : null}
+              {pendingSummary.changedFiles > 0
+                ? `${pendingSummary.changedFiles} file group(s)`
+                : null}
+              {pendingSummary.changedComponents > 0
+                ? ` · ${pendingSummary.changedComponents} component(s)`
+                : null}
               {pendingSummary.changedWires > 0 ? ` · ${pendingSummary.changedWires} wire(s)` : null}
-              {pendingSummary.changedBoards > 0 ? ` · ${pendingSummary.changedBoards} board(s)` : null}
+              {pendingSummary.changedBoards > 0
+                ? ` · ${pendingSummary.changedBoards} board(s)`
+                : null}
             </div>
-            <button className="agent-chat-row__toggle" onClick={() => toggleExpand(`draft-${pendingSummary.seq}`)}>
+            <button
+              className="agent-chat-row__toggle"
+              onClick={() => toggleExpand(`draft-${pendingSummary.seq}`)}
+            >
               {expandedRows[`draft-${pendingSummary.seq}`] ? 'Hide details' : 'Show details'}
             </button>
             {expandedRows[`draft-${pendingSummary.seq}`] && (
-              <pre className="agent-panel__trace-payload">{JSON.stringify(pendingSummary.payload, null, 2)}</pre>
+              <pre className="agent-panel__trace-payload">
+                {JSON.stringify(pendingSummary.payload, null, 2)}
+              </pre>
             )}
           </div>
         )}
         {chatRows.length === 0 ? (
-          <div className="agent-panel__muted">Start a session and send a message to chat with the agent.</div>
+          <div className="agent-panel__muted">
+            Start a session and send a message to chat with the agent.
+          </div>
         ) : (
           chatRows.map((row) => (
             <div key={row.id} className={`agent-chat-row agent-chat-row--${row.kind}`}>
@@ -773,9 +919,26 @@ export const AgentPanel: React.FC = () => {
                   {expandedRows[row.id] ? 'Hide details' : 'Show details'}
                 </button>
               )}
-              {expandedRows[row.id] && row.payload && (
-                <pre className="agent-panel__trace-payload">{JSON.stringify(row.payload, null, 2)}</pre>
-              )}
+              {expandedRows[row.id] &&
+                row.payload &&
+                (row.kind === 'tool' ? (
+                  <div className="agent-panel__trace-payload">
+                    <div>
+                      <strong>Input</strong>
+                    </div>
+                    <pre>{prettyJson(row.payload?.input ?? null)}</pre>
+                    <div>
+                      <strong>Output</strong>
+                    </div>
+                    <pre>{prettyJson(row.payload?.output ?? null)}</pre>
+                    <div>
+                      <strong>Raw event</strong>
+                    </div>
+                    <pre>{prettyJson(row.payload)}</pre>
+                  </div>
+                ) : (
+                  <pre className="agent-panel__trace-payload">{prettyJson(row.payload)}</pre>
+                ))}
             </div>
           ))
         )}

@@ -89,6 +89,29 @@ def add_component(
     y: float,
     properties: dict | None = None,
 ) -> tuple[ProjectSnapshotV2, ToolResult]:
+    # Resolve the LLM-supplied metadata_id to the canonical catalog id so the
+    # frontend ComponentRegistry can always look it up via registry.getByRef().
+    # The LLM often emits fuzzy / descriptive IDs (e.g. "display-oled-128x64-i2c")
+    # that don't match any registry key.  _find_component uses the same
+    # normalization logic the catalog already applies so the resolved id will be
+    # exactly what the components-metadata.json "id" field contains.
+    from app.agent.catalog import _find_component  # noqa: PLC0415
+    resolved_meta = _find_component(metadata_id)
+    if resolved_meta is not None:
+        canonical_id = resolved_meta.get("id") or metadata_id
+        if canonical_id != metadata_id:
+            import logging
+            logging.getLogger(__name__).info(
+                "add_component: resolved metadata_id %r → %r", metadata_id, canonical_id
+            )
+        metadata_id = canonical_id
+    else:
+        import logging
+        logging.getLogger(__name__).warning(
+            "add_component: could not resolve metadata_id %r in catalog — "
+            "component may not render on canvas", metadata_id
+        )
+
     updated = snapshot.model_copy(deep=True)
     _ensure_missing(component_id, _entity_ids(updated), "entity")
     updated.components.append(
@@ -101,6 +124,7 @@ def add_component(
         )
     )
     return _validate(updated), ToolResult(ok=True, changedComponentIds=[component_id])
+
 
 
 def update_component(
@@ -161,22 +185,23 @@ def connect_pins(
 ) -> tuple[ProjectSnapshotV2, ToolResult]:
     updated = snapshot.model_copy(deep=True)
     _ensure_missing(wire_id, {w.id for w in updated.wires}, "wire")
-    ids = _entity_ids(updated)
-    if start_component_id not in ids or end_component_id not in ids:
+    resolved_start_id = _resolve_entity_id(updated, start_component_id)
+    resolved_end_id = _resolve_entity_id(updated, end_component_id)
+    if resolved_start_id is None or resolved_end_id is None:
         raise ValueError("wire endpoints must reference existing boards or components")
 
     # Canonicalize component pin names against the component schema so the agent
     # consistently uses the exact pin casing/format published by the catalog
     # (e.g. 7segment exposes "A".."G","DP" but models often emit "a".."g","dp").
-    start_pin = _canonical_entity_pin(updated, start_component_id, start_pin)
-    end_pin = _canonical_entity_pin(updated, end_component_id, end_pin)
+    start_pin = _canonical_entity_pin(updated, resolved_start_id, start_pin)
+    end_pin = _canonical_entity_pin(updated, resolved_end_id, end_pin)
 
     updated.wires.append(
         SnapshotWire.model_validate(
             {
                 "id": wire_id,
-                "start": {"componentId": start_component_id, "pinName": start_pin, "x": 0.0, "y": 0.0},
-                "end": {"componentId": end_component_id, "pinName": end_pin, "x": 0.0, "y": 0.0},
+                "start": {"componentId": resolved_start_id, "pinName": start_pin, "x": 0.0, "y": 0.0},
+                "end": {"componentId": resolved_end_id, "pinName": end_pin, "x": 0.0, "y": 0.0},
                 "waypoints": [],
                 "color": color,
                 "signalType": signal_type,
@@ -189,13 +214,24 @@ def connect_pins(
 def _canonical_entity_pin(snapshot: ProjectSnapshotV2, entity_id: str, pin_name: str) -> str:
     board = next((b for b in snapshot.boards if b.id == entity_id), None)
     if board is not None:
-        schema_component_id = board.boardKind
-    else:
-        component = next((c for c in snapshot.components if c.id == entity_id), None)
-        if component is None:
-            raise ValueError(f"component not found: {entity_id}")
-        schema_component_id = component.metadataId
-    return _canonical_schema_pin(entity_id=entity_id, schema_component_id=schema_component_id, pin_name=pin_name)
+        # Board pin names come from the live canvas DOM (get_canvas_runtime_pins),
+        # not from components-metadata.json.  The static JSON schema for boards
+        # often has a different naming convention (e.g. "D2" vs "2") so we skip
+        # schema validation here and trust whatever the agent received from the
+        # live canvas tool.
+        raw = (pin_name or "").strip()
+        if not raw:
+            raise ValueError(f"pinName is required for board {entity_id}")
+        return raw
+
+    component = next((c for c in snapshot.components if c.id == entity_id), None)
+    if component is None:
+        raise ValueError(f"component not found: {entity_id}")
+    return _canonical_schema_pin(
+        entity_id=entity_id,
+        schema_component_id=component.metadataId,
+        pin_name=pin_name,
+    )
 
 
 def _canonical_schema_pin(*, entity_id: str, schema_component_id: str, pin_name: str) -> str:
@@ -367,6 +403,11 @@ def _unique_id(base: str, existing: set[str]) -> str:
 def _board(snapshot: ProjectSnapshotV2, board_id: str) -> SnapshotBoard:
     board = next((b for b in snapshot.boards if b.id == board_id), None)
     if board is None:
+        normalized = canonical_board_kind(board_id)
+        matches = [b for b in snapshot.boards if canonical_board_kind(b.boardKind) == normalized]
+        if len(matches) == 1:
+            return matches[0]
+    if board is None:
         raise ValueError(f"board not found: {board_id}")
     return board
 
@@ -421,3 +462,22 @@ def _normalize_replacement_text(replacement: str) -> str:
     if "\\n" in replacement or "\\r" in replacement:
         replacement = replacement.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
     return replacement
+
+
+def _resolve_entity_id(snapshot: ProjectSnapshotV2, entity_id: str) -> str | None:
+    raw = (entity_id or "").strip()
+    if not raw:
+        return None
+    ids = _entity_ids(snapshot)
+    if raw in ids:
+        return raw
+
+    normalized = raw.removeprefix("wokwi-").removeprefix("velxio-")
+    if normalized in ids:
+        return normalized
+
+    board_kind = canonical_board_kind(normalized)
+    board_matches = [b for b in snapshot.boards if canonical_board_kind(b.boardKind) == board_kind]
+    if len(board_matches) == 1:
+        return board_matches[0].id
+    return None

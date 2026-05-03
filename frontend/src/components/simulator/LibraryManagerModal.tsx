@@ -57,15 +57,15 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({ isOpen
     if (isOpen && activeTab === 'installed') fetchInstalled();
   }, [isOpen, activeTab, fetchInstalled]);
 
-  useEffect(() => {
-    if (isOpen) fetchInstalled();
-  }, [isOpen, fetchInstalled]);
-
-  // Search: immediate on open (empty query), debounced when typing
+  // Search: debounced when typing, clear results when query is empty
   useEffect(() => {
     if (!isOpen) return;
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setLoadingSearch(false);
+      return;
+    }
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const delay = searchQuery ? 400 : 0;
     debounceRef.current = setTimeout(async () => {
       setLoadingSearch(true);
       setStatusMsg(null);
@@ -78,7 +78,7 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({ isOpen
       } finally {
         setLoadingSearch(false);
       }
-    }, delay);
+    }, 400);
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -279,7 +279,7 @@ export const LibraryManagerModal: React.FC<LibraryManagerModalProps> = ({ isOpen
                   <p>
                     {searchQuery
                       ? `No libraries found for "${searchQuery}"`
-                      : 'No libraries available'}
+                      : 'Type a name to search for libraries'}
                   </p>
                 </div>
               )}

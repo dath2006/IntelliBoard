@@ -207,7 +207,7 @@ const ESP32_PIN_MAP: Record<string, number> = {
 };
 
 /** All known board component IDs in the simulator */
-export const BOARD_COMPONENT_IDS = [
+export const BOARD_COMPONENT_IDS = new Set([
   'arduino-uno',
   'arduino-nano',
   'arduino-mega',
@@ -227,7 +227,28 @@ export const BOARD_COMPONENT_IDS = [
   'xiao-esp32-c3',
   'aitewinrobot-esp32c3-supermini',
   'attiny85',
-];
+]);
+
+/** Known board aliases that may appear in imported examples or metadata. */
+const BOARD_COMPONENT_ALIASES: Record<string, string> = {
+  'esp32-devkit-v1': 'esp32',
+  'wokwi-esp32-devkit-v1': 'esp32',
+  'wokwi-esp32-devkit-c-v4': 'esp32-devkit-c-v4',
+  'wokwi-esp32-cam': 'esp32-cam',
+  'wokwi-wemos-lolin32-lite': 'wemos-lolin32-lite',
+  'wokwi-esp32-s3': 'esp32-s3',
+  'wokwi-xiao-esp32-s3': 'xiao-esp32-s3',
+  'wokwi-arduino-nano-esp32': 'arduino-nano-esp32',
+  'wokwi-esp32-c3': 'esp32-c3',
+  'wokwi-xiao-esp32-c3': 'xiao-esp32-c3',
+  'wokwi-aitewinrobot-esp32c3-supermini': 'aitewinrobot-esp32c3-supermini',
+  'wokwi-arduino-uno': 'arduino-uno',
+  'wokwi-arduino-nano': 'arduino-nano',
+  'wokwi-arduino-mega': 'arduino-mega',
+  'wokwi-pi-pico': 'raspberry-pi-pico',
+  'wokwi-pi-pico-w': 'pi-pico-w',
+  'wokwi-raspberry-pi-pico': 'raspberry-pi-pico',
+};
 
 /**
  * Check whether a componentId represents a board (not an external component).
@@ -235,14 +256,19 @@ export const BOARD_COMPONENT_IDS = [
 export function isBoardComponent(componentId: string): boolean {
   const cid = (componentId || '').toLowerCase();
   if (!cid) return false;
-  if (BOARD_COMPONENT_IDS.some((id) => cid === id || cid.startsWith(`${id}-`) || cid.startsWith(id))) {
+  if (BOARD_COMPONENT_IDS.has(cid)) return true;
+
+  const aliasTarget = BOARD_COMPONENT_ALIASES[cid];
+  if (aliasTarget && BOARD_COMPONENT_IDS.has(aliasTarget)) {
     return true;
   }
-  // Generic families to avoid brittle hardcoded lists for future board ids.
-  if (cid.startsWith('esp32') || cid.startsWith('wokwi-esp32')) return true;
-  if (cid.startsWith('arduino-')) return true;
-  if (cid.startsWith('raspberry-pi-') || cid.startsWith('pi-pico')) return true;
-  if (cid.includes('attiny')) return true;
+
+  // Accept explicit board-kind style prefixes only when the exact id is known.
+  if (cid.startsWith('wokwi-')) {
+    const trimmed = cid.slice('wokwi-'.length);
+    return BOARD_COMPONENT_IDS.has(trimmed) || Boolean(BOARD_COMPONENT_ALIASES[cid]);
+  }
+
   return false;
 }
 
@@ -269,7 +295,10 @@ export function normalizeBoardPinName(boardId: string, pinName: string): string 
   }
 
   // RP2040 aliases sometimes arrive as GPIOx, while mapping expects GPx.
-  if ((boardId === 'raspberry-pi-pico' || boardId === 'pi-pico-w' || boardId === 'nano-rp2040') && /^GPIO\d+$/i.test(raw)) {
+  if (
+    (boardId === 'raspberry-pi-pico' || boardId === 'pi-pico-w' || boardId === 'nano-rp2040') &&
+    /^GPIO\d+$/i.test(raw)
+  ) {
     return `GP${parseInt(raw.substring(4), 10)}`;
   }
 

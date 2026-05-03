@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from app.agent.catalog import (
+    get_canvas_runtime_pins as _get_canvas_runtime_pins,
     get_component_schema as _get_component_schema,
     list_component_schema_gaps as _list_component_schema_gaps,
     search_component_catalog as _search_component_catalog,
@@ -71,6 +73,60 @@ def search_component_catalog(
 
 def get_component_schema(component_id: str) -> dict[str, Any]:
     return _get_component_schema(component_id)
+
+
+async def get_canvas_runtime_pins(snapshot: ProjectSnapshotV2, instance_id: str) -> dict[str, Any]:
+    """Return ONLY the pin names the live canvas DOM reported for this instance.
+
+    Resolves the metadataId from the snapshot (boards → boardKind, components →
+    metadataId), then reads directly from the runtime pin catalog that the
+    frontend populates by reading element.pinInfo from the rendered wokwi
+    elements.
+
+    Pin names are normalised to the canonical snapshot format before being
+    returned (e.g. ESP32 "D2" → "2") so the agent always uses names that are
+    consistent with existing wires in the project.
+
+    The catalog is polled up to 4 times (every 500 ms, 2 s total) while the
+    frontend canvas renders and sends its pinInfo — this covers the race window
+    after a snapshot.updated event.  If still unavailable after retries the
+    agent should NOT attempt to wire and should inform the user.
+    """
+    # Resolve instance → metadataId.
+    board = next((b for b in snapshot.boards if b.id == instance_id), None)
+    if board is not None:
+        # Retry loop: wait for the frontend pin-flush to arrive.
+        for attempt in range(5):
+            result = _get_canvas_runtime_pins(board.boardKind)
+            if result.get("available"):
+                break
+            if attempt < 4:
+                await asyncio.sleep(0.5)
+        result["instanceId"] = instance_id
+        result["instanceType"] = "board"
+        return result
+
+    component = next((c for c in snapshot.components if c.id == instance_id), None)
+    if component is not None:
+        # Retry loop: wait for the frontend pin-flush to arrive.
+        for attempt in range(5):
+            result = _get_canvas_runtime_pins(component.metadataId)
+            if result.get("available"):
+                break
+            if attempt < 4:
+                await asyncio.sleep(0.5)
+        result["instanceId"] = instance_id
+        result["instanceType"] = "component"
+        # Components are not boards — no board-specific prefix normalisation needed.
+        return result
+
+    return {
+        "instanceId": instance_id,
+        "available": False,
+        "pinNames": [],
+        "error": f"instance not found in snapshot: {instance_id!r}",
+    }
+
 
 
 def list_component_schema_gaps(limit: int = 20) -> dict[str, Any]:
