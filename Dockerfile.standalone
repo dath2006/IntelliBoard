@@ -51,8 +51,21 @@ RUN git clone -b v4.4.7 --recursive --depth=1 --shallow-submodules \
 
 WORKDIR /opt/esp-idf
 
+# GitHub release downloads can intermittently fail (HTTP 502) in CI/local builds.
+# Use Espressif's GitHub asset mirror and add explicit retries for robustness.
+ENV IDF_GITHUB_ASSETS=dl.espressif.com/github_assets
+
 # Install toolchains for esp32 (Xtensa) and esp32c3 (RISC-V) only
-RUN ./install.sh esp32,esp32c3
+RUN set -eux; \
+    for i in 1 2 3 4 5; do \
+      ./install.sh esp32,esp32c3 && break; \
+      if [ "$i" -eq 5 ]; then \
+        echo "ESP-IDF tool install failed after $i attempts"; \
+        exit 1; \
+      fi; \
+      echo "ESP-IDF install failed (attempt $i), retrying in 20s..."; \
+      sleep 20; \
+    done
 
 # Clean up large unnecessary files to reduce image size
 RUN rm -rf .git docs examples \

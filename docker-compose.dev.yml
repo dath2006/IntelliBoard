@@ -1,0 +1,66 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.standalone
+    container_name: velxio-backend-dev
+    restart: unless-stopped
+    env_file:
+      - ./backend/.env
+    environment:
+      - PYTHONUNBUFFERED=1
+      - WATCHFILES_FORCE_POLLING=true
+      - DATABASE_URL=sqlite+aiosqlite:////app/data/velxio.db
+      - DATA_DIR=/app/data
+      - IDF_PATH=/opt/esp-idf
+      - IDF_TOOLS_PATH=/root/.espressif
+      - ARDUINO_ESP32_PATH=/opt/arduino-esp32
+      - QEMU_ESP32_LIB=/app/lib/libqemu-xtensa.so
+      - QEMU_RISCV32_LIB=/app/lib/libqemu-riscv32.so
+    command: >
+      bash -lc "arduino-cli core update-index || true &&
+      arduino-cli core install arduino:avr || true &&
+      arduino-cli core install rp2040:rp2040 || true &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
+    working_dir: /app
+    volumes:
+      - ./backend/app:/app/app
+      - ./data:/app/data
+      - arduino-libs:/root/.arduino15
+    ports:
+      - "8001:8001"
+
+  frontend:
+    image: node:20
+    container_name: velxio-frontend-dev
+    restart: unless-stopped
+    working_dir: /workspace/frontend
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+      - VITE_API_PROXY_TARGET=http://backend:8001
+    command: >
+      sh -c "npm --prefix /workspace install --include=optional &&
+      npm --prefix /workspace/wokwi-libs/avr8js install --include=optional &&
+      npm --prefix /workspace/wokwi-libs/rp2040js install --include=optional &&
+      npm --prefix /workspace/wokwi-libs/wokwi-elements install --include=optional &&
+      npm install --include=optional &&
+      npm run dev -- --host 0.0.0.0 --port 5173"
+    volumes:
+      - ./:/workspace
+      - root-node-modules:/workspace/node_modules
+      - frontend-node-modules:/workspace/frontend/node_modules
+      - avr8js-node-modules:/workspace/wokwi-libs/avr8js/node_modules
+      - rp2040js-node-modules:/workspace/wokwi-libs/rp2040js/node_modules
+      - wokwi-elements-node-modules:/workspace/wokwi-libs/wokwi-elements/node_modules
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+
+volumes:
+  arduino-libs:
+  root-node-modules:
+  frontend-node-modules:
+  avr8js-node-modules:
+  rp2040js-node-modules:
+  wokwi-elements-node-modules:
