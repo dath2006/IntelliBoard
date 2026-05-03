@@ -34,24 +34,27 @@ services:
     image: node:20
     container_name: velxio-frontend-dev
     restart: unless-stopped
-    working_dir: /workspace/frontend
+    working_dir: /app/frontend
     environment:
       - CHOKIDAR_USEPOLLING=true
       - VITE_API_PROXY_TARGET=http://backend:8001
     command: >
-      sh -c "npm --prefix /workspace install --include=optional &&
-      npm --prefix /workspace/wokwi-libs/avr8js install --include=optional &&
-      npm --prefix /workspace/wokwi-libs/rp2040js install --include=optional &&
-      npm --prefix /workspace/wokwi-libs/wokwi-elements install --include=optional &&
+      sh -c "echo '🔍 Diagnostic: Checking source structure...' && 
+      ls -d src/pages && 
+      echo '📦 Installing dependencies...' &&
+      npm --prefix /app/wokwi-libs/avr8js install --include=optional &&
+      npm --prefix /app/wokwi-libs/rp2040js install --include=optional &&
+      npm --prefix /app/wokwi-libs/wokwi-elements install --include=optional &&
       npm install --include=optional &&
       npm run dev -- --host 0.0.0.0 --port 5173"
     volumes:
-      - ./:/workspace
-      - root-node-modules:/workspace/node_modules
-      - frontend-node-modules:/workspace/frontend/node_modules
-      - avr8js-node-modules:/workspace/wokwi-libs/avr8js/node_modules
-      - rp2040js-node-modules:/workspace/wokwi-libs/rp2040js/node_modules
-      - wokwi-elements-node-modules:/workspace/wokwi-libs/wokwi-elements/node_modules
+      - ./frontend:/app/frontend
+      - ./scripts:/app/scripts
+      - ./wokwi-libs:/app/wokwi-libs
+      - frontend-node-modules:/app/frontend/node_modules
+      - avr8js-node-modules:/app/wokwi-libs/avr8js/node_modules
+      - rp2040js-node-modules:/app/wokwi-libs/rp2040js/node_modules
+      - wokwi-elements-node-modules:/app/wokwi-libs/wokwi-elements/node_modules
     ports:
       - "5173:5173"
     depends_on:
