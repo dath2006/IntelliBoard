@@ -31,6 +31,7 @@ import { useOscilloscopeStore } from '../store/useOscilloscopeStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { agentPanelBounds, useAgentStore } from '../store/useAgentStore';
 import { scanAndReportCanvasPins, clearPinObservationCache } from '../utils/canvasPinScanner';
+import { useAutoSave } from '../hooks/useAutoSave';
 import type { CompilationLog } from '../utils/compilationLogger';
 import '../App.css';
 
@@ -86,6 +87,9 @@ export const EditorPage: React.FC = () => {
     const unsub = wireElectricalSolver();
     return unsub;
   }, []);
+
+  // ── Auto-save canvas + code to DB on every change (2s debounce) ──────────
+  useAutoSave();
 
   // ── Debug: log full enriched canvas snapshot ──────────────────────────────
   const logSnapshot = useCallback(() => {

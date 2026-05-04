@@ -34,6 +34,7 @@ export interface ProjectSaveData {
   code?: string; // legacy fallback
   components_json: string;
   wires_json: string;
+  snapshot_json?: string;
 }
 
 export async function getMyProjects(): Promise<ProjectResponse[]> {

@@ -26,6 +26,7 @@ from app.api.routes.auth import router as auth_router
 from app.api.routes.metrics import router as metrics_router
 from app.api.routes.projects import router as projects_router
 from app.api.routes.agent_sessions import router as agent_sessions_router
+from app.api.routes.llm_providers import router as llm_providers_router
 from app.core.config import settings
 from app.database.session import Base, async_engine
 
@@ -94,6 +95,8 @@ async def lifespan(_app: FastAPI):
             "ALTER TABLE agent_session_events ADD COLUMN event_type VARCHAR(80) NOT NULL DEFAULT ''",
             "ALTER TABLE agent_session_events ADD COLUMN payload_json TEXT NOT NULL DEFAULT '{}'",
             "ALTER TABLE agent_session_events ADD COLUMN created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP",
+            # GitHub Copilot per-user token
+            "ALTER TABLE users ADD COLUMN github_copilot_token VARCHAR",
         ]
         for stmt in legacy_migrations:
             try:
@@ -135,6 +138,7 @@ app.include_router(libraries.router, prefix="/api/libraries", tags=["libraries"]
 app.include_router(auth_router, prefix="/api/auth", tags=["auth"])
 app.include_router(projects_router, prefix="/api", tags=["projects"])
 app.include_router(agent_sessions_router, prefix="/api/agent", tags=["agent"])
+app.include_router(llm_providers_router, prefix="/api/llm", tags=["llm-providers"])
 app.include_router(metrics_router, prefix="/api/metrics", tags=["metrics"])
 app.include_router(admin_router, prefix="/api/admin", tags=["admin"])
 

@@ -5,9 +5,51 @@ import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { useProjectStore } from '../../store/useProjectStore';
 import { createProject, updateProject } from '../../services/projectService';
 import { trackCreateProject, trackSaveProject } from '../../utils/analytics';
+import type { ProjectSnapshotV2 } from '../../services/agentSessions';
 
 interface SaveProjectModalProps {
   onClose: () => void;
+}
+
+/** Build a full ProjectSnapshotV2 from the current Zustand store state. */
+function buildSnapshotFromStores(): ProjectSnapshotV2 {
+  const sim = useSimulatorStore.getState();
+  const editor = useEditorStore.getState();
+
+  const fileGroups: Record<string, { name: string; content: string }[]> = {};
+  for (const [groupId, files] of Object.entries(editor.fileGroups)) {
+    fileGroups[groupId] = files.map((f) => ({ name: f.name, content: f.content }));
+  }
+
+  return {
+    version: 2,
+    boards: sim.boards.map((b) => ({
+      id: b.id,
+      boardKind: b.boardKind,
+      x: b.x,
+      y: b.y,
+      languageMode: b.languageMode ?? 'arduino',
+      activeFileGroupId: b.activeFileGroupId,
+    })),
+    activeBoardId: sim.activeBoardId,
+    components: sim.components.map((c) => ({
+      id: c.id,
+      metadataId: c.metadataId,
+      x: c.x,
+      y: c.y,
+      properties: c.properties ?? {},
+    })),
+    wires: sim.wires.map((w) => ({
+      id: w.id,
+      start: { componentId: w.start.componentId, pinName: w.start.pinName, x: w.start.x ?? 0, y: w.start.y ?? 0 },
+      end: { componentId: w.end.componentId, pinName: w.end.pinName, x: w.end.x ?? 0, y: w.end.y ?? 0 },
+      waypoints: w.waypoints ?? [],
+      color: w.color ?? '#22c55e',
+      signalType: w.signalType ?? null,
+    })),
+    fileGroups,
+    activeGroupId: editor.activeGroupId,
+  };
 }
 
 export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) => {
@@ -52,6 +94,10 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) =
     setSaving(true);
     setError('');
 
+    // Build a full snapshot from all boards and file groups so nothing is lost.
+    const snapshot = buildSnapshotFromStores();
+    const snapshotJson = JSON.stringify(snapshot);
+
     const payload = {
       name: name.trim(),
       description: description.trim() || undefined,
@@ -61,6 +107,7 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) =
       code,
       components_json: JSON.stringify(components),
       wires_json: JSON.stringify(wires),
+      snapshot_json: snapshotJson,
     };
 
     const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -75,6 +122,17 @@ export const SaveProjectModal: React.FC<SaveProjectModalProps> = ({ onClose }) =
         saved = await createProject(payload);
         trackCreateProject();
       }
+
+      // Mark all files as saved (clear modified flag) across all groups.
+      const editorState = useEditorStore.getState();
+      const clearedGroups: Record<string, typeof activeFiles> = {};
+      for (const [groupId, files] of Object.entries(editorState.fileGroups)) {
+        clearedGroups[groupId] = files.map((f) => ({ ...f, modified: false }));
+      }
+      useEditorStore.setState((s) => ({
+        fileGroups: clearedGroups,
+        files: s.files.map((f) => ({ ...f, modified: false })),
+      }));
 
       setCurrentProject({
         id: saved.id,

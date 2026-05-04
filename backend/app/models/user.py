@@ -30,5 +30,7 @@ class User(Base):
     # ISO-3166 alpha-2 country codes from CF-IPCountry. Country only (no city / IP).
     signup_country: Mapped[str | None] = mapped_column(String(2), nullable=True, index=True)
     last_country: Mapped[str | None] = mapped_column(String(2), nullable=True, index=True)
+    # GitHub Copilot OAuth token (per-user, stored encrypted at rest in future)
+    github_copilot_token: Mapped[str | None] = mapped_column(String, nullable=True)
 
     projects: Mapped[list["Project"]] = relationship("Project", back_populates="owner", lazy="select")  # noqa: F821

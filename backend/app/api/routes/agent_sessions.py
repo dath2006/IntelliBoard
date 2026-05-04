@@ -27,6 +27,7 @@ from app.agent.sessions import (
     load_draft_snapshot,
     replay_events,
     set_session_status,
+    sync_canvas_to_session,
 )
 from app.agent.runtime_pin_catalog import record_pin_observation
 from app.agent.snapshot_compat import legacy_to_snapshot_v2, load_snapshot_json
@@ -166,6 +167,39 @@ async def stream_agent_events(
             await asyncio.sleep(0.5)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.patch("/sessions/{session_id}/canvas", response_model=AgentSessionResponse)
+async def sync_canvas_snapshot(
+    session_id: str,
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """
+    Sync the user's current canvas state into the agent session's base and draft
+    snapshots. Call this whenever the user edits the canvas while a session is
+    active so the agent always works from the latest state.
+
+    Expects the raw snapshot JSON as the request body (application/json).
+    """
+    body = await request.json()
+    try:
+        canvas_snapshot = load_snapshot_json(json.dumps(body))
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid snapshot: {exc}") from exc
+
+    try:
+        session = await sync_canvas_to_session(
+            db,
+            session_id=session_id,
+            user_id=user.id,
+            canvas_snapshot=canvas_snapshot,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return _session_response(session)
 
 
 @router.post("/sessions/{session_id}/apply", response_model=AgentSessionResponse)

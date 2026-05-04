@@ -182,6 +182,95 @@ async def discard_draft(
         return session
 
 
+async def sync_canvas_to_session(
+    db: AsyncSession,
+    *,
+    session_id: str,
+    user_id: str,
+    canvas_snapshot: ProjectSnapshotV2,
+) -> AgentSession:
+    """
+    Merge the user's live canvas state into the session's base and draft snapshots.
+
+    This is called whenever the user edits the canvas while an agent session is
+    active, so the agent always works from the latest canvas state rather than
+    the stale snapshot captured at session-creation time.
+
+    Strategy: replace base_snapshot with the incoming canvas snapshot, then
+    re-apply any agent-only changes (components/wires/files that exist in the
+    draft but not in the base) on top of it.
+    """
+    async with get_session_lock(session_id):
+        session = await get_session_for_user(db, session_id=session_id, user_id=user_id)
+        if session is None:
+            raise ValueError("agent session not found")
+
+        old_base = load_snapshot_json(session.base_snapshot_json)
+        old_draft = load_snapshot_json(session.draft_snapshot_json)
+
+        # Compute agent-only additions: components/wires/fileGroup content that
+        # the agent added to the draft but that weren't in the old base.
+        old_base_component_ids = {c.id for c in old_base.components}
+        old_base_wire_ids = {w.id for w in old_base.wires}
+
+        agent_added_components = [
+            c for c in old_draft.components if c.id not in old_base_component_ids
+        ]
+        agent_added_wires = [
+            w for w in old_draft.wires if w.id not in old_base_wire_ids
+        ]
+
+        # Build new base from canvas snapshot.
+        new_base = canvas_snapshot.model_copy(deep=True)
+        session.base_snapshot_json = dump_snapshot_json(new_base)
+
+        # Build new draft = canvas snapshot + agent additions on top.
+        new_draft = canvas_snapshot.model_copy(deep=True)
+
+        # Merge agent-added components (skip if id already present in canvas).
+        canvas_component_ids = {c.id for c in new_draft.components}
+        for comp in agent_added_components:
+            if comp.id not in canvas_component_ids:
+                new_draft.components.append(comp)
+
+        # Merge agent-added wires (skip if id already present or endpoints missing).
+        canvas_entity_ids = {b.id for b in new_draft.boards} | {c.id for c in new_draft.components}
+        canvas_wire_ids = {w.id for w in new_draft.wires}
+        for wire in agent_added_wires:
+            if (
+                wire.id not in canvas_wire_ids
+                and wire.start.componentId in canvas_entity_ids
+                and wire.end.componentId in canvas_entity_ids
+            ):
+                new_draft.wires.append(wire)
+
+        # Merge agent file edits: for each group in the draft, if the agent
+        # changed a file's content vs the old base, carry that change forward.
+        for group_id, draft_files in old_draft.fileGroups.items():
+            old_base_files = {f.name: f.content for f in old_base.fileGroups.get(group_id, [])}
+            canvas_group = new_draft.fileGroups.get(group_id, [])
+            canvas_by_name = {f.name: f for f in canvas_group}
+            for df in draft_files:
+                agent_changed = df.name not in old_base_files or df.content != old_base_files[df.name]
+                if agent_changed and df.name in canvas_by_name:
+                    # Only overwrite if the user hasn't also changed this file
+                    # (canvas content == old base content means user didn't touch it).
+                    canvas_content = canvas_by_name[df.name].content
+                    old_base_content = old_base_files.get(df.name, "")
+                    if canvas_content == old_base_content:
+                        canvas_by_name[df.name] = canvas_by_name[df.name].model_copy(
+                            update={"content": df.content}
+                        )
+            if group_id in new_draft.fileGroups:
+                new_draft.fileGroups[group_id] = list(canvas_by_name.values())
+
+        session.draft_snapshot_json = dump_snapshot_json(new_draft)
+        session.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(session)
+        return session
+
+
 async def apply_draft_to_project(
     db: AsyncSession,
     *,

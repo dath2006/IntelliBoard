@@ -30,10 +30,11 @@ class Settings(BaseSettings):
         """Validate runtime-only agent requirements without affecting other APIs."""
         if not self.AGENT_ENABLED:
             return
-        if not self.OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY is required when AGENT_ENABLED is true.")
         if ":" not in self.AGENT_MODEL:
             raise RuntimeError("AGENT_MODEL must use the provider:model format.")
+        # OpenAI API key is only required for openai: models
+        if self.AGENT_MODEL.startswith("openai:") and not self.OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is required when using openai: models.")
 
 
 settings = Settings()

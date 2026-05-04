@@ -139,3 +139,16 @@ export async function listAgentSessionEvents(
   });
   return data;
 }
+
+/**
+ * Sync the user's current canvas snapshot into the agent session so the agent
+ * always works from the latest canvas state rather than the stale snapshot
+ * captured at session-creation time.
+ */
+export async function syncCanvasToSession(
+  sessionId: string,
+  snapshot: ProjectSnapshotV2,
+): Promise<AgentSession> {
+  const { data } = await api.patch<AgentSession>(`/agent/sessions/${sessionId}/canvas`, snapshot);
+  return data;
+}

@@ -12,8 +12,10 @@ import {
   listAgentSessions,
   sendAgentMessage,
   stopAgentSession,
+  syncCanvasToSession,
 } from '../../services/agentSessions';
 import { AgentEventStream } from './AgentEventStream';
+import { ModelSelector } from './ModelSelector';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import type { BoardKind } from '../../types/board';
@@ -97,6 +99,47 @@ const WIRE_SIGNAL_TYPES: ReadonlySet<WireSignalType> = new Set([
   'spi',
   'usart',
 ]);
+
+/** Build a ProjectSnapshotV2 from the current Zustand store state. */
+function buildSnapshotFromStores(): ProjectSnapshotV2 {
+  const sim = useSimulatorStore.getState();
+  const editor = useEditorStore.getState();
+
+  const fileGroups: Record<string, { name: string; content: string }[]> = {};
+  for (const [groupId, files] of Object.entries(editor.fileGroups)) {
+    fileGroups[groupId] = files.map((f) => ({ name: f.name, content: f.content }));
+  }
+
+  return {
+    version: 2,
+    boards: sim.boards.map((b) => ({
+      id: b.id,
+      boardKind: b.boardKind,
+      x: b.x,
+      y: b.y,
+      languageMode: (b.languageMode ?? 'arduino') as 'arduino' | 'micropython',
+      activeFileGroupId: b.activeFileGroupId,
+    })),
+    activeBoardId: sim.activeBoardId,
+    components: sim.components.map((c) => ({
+      id: c.id,
+      metadataId: c.metadataId,
+      x: c.x,
+      y: c.y,
+      properties: (c.properties ?? {}) as Record<string, unknown>,
+    })),
+    wires: sim.wires.map((w) => ({
+      id: w.id,
+      start: { componentId: w.start.componentId, pinName: w.start.pinName, x: w.start.x ?? 0, y: w.start.y ?? 0 },
+      end: { componentId: w.end.componentId, pinName: w.end.pinName, x: w.end.x ?? 0, y: w.end.y ?? 0 },
+      waypoints: w.waypoints ?? [],
+      color: w.color ?? '#22c55e',
+      signalType: (w.signalType as string | null | undefined) ?? null,
+    })),
+    fileGroups,
+    activeGroupId: editor.activeGroupId,
+  };
+}
 
 function statusClass(status: string): string {
   if (status === 'running' || status === 'queued') return 'agent-status-badge--running';
@@ -632,6 +675,59 @@ export const AgentPanel: React.FC = () => {
     setSyncWarning,
   ]);
 
+  const syncCanvasDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSyncedFingerprintRef = useRef<string | null>(null);
+
+  // Whenever the canvas meaningfully changes while a session is active,
+  // debounce-sync the live state back to the agent. Uses store subscriptions
+  // (not React state) to avoid reference-churn false positives.
+  useEffect(() => {
+    if (!activeSessionId) return;
+
+    const scheduleSync = () => {
+      // Don't sync while the agent is actively running.
+      const sessionStatus = useAgentStore.getState().sessions.find(
+        (s) => s.id === activeSessionId,
+      )?.status;
+      if (sessionStatus === 'running' || sessionStatus === 'queued') return;
+
+      const sim = useSimulatorStore.getState();
+      const editor = useEditorStore.getState();
+
+      // Build a cheap fingerprint — only sync when data actually changed.
+      const fingerprint = [
+        sim.boards.map((b) => `${b.id}:${b.x}:${b.y}`).join('|'),
+        sim.components.map((c) => `${c.id}:${c.x}:${c.y}`).join('|'),
+        sim.wires.map((w) => `${w.id}:${w.start.componentId}:${w.start.pinName}:${w.end.componentId}:${w.end.pinName}`).join('|'),
+        Object.entries(editor.fileGroups)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([gid, fs]) => `${gid}:${fs.map((f) => `${f.name}=${f.content}`).join(',')}`)
+          .join('|'),
+      ].join('||');
+
+      if (fingerprint === lastSyncedFingerprintRef.current) return;
+
+      if (syncCanvasDebounceRef.current) clearTimeout(syncCanvasDebounceRef.current);
+      syncCanvasDebounceRef.current = setTimeout(() => {
+        const liveSnapshot = buildSnapshotFromStores();
+        syncCanvasToSession(activeSessionId, liveSnapshot)
+          .then(() => { lastSyncedFingerprintRef.current = fingerprint; })
+          .catch(() => {
+            // Non-fatal: sync failure just means the agent may have slightly stale state.
+          });
+      }, 1500);
+    };
+
+    const unsubSim = useSimulatorStore.subscribe(scheduleSync);
+    const unsubEditor = useEditorStore.subscribe(scheduleSync);
+
+    return () => {
+      unsubSim();
+      unsubEditor();
+      if (syncCanvasDebounceRef.current) clearTimeout(syncCanvasDebounceRef.current);
+    };
+  }, [activeSessionId]);
+
   const sendPrompt = async (prompt: string) => {
     if (!prompt.trim()) return;
     if (!currentProject?.id) {
@@ -644,8 +740,12 @@ export const AgentPanel: React.FC = () => {
     try {
       let sessionId = activeSessionId;
       if (!sessionId) {
+        // Pass the current live canvas state so the agent starts with the
+        // latest user edits, not the potentially stale DB snapshot.
+        const liveSnapshot = buildSnapshotFromStores();
         const created = await createAgentSession({
           projectId: currentProject.id,
+          snapshotJson: JSON.stringify(liveSnapshot),
           modelName: defaultModelName || undefined,
         });
         upsertSession(created);
@@ -838,8 +938,10 @@ export const AgentPanel: React.FC = () => {
           className="agent-panel__new-btn"
           onClick={async () => {
             if (!currentProject?.id) return;
+            const liveSnapshot = buildSnapshotFromStores();
             const created = await createAgentSession({
               projectId: currentProject.id,
+              snapshotJson: JSON.stringify(liveSnapshot),
               modelName: defaultModelName || undefined,
             });
             upsertSession(created);
@@ -863,10 +965,10 @@ export const AgentPanel: React.FC = () => {
             </option>
           ))}
         </select>
-        <input
+        <ModelSelector
           value={defaultModelName}
-          onChange={(e) => setDefaultModelName(e.target.value)}
-          placeholder="openai:gpt-5.4-mini"
+          onChange={setDefaultModelName}
+          disabled={actionBusy}
         />
       </div>
 
