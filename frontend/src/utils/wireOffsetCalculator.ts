@@ -47,10 +47,10 @@ function extractSegments(wire: Wire): WireSegment[] {
   // Start point
   let currentPoint = { x: wire.start.x, y: wire.start.y };
 
-  // Add segments through control points
-  if (wire.controlPoints && wire.controlPoints.length > 0) {
-    for (const controlPoint of wire.controlPoints) {
-      const nextPoint = { x: controlPoint.x, y: controlPoint.y };
+  // Add segments through waypoints
+  if (wire.waypoints && wire.waypoints.length > 0) {
+    for (const waypoint of wire.waypoints) {
+      const nextPoint = { x: waypoint.x, y: waypoint.y };
 
       // Determine if segment is vertical or horizontal
       const isVertical =
@@ -235,21 +235,21 @@ export function applyOffsetToWire(wire: Wire, offset: number): Wire {
   if (offset === 0) return wire;
 
   // Determine primary direction from the first segment of the path
-  const firstControlOrEnd =
-    wire.controlPoints && wire.controlPoints.length > 0 ? wire.controlPoints[0] : wire.end;
+  const firstWaypointOrEnd =
+    wire.waypoints && wire.waypoints.length > 0 ? wire.waypoints[0] : wire.end;
 
   const isHorizontalFirst =
-    Math.abs(firstControlOrEnd.x - wire.start.x) >= Math.abs(firstControlOrEnd.y - wire.start.y);
+    Math.abs(firstWaypointOrEnd.x - wire.start.x) >= Math.abs(firstWaypointOrEnd.y - wire.start.y);
 
   // True pin positions (never moved)
   const pinStart = { x: wire.start.x, y: wire.start.y };
   const pinEnd = { x: wire.end.x, y: wire.end.y };
 
   // Offset intermediate points perpendicular to the primary direction
-  const shiftedControlPoints = (wire.controlPoints || []).map((cp) => ({
-    ...cp,
-    x: isHorizontalFirst ? cp.x : cp.x + offset,
-    y: isHorizontalFirst ? cp.y + offset : cp.y,
+  const shiftedWaypoints = (wire.waypoints || []).map((wp) => ({
+    ...wp,
+    x: isHorizontalFirst ? wp.x : wp.x + offset,
+    y: isHorizontalFirst ? wp.y + offset : wp.y,
   }));
 
   // Compute where the offset path actually starts/ends
@@ -262,30 +262,30 @@ export function applyOffsetToWire(wire: Wire, offset: number): Wire {
     ? { x: pinEnd.x, y: pinEnd.y + offset }
     : { x: pinEnd.x + offset, y: pinEnd.y };
 
-  // Build new control points:
+  // Build new waypoints:
   //   stub from pinStart → offsetStart, then the shifted intermediates, then stub from offsetEnd → pinEnd
   // We only need to add extra stubs when they are non-zero length.
-  const newControlPoints: typeof wire.controlPoints = [];
+  const newWaypoints: typeof wire.waypoints = [];
 
   // Leading stub end-point (where the offset path begins)
   if (offsetStart.x !== pinStart.x || offsetStart.y !== pinStart.y) {
-    newControlPoints.push({ id: `${wire.id}-stub-s`, ...offsetStart });
+    newWaypoints.push({ ...offsetStart });
   }
 
-  // Shifted original control points
-  for (const cp of shiftedControlPoints) {
-    newControlPoints.push(cp);
+  // Shifted original waypoints
+  for (const wp of shiftedWaypoints) {
+    newWaypoints.push(wp);
   }
 
   // Trailing stub start-point (where the offset path rejoins the pin)
   if (offsetEnd.x !== pinEnd.x || offsetEnd.y !== pinEnd.y) {
-    newControlPoints.push({ id: `${wire.id}-stub-e`, ...offsetEnd });
+    newWaypoints.push({ ...offsetEnd });
   }
 
   return {
     ...wire,
     start: { ...wire.start, x: pinStart.x, y: pinStart.y },
     end: { ...wire.end, x: pinEnd.x, y: pinEnd.y },
-    controlPoints: newControlPoints,
+    waypoints: newWaypoints,
   };
 }

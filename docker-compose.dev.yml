@@ -41,16 +41,25 @@ services:
     command: >
       sh -c "echo '🔍 Diagnostic: Checking source structure...' && 
       ls -d src/pages && 
-      echo '📦 Installing dependencies...' &&
+      echo '📦 Installing root dependencies (typescript, tsx)...' &&
+      npm --prefix /app install --include=dev &&
+      echo '📦 Installing wokwi-libs dependencies...' &&
       npm --prefix /app/wokwi-libs/avr8js install --include=optional &&
       npm --prefix /app/wokwi-libs/rp2040js install --include=optional &&
       npm --prefix /app/wokwi-libs/wokwi-elements install --include=optional &&
+      echo '📦 Installing frontend dependencies...' &&
       npm install --include=optional &&
-      npm run dev -- --host 0.0.0.0 --port 5173"
+      echo '🚀 Starting dev server...' &&
+      npm run generate:metadata &&
+      npm run generate:component-svgs &&
+      npx vite --host 0.0.0.0 --port 5173"
     volumes:
       - ./frontend:/app/frontend
       - ./scripts:/app/scripts
+      - ./package.json:/app/package.json
+      - ./package-lock.json:/app/package-lock.json
       - ./wokwi-libs:/app/wokwi-libs
+      - root-node-modules:/app/node_modules
       - frontend-node-modules:/app/frontend/node_modules
       - avr8js-node-modules:/app/wokwi-libs/avr8js/node_modules
       - rp2040js-node-modules:/app/wokwi-libs/rp2040js/node_modules
