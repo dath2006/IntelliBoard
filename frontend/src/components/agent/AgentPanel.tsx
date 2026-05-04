@@ -16,6 +16,7 @@ import {
 } from '../../services/agentSessions';
 import { AgentEventStream } from './AgentEventStream';
 import { ModelSelector } from './ModelSelector';
+import { ToolTraceRow } from './ToolTraceRow';
 import { useEditorStore } from '../../store/useEditorStore';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import type { BoardKind } from '../../types/board';
@@ -38,6 +39,11 @@ type ChatRow = {
   payload?: Record<string, unknown>;
   createdAt: string;
   expandable?: boolean;
+  // tool-specific
+  toolName?: string;
+  toolInput?: unknown;
+  toolOutput?: unknown;
+  toolFailed?: boolean;
 };
 
 function renderInlineMarkdown(text: string): React.ReactNode[] {
@@ -820,6 +826,22 @@ export const AgentPanel: React.FC = () => {
   const chatRows = useMemo(() => {
     const rows: ChatRow[] = [];
     const sorted = [...activeTraces].sort((a, b) => a.seq - b.seq);
+
+    console.log('[chatRows] Building from', sorted.length, 'traces');
+    console.log('[chatRows] Event types:', sorted.map(t => t.eventType).join(', '));
+
+    // Pre-build a map: toolCallId → result trace, so started rows can look up
+    // their result and render as completed immediately.
+    const resultByCallId = new Map<string, typeof sorted[number]>();
+    for (const t of sorted) {
+      if (t.eventType === 'tool.call.result') {
+        const callId = typeof t.payload?.toolCallId === 'string' ? t.payload.toolCallId : null;
+        if (callId) resultByCallId.set(callId, t);
+      }
+    }
+    // Track which result callIds were consumed so we can render orphan results.
+    const consumedResultCallIds = new Set<string>();
+
     for (const t of sorted) {
       if (t.eventType === 'run.started') {
         rows.push({
@@ -828,29 +850,76 @@ export const AgentPanel: React.FC = () => {
           text: typeof t.payload?.message === 'string' ? t.payload.message : 'Start run',
           createdAt: t.createdAt,
         });
+
       } else if (t.eventType === 'model.output.final') {
         rows.push({ id: t.id, kind: 'assistant', text: t.compactText, createdAt: t.createdAt });
-      } else if (t.eventType === 'tool.call.started' || t.eventType === 'tool.call.result') {
-        rows.push({
-          id: t.id,
-          kind: 'tool',
-          text: t.compactText || t.eventType,
-          createdAt: t.createdAt,
-          payload: t.payload,
-          expandable: true,
-        });
+
+      } else if (t.eventType === 'tool.call.started') {
+        const callId = typeof t.payload?.toolCallId === 'string' ? t.payload.toolCallId : null;
+        const result = callId ? resultByCallId.get(callId) : undefined;
+        const toolName = typeof t.payload?.tool === 'string' ? t.payload.tool : '';
+        const input = t.payload?.input ?? null;
+
+        if (result && callId) {
+          consumedResultCallIds.add(callId);
+          const output = result.payload?.output ?? null;
+          const failed = typeof output === 'object' && output !== null
+            && (output as Record<string, unknown>).ok === false;
+          rows.push({
+            id: t.id,
+            kind: 'tool',
+            text: toolName,
+            createdAt: result.createdAt,
+            toolName,
+            toolInput: input,
+            toolOutput: output,
+            toolFailed: failed,
+          });
+        } else {
+          // Still in progress — show as pending (no output yet).
+          rows.push({
+            id: t.id,
+            kind: 'tool',
+            text: toolName,
+            createdAt: t.createdAt,
+            toolName,
+            toolInput: input,
+            toolOutput: undefined,
+          });
+        }
+
+      } else if (t.eventType === 'tool.call.result') {
+        // Only render standalone if there was no matching started trace.
+        const callId = typeof t.payload?.toolCallId === 'string' ? t.payload.toolCallId : null;
+        if (!callId || !consumedResultCallIds.has(callId)) {
+          const toolName = typeof t.payload?.tool === 'string' ? t.payload.tool : '';
+          const output = t.payload?.output ?? null;
+          const failed = typeof output === 'object' && output !== null
+            && (output as Record<string, unknown>).ok === false;
+          rows.push({
+            id: t.id,
+            kind: 'tool',
+            text: toolName,
+            createdAt: t.createdAt,
+            toolName,
+            toolInput: null,
+            toolOutput: output,
+            toolFailed: failed,
+          });
+        }
+
       } else if (t.eventType === 'run.failed' || t.eventType === 'run.cancelled') {
         rows.push({
           id: t.id,
           kind: 'system',
-          text:
-            t.eventType === 'run.cancelled'
-              ? 'Run cancelled.'
-              : `Run failed${typeof t.payload?.error === 'string' ? `: ${t.payload.error}` : ''}`,
+          text: t.eventType === 'run.cancelled'
+            ? 'Run cancelled.'
+            : `Run failed${typeof t.payload?.error === 'string' ? `: ${t.payload.error}` : ''}`,
           createdAt: t.createdAt,
           payload: t.payload,
           expandable: true,
         });
+
       } else if (t.eventType === 'snapshot.updated') {
         rows.push({
           id: t.id,
@@ -860,22 +929,15 @@ export const AgentPanel: React.FC = () => {
           payload: t.payload,
           expandable: true,
         });
+
       } else if (t.eventType === 'session.applied') {
-        rows.push({
-          id: t.id,
-          kind: 'system',
-          text: 'Changes accepted and applied to project.',
-          createdAt: t.createdAt,
-        });
+        rows.push({ id: t.id, kind: 'system', text: 'Changes accepted and applied to project.', createdAt: t.createdAt });
+
       } else if (t.eventType === 'session.discarded') {
-        rows.push({
-          id: t.id,
-          kind: 'system',
-          text: 'Draft changes discarded.',
-          createdAt: t.createdAt,
-        });
+        rows.push({ id: t.id, kind: 'system', text: 'Draft changes discarded.', createdAt: t.createdAt });
       }
     }
+
     if (activeSession?.status === 'queued' && !rows.some((r) => r.kind === 'assistant')) {
       rows.push({
         id: 'queued-hint',
@@ -892,8 +954,8 @@ export const AgentPanel: React.FC = () => {
         createdAt: new Date().toISOString(),
       });
     }
-    // Merge only immediate assistant chunks that are emitted as part of the
-    // same response window (e.g. split finals), not across separate replies.
+
+    // Merge adjacent assistant chunks from the same response window.
     const merged: ChatRow[] = [];
     for (const row of rows) {
       const prev = merged[merged.length - 1];
@@ -1011,38 +1073,52 @@ export const AgentPanel: React.FC = () => {
             Start a session and send a message to chat with the agent.
           </div>
         ) : (
-          chatRows.map((row) => (
-            <div key={row.id} className={`agent-chat-row agent-chat-row--${row.kind}`}>
-              <div className="agent-chat-row__text">
-                {row.kind === 'assistant' ? renderMarkdownLite(row.text) : row.text}
+          chatRows.map((row) => {
+            if (row.kind === 'tool') {
+              return (
+                <ToolTraceRow
+                  key={row.id}
+                  toolName={row.toolName}
+                  input={row.toolInput}
+                  output={row.toolOutput}
+                  createdAt={row.createdAt}
+                  failed={row.toolFailed}
+                />
+              );
+            }
+            if (row.kind === 'system') {
+              const isError = row.text.startsWith('Run failed');
+              const isCancelled = row.text.startsWith('Run cancelled');
+              const isApplied = row.text.startsWith('Changes accepted');
+              const isDiscarded = row.text.startsWith('Draft changes discarded');
+              return (
+                <div key={row.id} className={`agent-system-row ${isError ? 'agent-system-row--error' : isCancelled ? 'agent-system-row--warn' : isApplied ? 'agent-system-row--success' : isDiscarded ? 'agent-system-row--muted' : ''}`}>
+                  <span className="agent-system-row__icon">
+                    {isError ? '✗' : isCancelled ? '⏹' : isApplied ? '✓' : isDiscarded ? '↩' : 'ℹ'}
+                  </span>
+                  <span className="agent-system-row__text">{row.text}</span>
+                  {row.expandable && row.payload && (
+                    <>
+                      <button className="agent-system-row__toggle" onClick={() => toggleExpand(row.id)}>
+                        {expandedRows[row.id] ? '▲' : '▼'}
+                      </button>
+                      {expandedRows[row.id] && (
+                        <pre className="tool-trace__pre agent-system-row__pre">{prettyJson(row.payload)}</pre>
+                      )}
+                    </>
+                  )}
+                </div>
+              );
+            }
+            // user / assistant
+            return (
+              <div key={row.id} className={`agent-chat-row agent-chat-row--${row.kind}`}>
+                <div className="agent-chat-row__text">
+                  {row.kind === 'assistant' ? renderMarkdownLite(row.text) : row.text}
+                </div>
               </div>
-              {row.expandable && row.payload && (
-                <button className="agent-chat-row__toggle" onClick={() => toggleExpand(row.id)}>
-                  {expandedRows[row.id] ? 'Hide details' : 'Show details'}
-                </button>
-              )}
-              {expandedRows[row.id] &&
-                row.payload &&
-                (row.kind === 'tool' ? (
-                  <div className="agent-panel__trace-payload">
-                    <div>
-                      <strong>Input</strong>
-                    </div>
-                    <pre>{prettyJson(row.payload?.input ?? null)}</pre>
-                    <div>
-                      <strong>Output</strong>
-                    </div>
-                    <pre>{prettyJson(row.payload?.output ?? null)}</pre>
-                    <div>
-                      <strong>Raw event</strong>
-                    </div>
-                    <pre>{prettyJson(row.payload)}</pre>
-                  </div>
-                ) : (
-                  <pre className="agent-panel__trace-payload">{prettyJson(row.payload)}</pre>
-                ))}
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 

@@ -178,6 +178,9 @@ export const useAgentStore = create<AgentState>((set) => ({
       let nextBufferedText = bufferedText;
       let nextTrace: AgentTraceItem | null = null;
 
+      // DEBUG: Log all events to see what's coming through
+      console.log('[ingestEvent]', event.eventType, event.seq, event.payload);
+
       if (event.eventType === 'model.output.delta') {
         const delta = typeof event.payload?.delta === 'string' ? event.payload.delta : '';
         nextBufferedText = bufferedText + delta;
@@ -203,6 +206,17 @@ export const useAgentStore = create<AgentState>((set) => ({
             : `tool-${event.seq}-${Math.random().toString(36).slice(2, 8)}`;
         const tool = typeof event.payload?.tool === 'string' ? event.payload.tool : 'tool';
         pendingBySession[toolCallId] = { toolCallId, tool, startedAt: event.createdAt };
+        // Also store as a trace so in-progress calls are visible in the UI.
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: `${tool} …`,
+          payload: { ...event.payload, toolCallId },
+          expanded: false,
+        };
       } else if (event.eventType === 'tool.call.result') {
         const toolCallId =
           typeof event.payload?.toolCallId === 'string' ? event.payload.toolCallId : undefined;
@@ -217,7 +231,7 @@ export const useAgentStore = create<AgentState>((set) => ({
           eventType: event.eventType,
           createdAt: event.createdAt,
           compactText: `${toolName} completed`,
-          payload: event.payload ?? {},
+          payload: { ...event.payload, toolCallId },
           expanded: false,
         };
         if (toolCallId) delete pendingBySession[toolCallId];

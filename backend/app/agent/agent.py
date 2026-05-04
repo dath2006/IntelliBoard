@@ -578,13 +578,13 @@ async def run_agent_session(
         )
         log_event("run.started", session_id=session_id)
 
-        # Resolve model — GitHub Copilot models need special handling
-        resolved_model_name = session.model_name
-        env_overrides: dict[str, str] = {}
-        if session.model_name and session.model_name.startswith("github-copilot:"):
+        # Resolve model — returns a model string for openai: or a configured
+        # OpenAIModel object for github-copilot: (no env mutation, fully isolated)
+        resolved_model: Any = session.model_name
+        if session.model_name:
             try:
                 from app.services.llm_providers import resolve_pydantic_ai_model
-                resolved_model_name, env_overrides = await resolve_pydantic_ai_model(
+                resolved_model = await resolve_pydantic_ai_model(
                     db, user_id, session.model_name
                 )
             except Exception as exc:
@@ -598,30 +598,23 @@ async def run_agent_session(
                 log_event("run.failed", session_id=session_id, error=str(exc))
                 raise
 
-        agent = build_agent(resolved_model_name, defer_model_check=model_override is not None)
+        agent = build_agent(
+            resolved_model if isinstance(resolved_model, str) else None,
+            defer_model_check=model_override is not None or not isinstance(resolved_model, str),
+        )
         run_kwargs: dict[str, Any] = {"deps": deps}
         run_params = inspect.signature(agent.run).parameters
         if "event_stream_handler" in run_params:
             run_kwargs["event_stream_handler"] = _event_stream_handler
         try:
-            import os
-            # Apply env overrides for GitHub Copilot (sets OPENAI_API_KEY + OPENAI_BASE_URL)
-            old_env = {k: os.environ.get(k) for k in env_overrides}
-            for k, v in env_overrides.items():
-                os.environ[k] = v
-            try:
-                if model_override is not None:
-                    with agent.override(model=model_override):
-                        result = await agent.run(contextual_prompt, **run_kwargs)
-                else:
+            # For GitHub Copilot, resolved_model is an OpenAIModel object — override directly.
+            # For OpenAI string models, model_override takes precedence if provided.
+            effective_override = model_override or (resolved_model if not isinstance(resolved_model, str) else None)
+            if effective_override is not None:
+                with agent.override(model=effective_override):
                     result = await agent.run(contextual_prompt, **run_kwargs)
-            finally:
-                # Restore original env values
-                for k, orig in old_env.items():
-                    if orig is None:
-                        os.environ.pop(k, None)
-                    else:
-                        os.environ[k] = orig
+            else:
+                result = await agent.run(contextual_prompt, **run_kwargs)
         except asyncio.CancelledError:
             await append_event(db, session_id=session_id, event_type="run.cancelled", payload={})
             await set_session_status(db, session_id=session_id, user_id=user_id, status="stopped")

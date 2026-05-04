@@ -2,7 +2,12 @@
 LLM Provider Service — bridges llm_connector.py with the pydantic-ai agent.
 
 Manages per-user GitHub Copilot tokens stored in the DB (users table),
-and resolves model strings for pydantic-ai consumption.
+and resolves model objects for pydantic-ai consumption.
+
+GitHub Copilot and OpenAI are FULLY INDEPENDENT:
+  - OpenAI:  uses settings.OPENAI_API_KEY, hits api.openai.com
+  - GitHub:  uses the user's Copilot session token, hits api.githubcopilot.com
+             — never touches OPENAI_API_KEY
 """
 from __future__ import annotations
 
@@ -22,6 +27,15 @@ if str(_ROOT) not in sys.path:
     sys.path.insert(0, str(_ROOT))
 
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# GitHub Copilot API constants (mirrors llm_connector.py)
+# ---------------------------------------------------------------------------
+_GH_CLIENT_ID = "Iv1.b507a08c87ecfe98"
+_GH_DEVICE_CODE_URL = "https://github.com/login/device/code"
+_GH_ACCESS_TOKEN_URL = "https://github.com/login/oauth/access_token"
+_GH_COPILOT_TOKEN_URL = "https://api.github.com/copilot_internal/v2/token"
+_GH_COPILOT_BASE_URL = "https://api.githubcopilot.com"
 
 # ---------------------------------------------------------------------------
 # Provider registry — static metadata only (no auth state here)
@@ -44,7 +58,7 @@ PROVIDERS: list[dict[str, str]] = [
     },
 ]
 
-# Models available when GitHub Copilot is connected
+# Fallback model lists (used when live API fetch fails)
 GITHUB_COPILOT_MODELS = [
     "gpt-4o",
     "gpt-4o-mini",
@@ -54,16 +68,13 @@ GITHUB_COPILOT_MODELS = [
     "o3-mini",
 ]
 
-# Default OpenAI models always available when OPENAI_API_KEY is set
 OPENAI_MODELS = [
     "gpt-5.4-mini",
 ]
 
 
 # ---------------------------------------------------------------------------
-# Token helpers — stored as JSON in users.github_copilot_token column
-# We use a lightweight approach: store the raw GitHub OAuth token in a
-# dedicated column added via migration.
+# Token helpers — stored in users.github_copilot_token column
 # ---------------------------------------------------------------------------
 
 async def get_github_token(db: AsyncSession, user_id: str) -> str | None:
@@ -101,13 +112,11 @@ async def delete_github_token(db: AsyncSession, user_id: str) -> None:
 async def list_models_for_user(db: AsyncSession, user_id: str) -> list[dict[str, Any]]:
     """
     Return all available models for a user across all providers.
-
-    Each entry: { id, label, provider, model_id }
-    where model_id is the pydantic-ai model string (e.g. "openai:gpt-4o").
+    Each entry: { id, label, provider, provider_label }
     """
     models: list[dict[str, Any]] = []
 
-    # OpenAI models — available when API key is configured server-side
+    # OpenAI models — only when API key is configured server-side
     if settings.OPENAI_API_KEY:
         for m in OPENAI_MODELS:
             models.append({
@@ -117,7 +126,7 @@ async def list_models_for_user(db: AsyncSession, user_id: str) -> list[dict[str,
                 "provider_label": "OpenAI",
             })
 
-    # GitHub Copilot models — available when user has connected their account
+    # GitHub Copilot models — only when user has connected their account
     gh_token = await get_github_token(db, user_id)
     if gh_token:
         copilot_models = await _fetch_copilot_models(gh_token)
@@ -145,49 +154,18 @@ async def _fetch_copilot_models(github_token: str) -> list[str]:
 
 
 # ---------------------------------------------------------------------------
-# Model string resolution for pydantic-ai
+# Copilot session token exchange
 # ---------------------------------------------------------------------------
 
-async def resolve_pydantic_ai_model(
-    db: AsyncSession,
-    user_id: str,
-    model_id: str,
-) -> tuple[str, dict[str, str]]:
-    """
-    Resolve a model_id (e.g. "github-copilot:gpt-4o") to a pydantic-ai
-    model string and any extra environment overrides needed.
-
-    Returns (pydantic_ai_model_string, env_overrides).
-    """
-    if model_id.startswith("github-copilot:"):
-        model_name = model_id[len("github-copilot:"):]
-        gh_token = await get_github_token(db, user_id)
-        if not gh_token:
-            raise ValueError(
-                "GitHub Copilot is not connected. Please connect your GitHub account first."
-            )
-        # Exchange for Copilot session token
-        copilot_token = await _get_copilot_session_token(gh_token)
-        # pydantic-ai supports openai-compatible endpoints via OpenAI provider
-        # with a custom base_url. We use the openai provider pointed at Copilot.
-        return f"openai:{model_name}", {
-            "OPENAI_API_KEY": copilot_token,
-            "OPENAI_BASE_URL": "https://api.githubcopilot.com",
-        }
-
-    if model_id.startswith("openai:"):
-        return model_id, {}
-
-    # Unknown prefix — pass through as-is (pydantic-ai handles it)
-    return model_id, {}
-
-
 async def _get_copilot_session_token(github_token: str) -> str:
-    """Exchange GitHub OAuth token for a short-lived Copilot session token."""
+    """
+    Exchange a GitHub OAuth token for a short-lived Copilot session token.
+    This token is used ONLY with api.githubcopilot.com — never with OpenAI.
+    """
     try:
         import requests
         resp = requests.get(
-            "https://api.github.com/copilot_internal/v2/token",
+            _GH_COPILOT_TOKEN_URL,
             headers={
                 "Authorization": f"token {github_token}",
                 "Accept": "application/json",
@@ -197,10 +175,79 @@ async def _get_copilot_session_token(github_token: str) -> str:
         if resp.ok:
             token = resp.json().get("token")
             if token:
+                log.debug("Copilot session token obtained successfully.")
                 return token
     except Exception as exc:
         log.warning("Copilot token exchange failed: %s. Using GitHub token directly.", exc)
     return github_token
+
+
+# ---------------------------------------------------------------------------
+# Model resolution for pydantic-ai
+# ---------------------------------------------------------------------------
+
+async def resolve_pydantic_ai_model(
+    db: AsyncSession,
+    user_id: str,
+    model_id: str,
+) -> Any:
+    """
+    Resolve a model_id to a pydantic-ai model object.
+
+    - "github-copilot:<name>" → OpenAIModel pointed at api.githubcopilot.com
+      using the user's Copilot session token. OPENAI_API_KEY is never read.
+    - "openai:<name>"         → standard pydantic-ai OpenAI model string
+      (pydantic-ai picks up OPENAI_API_KEY from env automatically).
+
+    Returns either a model string (for openai:) or a configured model object
+    (for github-copilot:) that pydantic-ai's Agent accepts.
+    """
+    if model_id.startswith("github-copilot:"):
+        return await _build_copilot_model(db, user_id, model_id)
+
+    # openai: or unknown prefix — return as plain string, pydantic-ai handles it
+    return model_id
+
+
+async def _build_copilot_model(db: AsyncSession, user_id: str, model_id: str) -> Any:
+    """
+    Build a pydantic-ai OpenAIModel configured for GitHub Copilot.
+
+    Uses an AsyncOpenAI client with:
+      - base_url = https://api.githubcopilot.com
+      - api_key  = Copilot session token (NOT settings.OPENAI_API_KEY)
+
+    This is completely isolated from the OpenAI provider.
+    """
+    from openai import AsyncOpenAI
+    from pydantic_ai.models.openai import OpenAIModel
+
+    model_name = model_id[len("github-copilot:"):]
+
+    gh_token = await get_github_token(db, user_id)
+    if not gh_token:
+        raise ValueError(
+            "GitHub Copilot is not connected. Please connect your GitHub account first."
+        )
+
+    copilot_token = await _get_copilot_session_token(gh_token)
+
+    # Build a dedicated AsyncOpenAI client pointing at Copilot's endpoint.
+    # This client has its own api_key and base_url — it never touches
+    # the process-level OPENAI_API_KEY environment variable.
+    copilot_client = AsyncOpenAI(
+        api_key=copilot_token,
+        base_url=_GH_COPILOT_BASE_URL,
+        default_headers={
+            "Copilot-Integration-Id": "vscode-chat",
+            "Editor-Version": "vscode/1.96.0",
+            "Editor-Plugin-Version": "copilot-chat/0.24.2",
+            "Openai-Organization": "github-copilot",
+            "Openai-Intent": "conversation-panel",
+        },
+    )
+
+    return OpenAIModel(model_name, openai_client=copilot_client)
 
 
 # ---------------------------------------------------------------------------
@@ -212,13 +259,13 @@ async def start_github_device_flow() -> dict[str, Any]:
     try:
         import requests
         resp = requests.post(
-            "https://github.com/login/device/code",
+            _GH_DEVICE_CODE_URL,
             headers={
                 "Accept": "application/json",
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             data={
-                "client_id": "Iv1.b507a08c87ecfe98",
+                "client_id": _GH_CLIENT_ID,
                 "scope": "read:user copilot",
             },
             timeout=15,
@@ -247,13 +294,13 @@ async def poll_github_device_flow(device_code: str) -> dict[str, Any]:
     try:
         import requests
         resp = requests.post(
-            "https://github.com/login/oauth/access_token",
+            _GH_ACCESS_TOKEN_URL,
             headers={
                 "Accept": "application/json",
                 "Content-Type": "application/x-www-form-urlencoded",
             },
             data={
-                "client_id": "Iv1.b507a08c87ecfe98",
+                "client_id": _GH_CLIENT_ID,
                 "device_code": device_code,
                 "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
             },
