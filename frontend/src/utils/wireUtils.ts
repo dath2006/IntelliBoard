@@ -3,6 +3,8 @@
  * Implements Wokwi-style orthogonal wire routing.
  */
 
+import type { Wire } from '../types/wire';
+
 /** Keyboard shortcut → hex color (matches Wokwi's color palette) */
 export const WIRE_KEY_COLORS: Record<string, string> = {
   '0': '#000000', // Black
@@ -139,4 +141,41 @@ export function generatePreviewPath(
   }
 
   return d;
+}
+
+/**
+ * Snaps a wire's intermediate path to a grid (e.g. 10px).
+ * Leaves the exact start and end coordinates intact so it stays attached to the pins,
+ * but adds or adjusts waypoints so the lines travel along grid lines.
+ */
+export function snapWireToGrid(wire: Wire, gridSize: number = 10): Wire {
+  const newWaypoints = [...(wire.waypoints || [])];
+  
+  if (newWaypoints.length === 0) {
+    // If there are no waypoints, the implicit L-shape might not be on the grid.
+    // We add 1 or 2 snapped waypoints to force it onto the grid.
+    const dx = Math.abs(wire.end.x - wire.start.x);
+    const dy = Math.abs(wire.end.y - wire.start.y);
+    const isHorizontalFirst = dx >= dy;
+
+    if (isHorizontalFirst) {
+      const cornerX = Math.round(wire.end.x / gridSize) * gridSize;
+      newWaypoints.push({ x: cornerX, y: wire.start.y });
+      newWaypoints.push({ x: cornerX, y: Math.round(wire.end.y / gridSize) * gridSize });
+    } else {
+      const cornerY = Math.round(wire.end.y / gridSize) * gridSize;
+      newWaypoints.push({ x: wire.start.x, y: cornerY });
+      newWaypoints.push({ x: Math.round(wire.end.x / gridSize) * gridSize, y: cornerY });
+    }
+  } else {
+    for (let i = 0; i < newWaypoints.length; i++) {
+      newWaypoints[i].x = Math.round(newWaypoints[i].x / gridSize) * gridSize;
+      newWaypoints[i].y = Math.round(newWaypoints[i].y / gridSize) * gridSize;
+    }
+  }
+
+  return {
+    ...wire,
+    waypoints: newWaypoints
+  };
 }

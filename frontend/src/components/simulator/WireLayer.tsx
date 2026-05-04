@@ -2,6 +2,7 @@ import React from 'react';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { WireRenderer } from './WireRenderer';
 import { WireInProgressRenderer } from './WireInProgressRenderer';
+import type { Wire } from '../../types/wire';
 
 const isTouchDevice =
   typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
@@ -14,6 +15,7 @@ export interface SegmentHandle {
 }
 
 interface WireLayerProps {
+  wires: Wire[];
   hoveredWireId: string | null;
   /** Segment drag preview: overrides the path of a specific wire */
   segmentDragPreview: { wireId: string; overridePath: string } | null;
@@ -26,13 +28,13 @@ interface WireLayerProps {
 }
 
 export const WireLayer: React.FC<WireLayerProps> = ({
+  wires,
   hoveredWireId,
   segmentDragPreview,
   segmentHandles,
   onHandleMouseDown,
   onHandleTouchStart,
 }) => {
-  const wires = useSimulatorStore((s) => s.wires);
   const wireInProgress = useSimulatorStore((s) => s.wireInProgress);
   const selectedWireId = useSimulatorStore((s) => s.selectedWireId);
 

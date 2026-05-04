@@ -18,7 +18,7 @@ import { PROPERTY_CHANGE_EVENT, type PropertyChangeDetail } from '../../simulati
 import { isSpiceMapped } from '../../simulation/spice/componentToSpice';
 import { PinOverlay } from './PinOverlay';
 import { isBoardComponent, boardPinToNumber } from '../../utils/boardPinMapping';
-import { autoWireColor, WIRE_KEY_COLORS } from '../../utils/wireUtils';
+import { autoWireColor, WIRE_KEY_COLORS, snapWireToGrid } from '../../utils/wireUtils';
 import {
   findWireNearPoint,
   getRenderedPoints,
@@ -27,10 +27,8 @@ import {
   renderedToWaypoints,
   renderedPointsToPath,
 } from '../../utils/wireHitDetection';
-
-/** Detect touch-capable device once */
-const isTouchDevice =
-  typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+import { calculateWireOffsets, applyOffsetToWire } from '../../utils/wireOffsetCalculator';
+import { routeWireAroundObstacles } from '../../utils/wireObstacleRouter';
 import type { ComponentMetadata } from '../../types/component-metadata';
 import type { BoardKind } from '../../types/board';
 import { BOARD_KIND_LABELS } from '../../types/board';
@@ -43,6 +41,10 @@ import {
 } from '../../utils/analytics';
 import { isEsp32BoardKind } from '../../utils/boardResolver';
 import './SimulatorCanvas.css';
+
+/** Detect touch-capable device once */
+const isTouchDevice =
+  typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
 const isEsp32Kind = isEsp32BoardKind;
 
@@ -86,10 +88,23 @@ export const SimulatorCanvas = () => {
   const updateWire = useSimulatorStore((s) => s.updateWire);
   const wires = useSimulatorStore((s) => s.wires);
 
+  // Compute offset wires: obstacle-avoidance → grid-snap → overlap-offset
+  const offsetWires = React.useMemo(() => {
+    // Step 1: Route each wire around component/board bounding boxes
+    const routedWires = wires.map((w) =>
+      routeWireAroundObstacles(w, components, boards),
+    );
+    // Step 2: Snap intermediate waypoints to grid
+    const snappedWires = routedWires.map((w) => snapWireToGrid(w, 10));
+    // Step 3: Offset overlapping parallel segments
+    const offsets = calculateWireOffsets(snappedWires);
+    return snappedWires.map((w) => applyOffsetToWire(w, offsets.get(w.id) || 0));
+  }, [wires, components, boards]);
+
   // Recalculate when the wire set changes (agent snapshots can add wires without
   // touching components, leaving start/end x/y undefined until we resolve pinInfo).
   // Use a stable key based on IDs to avoid infinite loops when we only update x/y.
-  const wireIdKey = React.useMemo(() => wires.map((w) => w.id).join('|'), [wires]);
+  const wireIdKey = React.useMemo(() => offsetWires.map((w) => w.id).join('|'), [offsetWires]);
 
   // Oscilloscope
   const oscilloscopeOpen = useOscilloscopeStore((s) => s.open);
@@ -180,13 +195,13 @@ export const SimulatorCanvas = () => {
   } | null>(null);
   /** Set to true during mouseup if a segment drag committed, so onClick can skip selection. */
   const segmentDragJustCommittedRef = useRef(false);
-  const wiresRef = useRef(wires);
-  wiresRef.current = wires;
+  const wiresRef = useRef(offsetWires);
+  wiresRef.current = offsetWires;
 
   // Compute midpoint handles for the selected wire's segments
   const segmentHandles = React.useMemo<SegmentHandle[]>(() => {
     if (!selectedWireId) return [];
-    const wire = wires.find((w) => w.id === selectedWireId);
+    const wire = offsetWires.find((w) => w.id === selectedWireId);
     if (!wire) return [];
     return getRenderedSegments(wire).map((seg, i) => ({
       segIndex: i,
@@ -194,7 +209,7 @@ export const SimulatorCanvas = () => {
       mx: (seg.x1 + seg.x2) / 2,
       my: (seg.y1 + seg.y2) / 2,
     }));
-  }, [selectedWireId, wires]);
+  }, [selectedWireId, offsetWires]);
 
   // Touch-specific state refs (for single-finger drag and pinch-to-zoom)
   const touchDraggedComponentIdRef = useRef<string | null>(null);
@@ -1755,6 +1770,7 @@ export const SimulatorCanvas = () => {
           >
             {/* Wire Layer - Renders below all components */}
             <WireLayer
+              wires={offsetWires}
               hoveredWireId={hoveredWireId}
               segmentDragPreview={segmentDragPreview}
               segmentHandles={segmentHandles}
