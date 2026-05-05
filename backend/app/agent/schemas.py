@@ -208,6 +208,20 @@ class AgentSessionMessageRequest(StrictModel):
     message: str = Field(min_length=1)
 
 
+class FrontendActionRequest(StrictModel):
+    actionId: str = Field(min_length=1)
+    action: str = Field(min_length=1)
+    payload: dict[str, Any] = Field(default_factory=dict)
+    timeoutMs: int | None = Field(default=None, ge=1000, le=120000)
+
+
+class FrontendActionResultRequest(StrictModel):
+    ok: bool
+    payload: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    action: str | None = None
+
+
 class PinCatalogObservationRequest(StrictModel):
     metadataId: str = Field(min_length=1)
     tagName: str | None = None

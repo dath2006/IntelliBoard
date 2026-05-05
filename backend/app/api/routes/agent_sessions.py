@@ -14,9 +14,11 @@ from app.agent.schemas import (
     AgentSessionCreateRequest,
     AgentSessionEventResponse,
     AgentSessionMessageRequest,
+    FrontendActionResultRequest,
     PinCatalogObservationRequest,
     AgentSessionResponse,
 )
+from app.agent.frontend_actions import resolve_frontend_action_result
 from app.agent.sessions import (
     append_event,
     apply_draft_to_project,
@@ -105,6 +107,43 @@ async def post_agent_message(
     if settings.AGENT_ENABLED:
         start_agent_run(session.id, user.id, body.message)
     return _session_response(updated)
+
+
+@router.post("/sessions/{session_id}/actions/{action_id}")
+async def post_frontend_action_result(
+    session_id: str,
+    action_id: str,
+    body: FrontendActionResultRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    session = await get_session_for_user(db, session_id=session_id, user_id=user.id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Agent session not found.")
+
+    resolved = resolve_frontend_action_result(
+        session_id=session_id,
+        action_id=action_id,
+        ok=body.ok,
+        payload=body.payload,
+        error=body.error,
+    )
+    if not resolved:
+        raise HTTPException(status_code=404, detail="Action request not found.")
+
+    await append_event(
+        db,
+        session_id=session_id,
+        event_type="frontend.action.result",
+        payload={
+            "actionId": action_id,
+            "action": body.action,
+            "ok": body.ok,
+            "payload": body.payload,
+            "error": body.error,
+        },
+    )
+    return {"ok": True}
 
 
 @router.post("/pin-observations")

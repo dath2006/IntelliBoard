@@ -5,7 +5,7 @@ sqlalchemy==2.0.36
 aiosqlite==0.20.0
 pydantic>=2.11.0
 pydantic-settings>=2.6.0
-pydantic-ai
+pydantic-ai-slim[openai]==1.89.1
 sse-starlette
 orjson
 python-multipart==0.0.12

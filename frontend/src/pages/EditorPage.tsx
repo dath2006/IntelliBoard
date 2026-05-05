@@ -30,6 +30,7 @@ import { useSimulatorStore } from '../store/useSimulatorStore';
 import { useOscilloscopeStore } from '../store/useOscilloscopeStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { agentPanelBounds, useAgentStore } from '../store/useAgentStore';
+import { useCompilationStore } from '../store/useCompilationStore';
 import { scanAndReportCanvasPins, clearPinObservationCache } from '../utils/canvasPinScanner';
 import { useAutoSave } from '../hooks/useAutoSave';
 import type { CompilationLog } from '../utils/compilationLogger';
@@ -75,8 +76,26 @@ export const EditorPage: React.FC = () => {
   );
   const isRaspberryPi3 = activeBoardKind === 'raspberry-pi-3';
   const oscilloscopeOpen = useOscilloscopeStore((s) => s.open);
-  const [consoleOpen, setConsoleOpen] = useState(false);
-  const [compileLogs, setCompileLogs] = useState<CompilationLog[]>([]);
+  const consoleOpen = useCompilationStore((s) => s.consoleOpen);
+  const setConsoleOpen = useCallback((next: boolean | ((v: boolean) => boolean)) => {
+    if (typeof next === 'function') {
+      useCompilationStore.setState((state) => ({ consoleOpen: next(state.consoleOpen) }));
+    } else {
+      useCompilationStore.getState().setConsoleOpen(next);
+    }
+  }, []);
+  const compileLogs = useCompilationStore((s) => s.logs);
+  const setCompileLogs = useCallback(
+    (next: CompilationLog[] | ((prev: CompilationLog[]) => CompilationLog[])) => {
+      if (typeof next === 'function') {
+        useCompilationStore.setState((state) => ({ logs: next(state.logs) }));
+      } else {
+        useCompilationStore.getState().setLogs(next);
+      }
+    },
+    [],
+  );
+  const clearCompileLogs = useCompilationStore((s) => s.clearLogs);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(BOTTOM_PANEL_DEFAULT);
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
@@ -109,7 +128,12 @@ export const EditorPage: React.FC = () => {
         : [];
       return { ...comp, pinNames };
     });
-    const snapshot = { activeBoardId, boards: enrichedBoards, components: enrichedComponents, wires };
+    const snapshot = {
+      activeBoardId,
+      boards: enrichedBoards,
+      components: enrichedComponents,
+      wires,
+    };
     console.log('[DEBUG] Canvas Snapshot', JSON.stringify(snapshot, null, 2));
   }, [activeBoardId, boards, components, wires]);
 
@@ -136,7 +160,6 @@ export const EditorPage: React.FC = () => {
     }, 300);
     return () => clearTimeout(timer);
   }, [boards, components]);
-
 
   // ── GitHub star prompt (show once: 2nd visit OR after 3 min) ──────────────
   useEffect(() => {
@@ -489,7 +512,7 @@ export const EditorPage: React.FC = () => {
                     isOpen={consoleOpen}
                     onClose={() => setConsoleOpen(false)}
                     logs={compileLogs}
-                    onClear={() => setCompileLogs([])}
+                    onClear={clearCompileLogs}
                   />
                 </div>
               </>

@@ -21,6 +21,10 @@ from pydantic_ai.messages import (
 from app.agent import snapshot_ops
 from app.agent import tools as agent_tools
 from app.agent.deps import AgentDeps
+from app.agent.frontend_actions import (
+    create_frontend_action_request,
+    wait_for_frontend_action_result,
+)
 from app.agent.observability import init_logfire, log_event
 from app.agent.safety import ensure_prompt_size, ensure_snapshot_size
 from app.agent.schemas import ProjectSnapshotV2, ToolResult
@@ -90,6 +94,8 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "You are the Velxio backend agent. Use tools to inspect or mutate the draft snapshot. "
         "Never replace the full snapshot; use operation tools for changes. "
         "Prefer minimal edits and return concise status updates. "
+        "For compilation or simulation controls that should mirror the UI, prefer the frontend action tools "
+        "(compile_in_frontend, run_simulation, pause_simulation, reset_simulation, serial_*). "
         "MANDATORY WIRING PROTOCOL: "
         "After every add_component or add_board, you MUST call get_canvas_runtime_pins(instance_id) "
         "with the exact id you just placed, BEFORE calling connect_pins. "
@@ -121,6 +127,39 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
             await ctx.deps.emit_event("tool.call.failed", {"tool": tool_name, "error": error})
             log_event("tool.call.failed", session_id=ctx.deps.session_id, tool=tool_name, error=error)
             return {"ok": False, "tool": tool_name, "error": error}
+
+    async def _run_frontend_action(
+        ctx: RunContext[AgentDeps],
+        action: str,
+        payload: dict[str, Any] | None = None,
+        *,
+        timeout_ms: int = 20000,
+    ) -> dict[str, Any]:
+        request = create_frontend_action_request(
+            session_id=ctx.deps.session_id,
+            action=action,
+            payload=payload or {},
+        )
+        await ctx.deps.emit_event(
+            "frontend.action.request",
+            {
+                "actionId": request.action_id,
+                "action": action,
+                "payload": request.payload,
+                "timeoutMs": timeout_ms,
+            },
+        )
+        result = await wait_for_frontend_action_result(
+            action_id=request.action_id,
+            timeout_ms=timeout_ms,
+        )
+        return {
+            "ok": result.ok,
+            "actionId": result.action_id,
+            "action": action,
+            "payload": result.payload,
+            "error": result.error,
+        }
 
     @agent.tool
     async def get_project_outline(ctx: RunContext[AgentDeps]) -> dict[str, Any]:
@@ -487,6 +526,164 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         return await _safe_tool_call(ctx, "compile_board", lambda: agent_tools.compile_board(ctx.deps.snapshot, board_id=board_id))
 
     @agent.tool
+    async def compile_in_frontend(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "compile_in_frontend",
+            lambda: _run_frontend_action(
+                ctx,
+                "compile",
+                {"boardId": board_id} if board_id else {},
+                timeout_ms=180000,
+            ),
+        )
+
+    @agent.tool
+    async def open_serial_monitor(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "open_serial_monitor",
+            lambda: _run_frontend_action(
+                ctx,
+                "serial.monitor.open",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
+    async def close_serial_monitor(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "close_serial_monitor",
+            lambda: _run_frontend_action(
+                ctx,
+                "serial.monitor.close",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
+    async def get_serial_monitor_status(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "get_serial_monitor_status",
+            lambda: _run_frontend_action(
+                ctx,
+                "serial.monitor.status",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
+    async def set_serial_baud_rate(
+        ctx: RunContext[AgentDeps],
+        baud_rate: int,
+        board_id: str | None = None,
+    ) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "set_serial_baud_rate",
+            lambda: _run_frontend_action(
+                ctx,
+                "serial.set_baud_rate",
+                {"boardId": board_id, "baudRate": baud_rate} if board_id else {"baudRate": baud_rate},
+            ),
+        )
+
+    @agent.tool
+    async def send_serial_message(
+        ctx: RunContext[AgentDeps],
+        text: str,
+        board_id: str | None = None,
+        line_ending: str | None = None,
+    ) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        payload: dict[str, Any] = {"text": text}
+        if board_id:
+            payload["boardId"] = board_id
+        if line_ending:
+            payload["lineEnding"] = line_ending
+        return await _safe_tool_call(
+            ctx,
+            "send_serial_message",
+            lambda: _run_frontend_action(ctx, "serial.send", payload),
+        )
+
+    @agent.tool
+    async def clear_serial_monitor(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "clear_serial_monitor",
+            lambda: _run_frontend_action(
+                ctx,
+                "serial.clear",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
+    async def capture_serial_monitor(
+        ctx: RunContext[AgentDeps],
+        max_lines: int = 200,
+        board_id: str | None = None,
+    ) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        payload: dict[str, Any] = {"maxLines": max_lines}
+        if board_id:
+            payload["boardId"] = board_id
+        return await _safe_tool_call(
+            ctx,
+            "capture_serial_monitor",
+            lambda: _run_frontend_action(ctx, "serial.capture", payload),
+        )
+
+    @agent.tool
+    async def run_simulation(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "run_simulation",
+            lambda: _run_frontend_action(
+                ctx,
+                "sim.run",
+                {"boardId": board_id} if board_id else {},
+                timeout_ms=180000,
+            ),
+        )
+
+    @agent.tool
+    async def pause_simulation(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "pause_simulation",
+            lambda: _run_frontend_action(
+                ctx,
+                "sim.pause",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
+    async def reset_simulation(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "reset_simulation",
+            lambda: _run_frontend_action(
+                ctx,
+                "sim.reset",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
     async def search_libraries(ctx: RunContext[AgentDeps], query: str) -> dict[str, Any]:
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(ctx, "search_libraries", lambda: agent_tools.search_libraries(query))
@@ -519,6 +716,13 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         return await _safe_tool_call(
             ctx, "validate_compile_readiness_state", lambda: validate_compile_readiness(ctx.deps.snapshot, board_id=board_id).model_dump()
         )
+
+    @agent.tool
+    async def wait_seconds(ctx: RunContext[AgentDeps], seconds: float = 1.0) -> dict[str, Any]:
+        ctx.deps.guard_tool_call()
+        duration = max(0.1, min(seconds, 10.0))
+        await asyncio.sleep(duration)
+        return {"ok": True, "seconds": duration}
 
     return agent
 

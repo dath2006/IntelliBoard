@@ -4,24 +4,22 @@ import { useSimulatorStore } from '../../store/useSimulatorStore';
 import type { BoardKind, LanguageMode } from '../../types/board';
 import { BOARD_KIND_FQBN, BOARD_KIND_LABELS, BOARD_SUPPORTS_MICROPYTHON } from '../../types/board';
 import { compileCode } from '../../services/compilation';
-import { reportRunEvent } from '../../services/metricsService';
 import { useProjectStore } from '../../store/useProjectStore';
 import { CompileAllProgress } from './CompileAllProgress';
 import type { BoardCompileStatus } from './CompileAllProgress';
 import { LibraryManagerModal } from '../simulator/LibraryManagerModal';
 import { InstallLibrariesModal } from '../simulator/InstallLibrariesModal';
-import { parseCompileResult } from '../../utils/compilationLogger';
 import type { CompilationLog } from '../../utils/compilationLogger';
 import { exportToWokwiZip, importFromWokwiZip } from '../../utils/wokwiZip';
 import { readFirmwareFile } from '../../utils/firmwareLoader';
-import {
-  trackCompileCode,
-  trackRunSimulation,
-  trackStopSimulation,
-  trackResetSimulation,
-  trackOpenLibraryManager,
-} from '../../utils/analytics';
+import { trackOpenLibraryManager } from '../../utils/analytics';
 import { isEsp32BoardKind } from '../../utils/boardResolver';
+import { runCompileAction } from '../../utils/compileActions';
+import {
+  runSimulationAction,
+  stopSimulationAction,
+  resetSimulationAction,
+} from '../../utils/simulatorActions';
 import './EditorToolbar.css';
 
 interface EditorToolbarProps {
@@ -31,7 +29,7 @@ interface EditorToolbarProps {
   setCompileLogs: (logs: CompilationLog[] | ((prev: CompilationLog[]) => CompilationLog[])) => void;
 }
 
-const BOARD_PILL_ICON: Record<BoardKind, string> = {
+const BOARD_PILL_ICON: Partial<Record<BoardKind, string>> = {
   'arduino-uno': '⬤',
   'arduino-nano': '▪',
   'arduino-mega': '▬',
@@ -42,7 +40,7 @@ const BOARD_PILL_ICON: Record<BoardKind, string> = {
   'esp32-c3': '⬡',
 };
 
-const BOARD_PILL_COLOR: Record<BoardKind, string> = {
+const BOARD_PILL_COLOR: Partial<Record<BoardKind, string>> = {
   'arduino-uno': '#4fc3f7',
   'arduino-nano': '#4fc3f7',
   'arduino-mega': '#4fc3f7',
@@ -56,43 +54,15 @@ const BOARD_PILL_COLOR: Record<BoardKind, string> = {
 export const EditorToolbar = ({
   consoleOpen,
   setConsoleOpen,
-  compileLogs: _compileLogs,
   setCompileLogs,
 }: EditorToolbarProps) => {
-  const { files, codeChangedSinceLastCompile, markCompiled } = useEditorStore();
-  const {
-    boards,
-    activeBoardId,
-    compileBoardProgram,
-    loadMicroPythonProgram,
-    setBoardLanguageMode,
-    updateBoard,
-    startBoard,
-    stopBoard,
-    resetBoard,
-    // legacy compat
-    startSimulation,
-    stopSimulation,
-    resetSimulation,
-    running,
-    compiledHex,
-  } = useSimulatorStore();
+  const { files, markCompiled } = useEditorStore();
+  const { boards, activeBoardId, compileBoardProgram, setBoardLanguageMode, updateBoard } =
+    useSimulatorStore();
 
   const activeBoard = boards.find((b) => b.id === activeBoardId) ?? boards[0];
+  const isRunning = activeBoard?.running ?? false;
   const currentProject = useProjectStore((s) => s.currentProject);
-
-  // Helper: report a Run event to the backend for analytics. Resolves the
-  // FQBN from the board kind so the backend can group by family/fqbn.
-  const reportRun = useCallback(
-    (boardKind: BoardKind | undefined) => {
-      const fqbn = boardKind ? BOARD_KIND_FQBN[boardKind] : null;
-      void reportRunEvent({
-        project_id: currentProject?.id ?? null,
-        board_fqbn: fqbn ?? null,
-      });
-    },
-    [currentProject],
-  );
   const [compiling, setCompiling] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [libManagerOpen, setLibManagerOpen] = useState(false);
@@ -136,247 +106,40 @@ export const EditorToolbar = ({
     setCompiling(true);
     setMessage(null);
     setConsoleOpen(true);
-    trackCompileCode();
-
-    const kind = activeBoard?.boardKind;
-
-    // Raspberry Pi 3B doesn't need arduino-cli compilation
-    if (kind === 'raspberry-pi-3') {
-      addLog({
-        timestamp: new Date(),
-        type: 'info',
-        message: 'Raspberry Pi 3B: no compilation needed — run Python scripts directly.',
-      });
-      setMessage({ type: 'success', text: 'Ready (no compilation needed)' });
-      setCompiling(false);
-      return;
-    }
-
-    // MicroPython mode — no backend compilation needed
-    if (activeBoard?.languageMode === 'micropython' && activeBoardId) {
-      addLog({
-        timestamp: new Date(),
-        type: 'info',
-        message: 'MicroPython: loading firmware and user files...',
-      });
-      try {
-        const groupFiles = useEditorStore.getState().getGroupFiles(activeBoard.activeFileGroupId);
-        const pyFiles = groupFiles.map((f) => ({ name: f.name, content: f.content }));
-        await loadMicroPythonProgram(activeBoardId, pyFiles);
-        addLog({
-          timestamp: new Date(),
-          type: 'success',
-          message: 'MicroPython firmware loaded successfully',
-        });
-        setMessage({ type: 'success', text: 'MicroPython ready' });
-      } catch (err) {
-        const errMsg = err instanceof Error ? err.message : 'Failed to load MicroPython';
-        addLog({ timestamp: new Date(), type: 'error', message: errMsg });
-        setMessage({ type: 'error', text: errMsg });
-      } finally {
-        setCompiling(false);
-      }
-      return;
-    }
-
-    const fqbn = kind ? BOARD_KIND_FQBN[kind] : null;
-    const boardLabel = kind ? BOARD_KIND_LABELS[kind] : 'Unknown';
-
-    if (!fqbn) {
-      addLog({ timestamp: new Date(), type: 'error', message: `No FQBN for board kind: ${kind}` });
-      setMessage({ type: 'error', text: 'Unknown board' });
-      setCompiling(false);
-      return;
-    }
-
-    addLog({
-      timestamp: new Date(),
-      type: 'info',
-      message: `Starting compilation for ${boardLabel} (${fqbn})...`,
+    const outcome = await runCompileAction({
+      boardId: activeBoardId,
+      onLog: addLog,
     });
-
-    try {
-      const groupFiles = activeBoard?.activeFileGroupId
-        ? useEditorStore.getState().getGroupFiles(activeBoard.activeFileGroupId)
-        : files;
-      const sketchFiles = (groupFiles.length > 0 ? groupFiles : files).map((f) => ({
-        name: f.name,
-        content: f.content,
-      }));
-      const result = await compileCode(sketchFiles, fqbn, currentProject?.id ?? null);
-
-      const resultLogs = parseCompileResult(result, boardLabel);
-      setCompileLogs((prev: CompilationLog[]) => [...prev, ...resultLogs]);
-
-      if (result.success) {
-        const program = result.hex_content ?? result.binary_content ?? null;
-        if (program && activeBoardId) {
-          compileBoardProgram(activeBoardId, program);
-          if (result.has_wifi !== undefined) {
-            updateBoard(activeBoardId, { hasWifi: result.has_wifi });
-          }
-        }
-        setMessage({ type: 'success', text: 'Compiled successfully' });
-        markCompiled();
-        setMissingLibHint(false);
-      } else {
-        const errText = result.error || result.stderr || 'Compile failed';
-        setMessage({ type: 'error', text: errText });
-        // Detect missing library errors — common patterns:
-        // "No such file or directory" for #include, "fatal error: XXX.h"
-        const looksLikeMissingLib =
-          /No such file or directory|fatal error:.*\.h|library not found/i.test(errText);
-        setMissingLibHint(looksLikeMissingLib);
-      }
-    } catch (err) {
-      const errMsg = err instanceof Error ? err.message : 'Compile failed';
-      addLog({ timestamp: new Date(), type: 'error', message: errMsg });
-      setMessage({ type: 'error', text: errMsg });
-    } finally {
-      setCompiling(false);
+    if (outcome.message) {
+      setMessage(outcome.message);
     }
+    setMissingLibHint(outcome.missingLibHint);
+    setCompiling(false);
   };
 
-  // Track whether we should auto-run after compilation completes
-  const autoRunAfterCompile = useRef(false);
-
   const handleRun = async () => {
-    if (activeBoardId) {
-      const board = boards.find((b) => b.id === activeBoardId);
-
-      // MicroPython mode: stop any running session first, then reload firmware + start
-      if (board?.languageMode === 'micropython') {
-        trackRunSimulation(board.boardKind);
-        reportRun(board.boardKind);
-
-        // Always stop the current session so the new run gets a clean QEMU boot.
-        // This also prevents the double start_esp32 that occurs when the bridge
-        // is already connected and startBoard() is called again.
-        if (board.running) {
-          stopBoard(activeBoardId);
-          // Give the WebSocket a moment to close cleanly before reconnecting.
-          await new Promise((resolve) => setTimeout(resolve, 300));
-        }
-
-        setCompiling(true);
-        setMessage(null);
-        addLog({
-          timestamp: new Date(),
-          type: 'info',
-          message: 'MicroPython: loading firmware and user files...',
-        });
-        try {
-          const groupFiles = useEditorStore.getState().getGroupFiles(board.activeFileGroupId);
-          const pyFiles = groupFiles.map((f) => ({ name: f.name, content: f.content }));
-          await loadMicroPythonProgram(activeBoardId, pyFiles);
-          addLog({
-            timestamp: new Date(),
-            type: 'success',
-            message: 'MicroPython firmware loaded',
-          });
-        } catch (err) {
-          const errMsg = err instanceof Error ? err.message : 'Failed to load MicroPython';
-          addLog({ timestamp: new Date(), type: 'error', message: errMsg });
-          setMessage({ type: 'error', text: errMsg });
-          setCompiling(false);
-          return;
-        }
-        setCompiling(false);
-        startBoard(activeBoardId);
-        setMessage(null);
-        return;
-      }
-
-      const isQemuBoard =
-        board?.boardKind === 'raspberry-pi-3' ||
-        (board?.boardKind ? isEsp32BoardKind(board.boardKind) : false);
-
-      // QEMU boards: auto-compile if no firmware available yet
-      if (isQemuBoard) {
-        if (!board?.compiledProgram || codeChangedSinceLastCompile) {
-          autoRunAfterCompile.current = true;
-          await handleCompile();
-          const updatedBoard = useSimulatorStore
-            .getState()
-            .boards.find((b) => b.id === activeBoardId);
-          if (autoRunAfterCompile.current && updatedBoard?.compiledProgram) {
-            autoRunAfterCompile.current = false;
-            trackRunSimulation(updatedBoard.boardKind);
-            reportRun(updatedBoard.boardKind);
-            startBoard(activeBoardId);
-            setMessage(null);
-          } else {
-            autoRunAfterCompile.current = false;
-          }
-          return;
-        }
-        trackRunSimulation(board?.boardKind);
-        reportRun(board?.boardKind);
-        startBoard(activeBoardId);
-        setMessage(null);
-        return;
-      }
-
-      // Auto-compile if no program or code changed since last compile
-      if (!board?.compiledProgram || codeChangedSinceLastCompile) {
-        autoRunAfterCompile.current = true;
-        await handleCompile();
-        // After compile, check if it succeeded and run
-        const updatedBoard = useSimulatorStore
-          .getState()
-          .boards.find((b) => b.id === activeBoardId);
-        if (autoRunAfterCompile.current && updatedBoard?.compiledProgram) {
-          autoRunAfterCompile.current = false;
-          trackRunSimulation(updatedBoard.boardKind);
-          reportRun(updatedBoard.boardKind);
-          startBoard(activeBoardId);
-          setMessage(null);
-        } else {
-          autoRunAfterCompile.current = false;
-        }
-        return;
-      }
-
-      trackRunSimulation(board?.boardKind);
-      reportRun(board?.boardKind);
-      startBoard(activeBoardId);
-      setMessage(null);
-      return;
-    }
-
-    // Legacy fallback
-    if (!compiledHex || codeChangedSinceLastCompile) {
-      autoRunAfterCompile.current = true;
-      await handleCompile();
-      const hex = useSimulatorStore.getState().compiledHex;
-      if (autoRunAfterCompile.current && hex) {
-        autoRunAfterCompile.current = false;
-        trackRunSimulation();
-        reportRun(undefined);
-        startSimulation();
-        setMessage(null);
-      } else {
-        autoRunAfterCompile.current = false;
-      }
+    const outcome = await runSimulationAction({
+      boardId: activeBoardId,
+      onLog: addLog,
+      onCompilingChange: (compiling) => {
+        setCompiling(compiling);
+        if (compiling) setConsoleOpen(true);
+      },
+    });
+    if (!outcome.ok && outcome.error) {
+      setMessage({ type: 'error', text: outcome.error });
     } else {
-      trackRunSimulation();
-      reportRun(undefined);
-      startSimulation();
       setMessage(null);
     }
   };
 
   const handleStop = () => {
-    trackStopSimulation();
-    if (activeBoardId) stopBoard(activeBoardId);
-    else stopSimulation();
+    stopSimulationAction(activeBoardId);
     setMessage(null);
   };
 
   const handleReset = () => {
-    trackResetSimulation();
-    if (activeBoardId) resetBoard(activeBoardId);
-    else resetSimulation();
+    resetSimulationAction(activeBoardId);
     setMessage(null);
   };
 
@@ -441,14 +204,12 @@ export const EditorToolbar = ({
   };
 
   const handleRunAll = () => {
-    const boardsList = useSimulatorStore.getState().boards;
+    const simulatorState = useSimulatorStore.getState();
+    const boardsList = simulatorState.boards;
     for (const board of boardsList) {
-      const isQemu =
-        board.boardKind === 'raspberry-pi-3' ||
-        isEsp32BoardKind(board.boardKind);
+      const isQemu = board.boardKind === 'raspberry-pi-3' || isEsp32BoardKind(board.boardKind);
       if (!board.running && (isQemu || board.compiledProgram)) {
-        reportRun(board.boardKind);
-        startBoard(board.id);
+        simulatorState.startBoard(board.id);
       }
     }
     setCompileAllOpen(false);
@@ -645,7 +406,7 @@ export const EditorToolbar = ({
             {/* Run */}
             <button
               onClick={handleRun}
-              disabled={running || compiling || !activeBoard}
+              disabled={isRunning || compiling || !activeBoard}
               className="tb-btn tb-btn-run"
               title={
                 !activeBoard
@@ -663,7 +424,7 @@ export const EditorToolbar = ({
             {/* Stop */}
             <button
               onClick={handleStop}
-              disabled={!running}
+              disabled={!isRunning}
               className="tb-btn tb-btn-stop"
               title="Stop"
             >
@@ -675,7 +436,7 @@ export const EditorToolbar = ({
             {/* Reset */}
             <button
               onClick={handleReset}
-              disabled={!compiledHex && !activeBoard?.compiledProgram}
+              disabled={!activeBoard?.compiledProgram}
               className="tb-btn tb-btn-reset"
               title="Reset"
             >
@@ -723,7 +484,7 @@ export const EditorToolbar = ({
                 {/* Run All */}
                 <button
                   onClick={handleRunAll}
-                  disabled={running}
+                  disabled={isRunning}
                   className="tb-btn tb-btn-run-all"
                   title="Run all boards"
                 >

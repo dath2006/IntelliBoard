@@ -17,11 +17,7 @@ import { useEditorStore } from './useEditorStore';
 import { useVfsStore } from './useVfsStore';
 import { boardPinToNumber, isBoardComponent } from '../utils/boardPinMapping';
 import { createSerialBatcher } from './serialBatcher';
-import {
-  isEsp32BoardKind,
-  isRiscVEsp32BoardKind,
-  resolveBoardKind,
-} from '../utils/boardResolver';
+import { isEsp32BoardKind, isRiscVEsp32BoardKind, resolveBoardKind } from '../utils/boardResolver';
 import {
   bindBoard as icBindBoard,
   unbindBoard as icUnbindBoard,
@@ -380,10 +376,28 @@ interface SimulatorState {
 
   // ── Serial monitor ──────────────────────────────────────────────────────
   toggleSerialMonitor: () => void;
+  openSerialMonitor: (boardId?: string) => void;
+  closeSerialMonitor: (boardId?: string) => void;
   serialWrite: (text: string) => void;
   serialWriteToBoard: (boardId: string, text: string) => void;
   clearSerialOutput: () => void;
   clearBoardSerialOutput: (boardId: string) => void;
+  setBoardSerialBaudRate: (boardId: string | undefined, baudRate: number) => void;
+  getSerialMonitorStatus: (boardId?: string) => {
+    boardId: string | null;
+    open: boolean;
+    baudRate: number;
+  };
+  captureSerialSnapshot: (
+    boardId?: string,
+    maxLines?: number,
+  ) => {
+    boardId: string | null;
+    baudRate: number;
+    totalLines: number;
+    truncated: boolean;
+    lines: string[];
+  };
 }
 
 // ── Helper: create a simulator for a given board kind ─────────────────────
@@ -493,7 +507,8 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     addBoard: (boardKind: BoardKind, x: number, y: number, preferredId?: string) => {
       boardKind = resolveBoardKind(boardKind);
       const existing = get().boards.filter((b) => b.boardKind === boardKind);
-      let id = preferredId ?? (existing.length === 0 ? boardKind : `${boardKind}-${existing.length + 1}`);
+      let id =
+        preferredId ?? (existing.length === 0 ? boardKind : `${boardKind}-${existing.length + 1}`);
       if (get().boards.some((b) => b.id === id)) {
         if (preferredId) {
           let suffix = 2;
@@ -1575,6 +1590,23 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
 
     toggleSerialMonitor: () => set((s) => ({ serialMonitorOpen: !s.serialMonitorOpen })),
 
+    openSerialMonitor: (boardId?: string) => {
+      const id = boardId ?? get().activeBoardId ?? INITIAL_BOARD_ID;
+      set((s) => {
+        const boards = s.boards.map((b) => (b.id === id ? { ...b, serialMonitorOpen: true } : b));
+        return { boards, serialMonitorOpen: true };
+      });
+    },
+
+    closeSerialMonitor: (boardId?: string) => {
+      const id = boardId ?? get().activeBoardId ?? INITIAL_BOARD_ID;
+      set((s) => {
+        const boards = s.boards.map((b) => (b.id === id ? { ...b, serialMonitorOpen: false } : b));
+        const isActive = s.activeBoardId === id;
+        return { boards, ...(isActive ? { serialMonitorOpen: false } : {}) };
+      });
+    },
+
     serialWrite: (text: string) => {
       const { activeBoardId } = get();
       const boardId = activeBoardId ?? INITIAL_BOARD_ID;
@@ -1633,6 +1665,46 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         ...(isActive ? { serialOutput: '' } : {}),
         boards: s.boards.map((b) => (b.id === boardId ? { ...b, serialOutput: '' } : b)),
       }));
+    },
+
+    setBoardSerialBaudRate: (boardId: string | undefined, baudRate: number) => {
+      const id = boardId ?? get().activeBoardId ?? INITIAL_BOARD_ID;
+      set((s) => {
+        const boards = s.boards.map((b) => (b.id === id ? { ...b, serialBaudRate: baudRate } : b));
+        const isActive = s.activeBoardId === id;
+        return { boards, ...(isActive ? { serialBaudRate: baudRate } : {}) };
+      });
+    },
+
+    getSerialMonitorStatus: (boardId?: string) => {
+      const id = boardId ?? get().activeBoardId ?? null;
+      const board = id ? get().boards.find((b) => b.id === id) : null;
+      return {
+        boardId: id,
+        open: board?.serialMonitorOpen ?? get().serialMonitorOpen,
+        baudRate: board?.serialBaudRate ?? get().serialBaudRate,
+      };
+    },
+
+    captureSerialSnapshot: (boardId?: string, maxLines: number = 200) => {
+      const id = boardId ?? get().activeBoardId ?? null;
+      const board = id ? get().boards.find((b) => b.id === id) : null;
+      const output = board?.serialOutput ?? '';
+      const normalized = output.replace(/\r\n/g, '\n');
+      const rawLines = normalized.split('\n');
+      if (rawLines.length > 0 && rawLines[rawLines.length - 1] === '') {
+        rawLines.pop();
+      }
+      const totalLines = rawLines.length;
+      const clamped = Math.max(1, Math.min(maxLines, totalLines || maxLines));
+      const lines = totalLines > clamped ? rawLines.slice(-clamped) : rawLines;
+      return {
+        boardId: id,
+        baudRate: board?.serialBaudRate ?? 0,
+        totalLines,
+        truncated: totalLines > lines.length,
+        lines,
+      };
     },
   };
 });

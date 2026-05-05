@@ -235,6 +235,33 @@ export const useAgentStore = create<AgentState>((set) => ({
           expanded: false,
         };
         if (toolCallId) delete pendingBySession[toolCallId];
+      } else if (event.eventType === 'frontend.action.request') {
+        const action =
+          typeof event.payload?.action === 'string' ? event.payload.action : 'frontend.action';
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: `${action} requested`,
+          payload: event.payload ?? {},
+          expanded: false,
+        };
+      } else if (event.eventType === 'frontend.action.result') {
+        const action =
+          typeof event.payload?.action === 'string' ? event.payload.action : 'frontend.action';
+        const ok = event.payload?.ok === true;
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: `${action} ${ok ? 'completed' : 'failed'}`,
+          payload: event.payload ?? {},
+          expanded: false,
+        };
       } else if (event.eventType === 'run.started') {
         const msg = typeof event.payload?.message === 'string' ? event.payload.message : '';
         nextTrace = {

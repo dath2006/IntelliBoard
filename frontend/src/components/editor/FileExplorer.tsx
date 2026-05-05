@@ -4,9 +4,15 @@ import { useSimulatorStore } from '../../store/useSimulatorStore';
 import type { BoardKind } from '../../types/board';
 import { BOARD_KIND_LABELS } from '../../types/board';
 import { useAuthStore } from '../../store/useAuthStore';
-import { getMyProjects, type ProjectResponse } from '../../services/projectService';
+import {
+  deleteProject,
+  getMyProjects,
+  updateProject,
+  type ProjectResponse,
+} from '../../services/projectService';
 import { NewProjectModal } from '../layout/NewProjectModal';
 import { useNavigate } from 'react-router-dom';
+import { useProjectStore } from '../../store/useProjectStore';
 import './FileExplorer.css';
 
 // SVG icons — same style as EditorToolbar (stroke-based, 16x16)
@@ -187,6 +193,12 @@ interface FileExplorerProps {
   onSaveClick: () => void;
 }
 
+interface ProjectContextMenu {
+  projectId: string;
+  x: number;
+  y: number;
+}
+
 export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   const {
     fileGroups,
@@ -202,6 +214,9 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   const activeBoardId = useSimulatorStore((s) => s.activeBoardId);
   const setActiveBoardId = useSimulatorStore((s) => s.setActiveBoardId);
   const user = useAuthStore((s) => s.user);
+  const currentProject = useProjectStore((s) => s.currentProject);
+  const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
+  const clearCurrentProject = useProjectStore((s) => s.clearCurrentProject);
   const navigate = useNavigate();
 
   const [showProjects, setShowProjects] = useState(false);
@@ -210,8 +225,11 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
 
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
+  const [projectContextMenu, setProjectContextMenu] = useState<ProjectContextMenu | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState('');
+  const [renamingProjectId, setRenamingProjectId] = useState<string | null>(null);
+  const [projectRenameValue, setProjectRenameValue] = useState('');
   // Track which board group is creating a file: boardGroupId or null
   const [creatingInGroup, setCreatingInGroup] = useState<string | null>(null);
   const [newFileName, setNewFileName] = useState('');
@@ -229,6 +247,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   }, [renamingId]);
 
   useEffect(() => {
+    if (renamingProjectId && renameInputRef.current) {
+      renameInputRef.current.focus();
+      renameInputRef.current.select();
+    }
+  }, [renamingProjectId]);
+
+  useEffect(() => {
     if (creatingInGroup && newFileInputRef.current) {
       newFileInputRef.current.focus();
     }
@@ -236,11 +261,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
 
   // Close context menu on click outside
   useEffect(() => {
-    if (!contextMenu) return;
-    const handler = () => setContextMenu(null);
+    if (!contextMenu && !projectContextMenu) return;
+    const handler = () => {
+      setContextMenu(null);
+      setProjectContextMenu(null);
+    };
     document.addEventListener('click', handler);
     return () => document.removeEventListener('click', handler);
-  }, [contextMenu]);
+  }, [contextMenu, projectContextMenu]);
 
   useEffect(() => {
     if (showProjects && user) {
@@ -275,7 +303,15 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
   const handleContextMenu = (e: React.MouseEvent, fileId: string, boardGroupId: string) => {
     e.preventDefault();
     e.stopPropagation();
+    setProjectContextMenu(null);
     setContextMenu({ fileId, boardGroupId, x: e.clientX, y: e.clientY });
+  };
+
+  const handleProjectContextMenu = (e: React.MouseEvent, projectId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu(null);
+    setProjectContextMenu({ projectId, x: e.clientX, y: e.clientY });
   };
 
   const startRename = (fileId: string, groupId: string) => {
@@ -287,6 +323,12 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
     setContextMenu(null);
   };
 
+  const startProjectRename = (project: ProjectResponse) => {
+    setRenamingProjectId(project.id);
+    setProjectRenameValue(project.name);
+    setProjectContextMenu(null);
+  };
+
   const commitRename = useCallback(() => {
     if (renamingId && renameValue.trim()) {
       renameFile(renamingId, renameValue.trim());
@@ -294,12 +336,57 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
     setRenamingId(null);
   }, [renamingId, renameValue, renameFile]);
 
+  const commitProjectRename = useCallback(async () => {
+    if (!renamingProjectId) return;
+    const nextName = projectRenameValue.trim();
+    if (!nextName) {
+      setRenamingProjectId(null);
+      return;
+    }
+
+    try {
+      const updated = await updateProject(renamingProjectId, { name: nextName });
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === updated.id ? { ...p, name: updated.name, slug: updated.slug } : p,
+        ),
+      );
+      if (currentProject?.id === updated.id) {
+        setCurrentProject({
+          id: updated.id,
+          slug: updated.slug,
+          ownerUsername: updated.owner_username,
+          isPublic: updated.is_public,
+        });
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Failed to rename project.');
+    } finally {
+      setRenamingProjectId(null);
+    }
+  }, [renamingProjectId, projectRenameValue, currentProject, setCurrentProject]);
+
   const handleDelete = (fileId: string, groupId: string) => {
     setContextMenu(null);
     const files = fileGroups[groupId] ?? [];
     if (files.length <= 1) return;
     if (!window.confirm('Delete this file?')) return;
     deleteFile(fileId);
+  };
+
+  const handleProjectDelete = async (projectId: string) => {
+    setProjectContextMenu(null);
+    if (!window.confirm('Delete this project? This cannot be undone.')) return;
+    try {
+      await deleteProject(projectId);
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      if (currentProject?.id === projectId) {
+        clearCurrentProject();
+        navigate('/editor', { replace: true });
+      }
+    } catch (err: any) {
+      alert(err?.response?.data?.detail || 'Failed to delete project.');
+    }
   };
 
   const startCreateFile = (boardId: string, groupId: string) => {
@@ -370,152 +457,170 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
                   key={p.id}
                   className="file-explorer-item fe-file-item"
                   onClick={() => navigate(`/project/${p.id}`)}
+                  onContextMenu={(e) => handleProjectContextMenu(e, p.id)}
+                  onDoubleClick={() => startProjectRename(p)}
                   title={p.description || p.name}
                 >
                   <span className="file-explorer-icon">
                     <IcoProjects />
                   </span>
-                  <span className="file-explorer-name">{p.name}</span>
+                  {renamingProjectId === p.id ? (
+                    <input
+                      ref={renameInputRef}
+                      className="file-explorer-rename-input"
+                      value={projectRenameValue}
+                      onChange={(e) => setProjectRenameValue(e.target.value)}
+                      onBlur={commitProjectRename}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') void commitProjectRename();
+                        if (e.key === 'Escape') setRenamingProjectId(null);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  ) : (
+                    <span className="file-explorer-name">{p.name}</span>
+                  )}
                 </div>
               ))
             )}
           </div>
         ) : (
           boards.map((board) => {
-          const groupId = board.activeFileGroupId;
-          const groupFiles = fileGroups[groupId] ?? [];
-          const isActiveBoard = board.id === activeBoardId;
-          const isOpen = !collapsed[board.id];
-          const color = BOARD_COLOR[board.boardKind];
+            const groupId = board.activeFileGroupId;
+            const groupFiles = fileGroups[groupId] ?? [];
+            const isActiveBoard = board.id === activeBoardId;
+            const isOpen = !collapsed[board.id];
+            const color = BOARD_COLOR[board.boardKind];
 
-          // Status dot color
-          const statusColor = board.running
-            ? '#22c55e'
-            : board.compiledProgram
-              ? '#f59e0b'
-              : '#6b7280';
+            // Status dot color
+            const statusColor = board.running
+              ? '#22c55e'
+              : board.compiledProgram
+                ? '#f59e0b'
+                : '#6b7280';
 
-          return (
-            <div key={board.id} className="fe-board-section">
-              {/* Board section header */}
-              <div
-                className={`fe-board-header${isActiveBoard ? ' fe-board-header-active' : ''}`}
-                onClick={() => {
-                  switchToBoard(board.id, groupId);
-                  if (!isOpen) toggleCollapse(board.id);
-                }}
-                title={`${BOARD_KIND_LABELS[board.boardKind]} — click to edit`}
-              >
-                <button
-                  className="fe-collapse-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    toggleCollapse(board.id);
+            return (
+              <div key={board.id} className="fe-board-section">
+                {/* Board section header */}
+                <div
+                  className={`fe-board-header${isActiveBoard ? ' fe-board-header-active' : ''}`}
+                  onClick={() => {
+                    switchToBoard(board.id, groupId);
+                    if (!isOpen) toggleCollapse(board.id);
                   }}
-                  title={isOpen ? 'Collapse' : 'Expand'}
+                  title={`${BOARD_KIND_LABELS[board.boardKind]} — click to edit`}
                 >
-                  <IcoChevron open={isOpen} />
-                </button>
+                  <button
+                    className="fe-collapse-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      toggleCollapse(board.id);
+                    }}
+                    title={isOpen ? 'Collapse' : 'Expand'}
+                  >
+                    <IcoChevron open={isOpen} />
+                  </button>
 
-                <span className="fe-board-icon" style={{ color }}>
-                  {BOARD_ICON[board.boardKind]}
-                </span>
+                  <span className="fe-board-icon" style={{ color }}>
+                    {BOARD_ICON[board.boardKind]}
+                  </span>
 
-                <span className="fe-board-label">{BOARD_KIND_LABELS[board.boardKind]}</span>
+                  <span className="fe-board-label">{BOARD_KIND_LABELS[board.boardKind]}</span>
 
-                <span
-                  className="fe-status-dot"
-                  style={{ background: statusColor }}
-                  title={board.running ? 'Running' : board.compiledProgram ? 'Compiled' : 'Idle'}
-                />
+                  <span
+                    className="fe-status-dot"
+                    style={{ background: statusColor }}
+                    title={board.running ? 'Running' : board.compiledProgram ? 'Compiled' : 'Idle'}
+                  />
 
-                {/* New file button — visible on hover */}
-                <button
-                  className="fe-board-new-btn"
-                  title="New file in this board"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    startCreateFile(board.id, groupId);
-                  }}
-                >
-                  <IcoNewFile />
-                </button>
-              </div>
-
-              {/* Files under this board */}
-              {isOpen && (
-                <div className="fe-board-files">
-                  {groupFiles.map((file) => {
-                    const isActiveFile = isActiveBoard && file.id === activeFileId;
-                    return (
-                      <div
-                        key={file.id}
-                        className={`file-explorer-item fe-file-item${isActiveFile ? ' file-explorer-item-active' : ''}`}
-                        onClick={() => handleFileClick(file.id, board.id, groupId)}
-                        onContextMenu={(e) => handleContextMenu(e, file.id, groupId)}
-                        onDoubleClick={() => {
-                          switchToBoard(board.id, groupId);
-                          startRename(file.id, groupId);
-                        }}
-                        title={`${file.name}${file.modified ? ' (unsaved)' : ''}`}
-                      >
-                        <span className="file-explorer-icon">
-                          <FileIcon name={file.name} />
-                        </span>
-
-                        {renamingId === file.id ? (
-                          <input
-                            ref={renameInputRef}
-                            className="file-explorer-rename-input"
-                            value={renameValue}
-                            onChange={(e) => setRenameValue(e.target.value)}
-                            onBlur={commitRename}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') commitRename();
-                              if (e.key === 'Escape') setRenamingId(null);
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                          />
-                        ) : (
-                          <span className="file-explorer-name">{file.name}</span>
-                        )}
-
-                        {file.modified && (
-                          <span className="file-explorer-dot" title="Unsaved changes" />
-                        )}
-                      </div>
-                    );
-                  })}
-
-                  {/* Inline new-file input for this group */}
-                  {creatingInGroup === groupId && (
-                    <div className="file-explorer-item file-explorer-item-new fe-file-item">
-                      <span className="file-explorer-icon">
-                        <IcoFile />
-                      </span>
-                      <input
-                        ref={newFileInputRef}
-                        className="file-explorer-rename-input"
-                        value={newFileName}
-                        placeholder="filename.ino"
-                        onChange={(e) => setNewFileName(e.target.value)}
-                        onBlur={commitCreateFile}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') commitCreateFile();
-                          if (e.key === 'Escape') {
-                            setCreatingInGroup(null);
-                            setNewFileName('');
-                          }
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    </div>
-                  )}
+                  {/* New file button — visible on hover */}
+                  <button
+                    className="fe-board-new-btn"
+                    title="New file in this board"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      startCreateFile(board.id, groupId);
+                    }}
+                  >
+                    <IcoNewFile />
+                  </button>
                 </div>
-              )}
-            </div>
-          );
-        }))}
+
+                {/* Files under this board */}
+                {isOpen && (
+                  <div className="fe-board-files">
+                    {groupFiles.map((file) => {
+                      const isActiveFile = isActiveBoard && file.id === activeFileId;
+                      return (
+                        <div
+                          key={file.id}
+                          className={`file-explorer-item fe-file-item${isActiveFile ? ' file-explorer-item-active' : ''}`}
+                          onClick={() => handleFileClick(file.id, board.id, groupId)}
+                          onContextMenu={(e) => handleContextMenu(e, file.id, groupId)}
+                          onDoubleClick={() => {
+                            switchToBoard(board.id, groupId);
+                            startRename(file.id, groupId);
+                          }}
+                          title={`${file.name}${file.modified ? ' (unsaved)' : ''}`}
+                        >
+                          <span className="file-explorer-icon">
+                            <FileIcon name={file.name} />
+                          </span>
+
+                          {renamingId === file.id ? (
+                            <input
+                              ref={renameInputRef}
+                              className="file-explorer-rename-input"
+                              value={renameValue}
+                              onChange={(e) => setRenameValue(e.target.value)}
+                              onBlur={commitRename}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') commitRename();
+                                if (e.key === 'Escape') setRenamingId(null);
+                              }}
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          ) : (
+                            <span className="file-explorer-name">{file.name}</span>
+                          )}
+
+                          {file.modified && (
+                            <span className="file-explorer-dot" title="Unsaved changes" />
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Inline new-file input for this group */}
+                    {creatingInGroup === groupId && (
+                      <div className="file-explorer-item file-explorer-item-new fe-file-item">
+                        <span className="file-explorer-icon">
+                          <IcoFile />
+                        </span>
+                        <input
+                          ref={newFileInputRef}
+                          className="file-explorer-rename-input"
+                          value={newFileName}
+                          placeholder="filename.ino"
+                          onChange={(e) => setNewFileName(e.target.value)}
+                          onBlur={commitCreateFile}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') commitCreateFile();
+                            if (e.key === 'Escape') {
+                              setCreatingInGroup(null);
+                              setNewFileName('');
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
 
         {/* Fallback: no boards yet */}
         {!showProjects && boards.length === 0 && (
@@ -544,9 +649,30 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({ onSaveClick }) => {
         </div>
       )}
 
-      {isNewProjectModalOpen && (
-        <NewProjectModal onClose={() => setIsNewProjectModalOpen(false)} />
+      {projectContextMenu && (
+        <div
+          className="file-explorer-context-menu"
+          style={{ top: projectContextMenu.y, left: projectContextMenu.x }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            onClick={() => {
+              const project = projects.find((p) => p.id === projectContextMenu.projectId);
+              if (project) startProjectRename(project);
+            }}
+          >
+            Rename
+          </button>
+          <button
+            className="ctx-delete"
+            onClick={() => handleProjectDelete(projectContextMenu.projectId)}
+          >
+            Delete
+          </button>
+        </div>
       )}
+
+      {isNewProjectModalOpen && <NewProjectModal onClose={() => setIsNewProjectModalOpen(false)} />}
     </div>
   );
 };

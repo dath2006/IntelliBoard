@@ -3,16 +3,28 @@ from __future__ import annotations
 import json
 import re
 import os
+import logging
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
 from app.agent.runtime_pin_catalog import get_observed_pin_names
 
+log = logging.getLogger(__name__)
+
 _COMPONENT_ID_ALIASES: dict[str, str] = {
     # Common board aliases used by models/users.
     "esp32": "esp32-devkit-v1",
     "wokwi-esp32-devkit-v1": "esp32-devkit-v1",
+}
+
+_QUERY_STOPWORDS: set[str] = {
+    "display",
+    "module",
+    "component",
+    "board",
+    "sensor",
+    "part",
 }
 
 
@@ -52,19 +64,29 @@ def search_component_catalog(
     q = query.strip().lower()
     if not q:
         raise ValueError("query is required")
+    q_norm = _normalize_key(q)
+    q_tokens = _filter_query_tokens(_tokenize_key(q))
+    log.debug(
+        "component_search query=%r q_norm=%r q_tokens=%s",
+        query,
+        q_norm,
+        sorted(q_tokens),
+    )
     results: list[tuple[int, dict[str, Any]]] = []
     for component in load_component_catalog():
         if category and component.get("category") != category:
             continue
-        haystack = " ".join(
-            [
-                str(component.get("id", "")),
-                str(component.get("name", "")),
-                str(component.get("description", "")),
-                " ".join(str(tag) for tag in component.get("tags", [])),
-            ]
-        ).lower()
-        if q not in haystack:
+        cid = str(component.get("id", ""))
+        name = str(component.get("name", ""))
+        desc = str(component.get("description", ""))
+        tags = [str(tag) for tag in component.get("tags", [])]
+        haystack = " ".join([cid, name, desc, " ".join(tags)]).lower()
+        haystack_norm = _normalize_key(haystack)
+        haystack_tokens = set().union(*(_tokenize_key(value) for value in [cid, name, desc, *tags] if value))
+
+        token_match = _token_overlap_match(q_tokens, haystack_tokens)
+        fuzzy_match = _fuzzy_token_match(q_tokens, haystack_tokens)
+        if q not in haystack and (not q_norm or q_norm not in haystack_norm) and not token_match and not fuzzy_match:
             continue
         score = 0
         if str(component.get("id", "")).lower() == q:
@@ -73,9 +95,21 @@ def search_component_catalog(
             score += 50
         if q in " ".join(str(tag).lower() for tag in component.get("tags", [])):
             score += 25
+        if token_match:
+            score += 15 * len(q_tokens)
+        if fuzzy_match:
+            score += 6 * len(q_tokens)
+        if q_norm and q_norm in haystack_norm:
+            score += 20
         results.append((score, _compact_component(component)))
     results.sort(key=lambda item: (-item[0], item[1].get("id", "")))
-    return [item for _, item in results[:limit]]
+    top = [item for _, item in results[:limit]]
+    log.debug(
+        "component_search matched=%d returned=%d",
+        len(results),
+        len(top),
+    )
+    return top
 
 
 def get_component_schema(component_id: str) -> dict[str, Any]:
@@ -247,6 +281,84 @@ def _tokenize_key(value: str) -> set[str]:
     if compact.startswith("esp32") and len(compact) > 5:
         tokens.extend(["esp32", compact[5:]])
     return set(tokens)
+
+
+def _filter_query_tokens(tokens: set[str]) -> set[str]:
+    return {t for t in tokens if t and t not in _QUERY_STOPWORDS}
+
+
+def _token_overlap_match(query_tokens: set[str], haystack_tokens: set[str]) -> bool:
+    if not query_tokens or not haystack_tokens:
+        return False
+    overlap = len(query_tokens & haystack_tokens)
+    if overlap == 0:
+        return False
+    required = max(1, len(query_tokens) - 1)
+    return overlap >= required
+
+
+def _fuzzy_token_match(query_tokens: set[str], haystack_tokens: set[str]) -> bool:
+    if not query_tokens or not haystack_tokens:
+        return False
+    for q in query_tokens:
+        if q in haystack_tokens:
+            continue
+        if not _has_close_token(q, haystack_tokens):
+            return False
+    return True
+
+
+def _has_close_token(needle: str, haystack: set[str]) -> bool:
+    for token in haystack:
+        max_dist = _max_distance_for_token(needle, token)
+        if max_dist is None:
+            continue
+        if _edit_distance(needle, token, max_dist) <= max_dist:
+            return True
+    return False
+
+
+def _max_distance_for_token(a: str, b: str) -> int | None:
+    la, lb = len(a), len(b)
+    if la == 0 or lb == 0:
+        return None
+    length = max(la, lb)
+    if length <= 4:
+        return 1
+    if length <= 8:
+        return 2
+    if length <= 12:
+        return 3
+    return 4
+
+
+def _edit_distance(a: str, b: str, max_dist: int) -> int:
+    if a == b:
+        return 0
+    if abs(len(a) - len(b)) > max_dist:
+        return max_dist + 1
+
+    # Ensure a is the shorter string for less work.
+    if len(a) > len(b):
+        a, b = b, a
+
+    prev = list(range(len(a) + 1))
+    for i, ch_b in enumerate(b, start=1):
+        curr = [i] + [0] * len(a)
+        row_min = curr[0]
+        for j, ch_a in enumerate(a, start=1):
+            cost = 0 if ch_a == ch_b else 1
+            curr[j] = min(
+                prev[j] + 1,
+                curr[j - 1] + 1,
+                prev[j - 1] + cost,
+            )
+            if curr[j] < row_min:
+                row_min = curr[j]
+        if row_min > max_dist:
+            return max_dist + 1
+        prev = curr
+    return prev[-1]
 
 
 def _infer_pin_role(pin_name: str) -> str:

@@ -10,10 +10,12 @@ import {
   getAgentSessionSnapshot,
   listAgentSessionEvents,
   listAgentSessions,
+  postFrontendActionResult,
   sendAgentMessage,
   stopAgentSession,
   syncCanvasToSession,
 } from '../../services/agentSessions';
+import { runFrontendAction, type FrontendActionRequest } from '../../services/agentFrontendActions';
 import { AgentEventStream } from './AgentEventStream';
 import { ModelSelector } from './ModelSelector';
 import { ToolTraceRow } from './ToolTraceRow';
@@ -136,8 +138,18 @@ function buildSnapshotFromStores(): ProjectSnapshotV2 {
     })),
     wires: sim.wires.map((w) => ({
       id: w.id,
-      start: { componentId: w.start.componentId, pinName: w.start.pinName, x: w.start.x ?? 0, y: w.start.y ?? 0 },
-      end: { componentId: w.end.componentId, pinName: w.end.pinName, x: w.end.x ?? 0, y: w.end.y ?? 0 },
+      start: {
+        componentId: w.start.componentId,
+        pinName: w.start.pinName,
+        x: w.start.x ?? 0,
+        y: w.start.y ?? 0,
+      },
+      end: {
+        componentId: w.end.componentId,
+        pinName: w.end.pinName,
+        x: w.end.x ?? 0,
+        y: w.end.y ?? 0,
+      },
       waypoints: w.waypoints ?? [],
       color: w.color ?? '#22c55e',
       signalType: (w.signalType as string | null | undefined) ?? null,
@@ -397,18 +409,11 @@ export const AgentPanel: React.FC = () => {
         };
 
         const normalizedStartPin = isBoardComponent(startId)
-          ? normalizeBoardPinName(
-              resolveBoardKind(startId) ?? startId,
-              wire.start.pinName,
-            )
+          ? normalizeBoardPinName(resolveBoardKind(startId) ?? startId, wire.start.pinName)
           : normalizeComponentPin(startId, wire.start.pinName);
         const normalizedEndPin = isBoardComponent(endId)
-          ? normalizeBoardPinName(
-              resolveBoardKind(endId) ?? endId,
-              wire.end.pinName,
-            )
+          ? normalizeBoardPinName(resolveBoardKind(endId) ?? endId, wire.end.pinName)
           : normalizeComponentPin(endId, wire.end.pinName);
-
 
         if (isBoardComponent(startId)) {
           const boardKind = resolveBoardKind(startId) ?? startId;
@@ -523,6 +528,27 @@ export const AgentPanel: React.FC = () => {
     void scanAndReportCanvasPins({ boards, components, upgradeDelayMs: 250 });
   };
 
+  const handleFrontendActionRequest = async (event: { payload?: Record<string, unknown> }) => {
+    if (!activeSessionId) return;
+    const payload = event.payload ?? {};
+    const actionId = typeof payload.actionId === 'string' ? payload.actionId : null;
+    const action = typeof payload.action === 'string' ? payload.action : null;
+    if (!actionId || !action) return;
+
+    const request: FrontendActionRequest = {
+      actionId,
+      action,
+      payload:
+        typeof payload.payload === 'object' && payload.payload
+          ? (payload.payload as Record<string, unknown>)
+          : undefined,
+      timeoutMs: typeof payload.timeoutMs === 'number' ? payload.timeoutMs : undefined,
+    };
+
+    const result = await runFrontendAction(request);
+    await postFrontendActionResult(activeSessionId, actionId, { ...result, action });
+  };
+
   const reconcileEvents = async (sessionId: string, fromSeq: number) => {
     if (reconcilingRef.current) return;
     reconcilingRef.current = true;
@@ -605,6 +631,9 @@ export const AgentPanel: React.FC = () => {
         },
         onEvent: async (event) => {
           ingestEvent(activeSessionId, event);
+          if (event.eventType === 'frontend.action.request') {
+            void handleFrontendActionRequest(event);
+          }
           if (event.eventType === 'run.started')
             bumpSessionStatus(activeSessionId, 'running', event.createdAt);
           if (event.eventType === 'run.completed')
@@ -692,9 +721,9 @@ export const AgentPanel: React.FC = () => {
 
     const scheduleSync = () => {
       // Don't sync while the agent is actively running.
-      const sessionStatus = useAgentStore.getState().sessions.find(
-        (s) => s.id === activeSessionId,
-      )?.status;
+      const sessionStatus = useAgentStore
+        .getState()
+        .sessions.find((s) => s.id === activeSessionId)?.status;
       if (sessionStatus === 'running' || sessionStatus === 'queued') return;
 
       const sim = useSimulatorStore.getState();
@@ -704,7 +733,12 @@ export const AgentPanel: React.FC = () => {
       const fingerprint = [
         sim.boards.map((b) => `${b.id}:${b.x}:${b.y}`).join('|'),
         sim.components.map((c) => `${c.id}:${c.x}:${c.y}`).join('|'),
-        sim.wires.map((w) => `${w.id}:${w.start.componentId}:${w.start.pinName}:${w.end.componentId}:${w.end.pinName}`).join('|'),
+        sim.wires
+          .map(
+            (w) =>
+              `${w.id}:${w.start.componentId}:${w.start.pinName}:${w.end.componentId}:${w.end.pinName}`,
+          )
+          .join('|'),
         Object.entries(editor.fileGroups)
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([gid, fs]) => `${gid}:${fs.map((f) => `${f.name}=${f.content}`).join(',')}`)
@@ -717,7 +751,9 @@ export const AgentPanel: React.FC = () => {
       syncCanvasDebounceRef.current = setTimeout(() => {
         const liveSnapshot = buildSnapshotFromStores();
         syncCanvasToSession(activeSessionId, liveSnapshot)
-          .then(() => { lastSyncedFingerprintRef.current = fingerprint; })
+          .then(() => {
+            lastSyncedFingerprintRef.current = fingerprint;
+          })
           .catch(() => {
             // Non-fatal: sync failure just means the agent may have slightly stale state.
           });
@@ -828,19 +864,24 @@ export const AgentPanel: React.FC = () => {
     const sorted = [...activeTraces].sort((a, b) => a.seq - b.seq);
 
     console.log('[chatRows] Building from', sorted.length, 'traces');
-    console.log('[chatRows] Event types:', sorted.map(t => t.eventType).join(', '));
+    console.log('[chatRows] Event types:', sorted.map((t) => t.eventType).join(', '));
 
-    // Pre-build a map: toolCallId → result trace, so started rows can look up
-    // their result and render as completed immediately.
-    const resultByCallId = new Map<string, typeof sorted[number]>();
+    // Pre-build maps: toolCallId/actionId → result trace, so started rows can
+    // look up their result and render as completed immediately.
+    const resultByCallId = new Map<string, (typeof sorted)[number]>();
+    const resultByActionId = new Map<string, (typeof sorted)[number]>();
     for (const t of sorted) {
       if (t.eventType === 'tool.call.result') {
         const callId = typeof t.payload?.toolCallId === 'string' ? t.payload.toolCallId : null;
         if (callId) resultByCallId.set(callId, t);
+      } else if (t.eventType === 'frontend.action.result') {
+        const actionId = typeof t.payload?.actionId === 'string' ? t.payload.actionId : null;
+        if (actionId) resultByActionId.set(actionId, t);
       }
     }
     // Track which result callIds were consumed so we can render orphan results.
     const consumedResultCallIds = new Set<string>();
+    const consumedResultActionIds = new Set<string>();
 
     for (const t of sorted) {
       if (t.eventType === 'run.started') {
@@ -850,10 +891,8 @@ export const AgentPanel: React.FC = () => {
           text: typeof t.payload?.message === 'string' ? t.payload.message : 'Start run',
           createdAt: t.createdAt,
         });
-
       } else if (t.eventType === 'model.output.final') {
         rows.push({ id: t.id, kind: 'assistant', text: t.compactText, createdAt: t.createdAt });
-
       } else if (t.eventType === 'tool.call.started') {
         const callId = typeof t.payload?.toolCallId === 'string' ? t.payload.toolCallId : null;
         const result = callId ? resultByCallId.get(callId) : undefined;
@@ -863,8 +902,10 @@ export const AgentPanel: React.FC = () => {
         if (result && callId) {
           consumedResultCallIds.add(callId);
           const output = result.payload?.output ?? null;
-          const failed = typeof output === 'object' && output !== null
-            && (output as Record<string, unknown>).ok === false;
+          const failed =
+            typeof output === 'object' &&
+            output !== null &&
+            (output as Record<string, unknown>).ok === false;
           rows.push({
             id: t.id,
             kind: 'tool',
@@ -887,15 +928,16 @@ export const AgentPanel: React.FC = () => {
             toolOutput: undefined,
           });
         }
-
       } else if (t.eventType === 'tool.call.result') {
         // Only render standalone if there was no matching started trace.
         const callId = typeof t.payload?.toolCallId === 'string' ? t.payload.toolCallId : null;
         if (!callId || !consumedResultCallIds.has(callId)) {
           const toolName = typeof t.payload?.tool === 'string' ? t.payload.tool : '';
           const output = t.payload?.output ?? null;
-          const failed = typeof output === 'object' && output !== null
-            && (output as Record<string, unknown>).ok === false;
+          const failed =
+            typeof output === 'object' &&
+            output !== null &&
+            (output as Record<string, unknown>).ok === false;
           rows.push({
             id: t.id,
             kind: 'tool',
@@ -907,19 +949,87 @@ export const AgentPanel: React.FC = () => {
             toolFailed: failed,
           });
         }
+      } else if (t.eventType === 'tool.call.failed') {
+        const toolName = typeof t.payload?.tool === 'string' ? t.payload.tool : '';
+        const error = typeof t.payload?.error === 'string' ? t.payload.error : 'Tool failed.';
+        rows.push({
+          id: t.id,
+          kind: 'tool',
+          text: toolName,
+          createdAt: t.createdAt,
+          toolName,
+          toolInput: t.payload?.input ?? null,
+          toolOutput: { ok: false, error },
+          toolFailed: true,
+        });
+      } else if (t.eventType === 'frontend.action.request') {
+        const actionId = typeof t.payload?.actionId === 'string' ? t.payload.actionId : null;
+        const actionName =
+          typeof t.payload?.action === 'string' ? t.payload.action : 'frontend.action';
+        const input = t.payload?.payload ?? t.payload ?? null;
+        const result = actionId ? resultByActionId.get(actionId) : undefined;
 
+        if (result && actionId) {
+          consumedResultActionIds.add(actionId);
+          const output = result.payload ?? null;
+          const failed =
+            typeof output === 'object' &&
+            output !== null &&
+            (output as Record<string, unknown>).ok === false;
+          rows.push({
+            id: t.id,
+            kind: 'tool',
+            text: actionName,
+            createdAt: result.createdAt,
+            toolName: actionName,
+            toolInput: input,
+            toolOutput: output,
+            toolFailed: failed,
+          });
+        } else {
+          rows.push({
+            id: t.id,
+            kind: 'tool',
+            text: actionName,
+            createdAt: t.createdAt,
+            toolName: actionName,
+            toolInput: input,
+            toolOutput: undefined,
+          });
+        }
+      } else if (t.eventType === 'frontend.action.result') {
+        const actionId = typeof t.payload?.actionId === 'string' ? t.payload.actionId : null;
+        if (!actionId || !consumedResultActionIds.has(actionId)) {
+          const actionName =
+            typeof t.payload?.action === 'string' ? t.payload.action : 'frontend.action';
+          const output = t.payload ?? null;
+          const failed =
+            typeof output === 'object' &&
+            output !== null &&
+            (output as Record<string, unknown>).ok === false;
+          rows.push({
+            id: t.id,
+            kind: 'tool',
+            text: actionName,
+            createdAt: t.createdAt,
+            toolName: actionName,
+            toolInput: null,
+            toolOutput: output,
+            toolFailed: failed,
+          });
+        }
       } else if (t.eventType === 'run.failed' || t.eventType === 'run.cancelled') {
         rows.push({
           id: t.id,
           kind: 'system',
-          text: t.eventType === 'run.cancelled'
-            ? 'Run cancelled.'
-            : `Run failed${typeof t.payload?.error === 'string' ? `: ${t.payload.error}` : ''}`,
+          text:
+            t.eventType === 'run.cancelled'
+              ? 'Run cancelled.'
+              : `Run failed${typeof t.payload?.error === 'string' ? `: ${t.payload.error}` : ''}`,
           createdAt: t.createdAt,
           payload: t.payload,
           expandable: true,
         });
-
       } else if (t.eventType === 'snapshot.updated') {
         rows.push({
           id: t.id,
@@ -929,12 +1039,20 @@ export const AgentPanel: React.FC = () => {
           payload: t.payload,
           expandable: true,
         });
-
       } else if (t.eventType === 'session.applied') {
-        rows.push({ id: t.id, kind: 'system', text: 'Changes accepted and applied to project.', createdAt: t.createdAt });
-
+        rows.push({
+          id: t.id,
+          kind: 'system',
+          text: 'Changes accepted and applied to project.',
+          createdAt: t.createdAt,
+        });
       } else if (t.eventType === 'session.discarded') {
-        rows.push({ id: t.id, kind: 'system', text: 'Draft changes discarded.', createdAt: t.createdAt });
+        rows.push({
+          id: t.id,
+          kind: 'system',
+          text: 'Draft changes discarded.',
+          createdAt: t.createdAt,
+        });
       }
     }
 
@@ -1092,18 +1210,26 @@ export const AgentPanel: React.FC = () => {
               const isApplied = row.text.startsWith('Changes accepted');
               const isDiscarded = row.text.startsWith('Draft changes discarded');
               return (
-                <div key={row.id} className={`agent-system-row ${isError ? 'agent-system-row--error' : isCancelled ? 'agent-system-row--warn' : isApplied ? 'agent-system-row--success' : isDiscarded ? 'agent-system-row--muted' : ''}`}>
+                <div
+                  key={row.id}
+                  className={`agent-system-row ${isError ? 'agent-system-row--error' : isCancelled ? 'agent-system-row--warn' : isApplied ? 'agent-system-row--success' : isDiscarded ? 'agent-system-row--muted' : ''}`}
+                >
                   <span className="agent-system-row__icon">
                     {isError ? '✗' : isCancelled ? '⏹' : isApplied ? '✓' : isDiscarded ? '↩' : 'ℹ'}
                   </span>
                   <span className="agent-system-row__text">{row.text}</span>
                   {row.expandable && row.payload && (
                     <>
-                      <button className="agent-system-row__toggle" onClick={() => toggleExpand(row.id)}>
+                      <button
+                        className="agent-system-row__toggle"
+                        onClick={() => toggleExpand(row.id)}
+                      >
                         {expandedRows[row.id] ? '▲' : '▼'}
                       </button>
                       {expandedRows[row.id] && (
-                        <pre className="tool-trace__pre agent-system-row__pre">{prettyJson(row.payload)}</pre>
+                        <pre className="tool-trace__pre agent-system-row__pre">
+                          {prettyJson(row.payload)}
+                        </pre>
                       )}
                     </>
                   )}

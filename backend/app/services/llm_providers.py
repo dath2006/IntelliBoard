@@ -247,7 +247,23 @@ async def _build_copilot_model(db: AsyncSession, user_id: str, model_id: str) ->
         },
     )
 
-    return OpenAIModel(model_name, openai_client=copilot_client)
+    init_params = getattr(OpenAIModel, "__init__", None)
+    if init_params is None:
+        return OpenAIModel(model_name)
+    try:
+        import inspect
+
+        params = inspect.signature(init_params).parameters
+    except Exception:
+        params = {}
+
+    if "openai_client" in params:
+        return OpenAIModel(model_name, openai_client=copilot_client)
+    if "client" in params:
+        return OpenAIModel(model_name, client=copilot_client)
+    if "async_client" in params:
+        return OpenAIModel(model_name, async_client=copilot_client)
+    return OpenAIModel(model_name)
 
 
 # ---------------------------------------------------------------------------

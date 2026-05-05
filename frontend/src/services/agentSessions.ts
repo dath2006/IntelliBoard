@@ -22,6 +22,13 @@ export interface AgentSessionEvent {
   createdAt: string;
 }
 
+export interface FrontendActionResultRequest {
+  ok: boolean;
+  payload?: Record<string, unknown>;
+  error?: string;
+  action?: string;
+}
+
 export interface SnapshotFile {
   name: string;
   content: string;
@@ -69,7 +76,9 @@ export interface CreateAgentSessionRequest {
   modelName?: string;
 }
 
-export async function createAgentSession(payload: CreateAgentSessionRequest): Promise<AgentSession> {
+export async function createAgentSession(
+  payload: CreateAgentSessionRequest,
+): Promise<AgentSession> {
   const { data } = await api.post<AgentSession>('/agent/sessions', payload);
   return data;
 }
@@ -82,7 +91,9 @@ export async function listAgentSessions(projectId?: string): Promise<AgentSessio
 }
 
 export async function sendAgentMessage(sessionId: string, message: string): Promise<AgentSession> {
-  const { data } = await api.post<AgentSession>(`/agent/sessions/${sessionId}/messages`, { message });
+  const { data } = await api.post<AgentSession>(`/agent/sessions/${sessionId}/messages`, {
+    message,
+  });
   return data;
 }
 
@@ -99,6 +110,14 @@ export async function discardAgentSession(sessionId: string): Promise<AgentSessi
 export async function stopAgentSession(sessionId: string): Promise<AgentSession> {
   const { data } = await api.post<AgentSession>(`/agent/sessions/${sessionId}/stop`);
   return data;
+}
+
+export async function postFrontendActionResult(
+  sessionId: string,
+  actionId: string,
+  result: FrontendActionResultRequest,
+): Promise<void> {
+  await api.post(`/agent/sessions/${sessionId}/actions/${actionId}`, result);
 }
 
 export async function getAgentSessionSnapshot(sessionId: string): Promise<ProjectSnapshotV2> {
