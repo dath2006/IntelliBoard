@@ -200,7 +200,32 @@ async def search_libraries(query: str, arduino_service=None) -> dict[str, Any]:
         from app.api.routes.compile import arduino_cli
 
         service = arduino_cli
-    return await service.search_libraries(query)
+    if not query.strip():
+        return {"success": True, "libraries": [], "total": 0}
+    result = await service.search_libraries(query)
+    if not result.get("success"):
+        return result
+
+    libraries = result.get("libraries") or []
+    limit = 25
+    trimmed: list[dict[str, Any]] = []
+    for lib in libraries[:limit]:
+        latest = lib.get("latest") or {}
+        trimmed.append(
+            {
+                "name": lib.get("name") or latest.get("name") or "",
+                "version": latest.get("version") or "",
+                "author": latest.get("author") or lib.get("author") or "",
+                "sentence": latest.get("sentence") or latest.get("paragraph") or "",
+            }
+        )
+
+    return {
+        "success": True,
+        "libraries": trimmed,
+        "total": len(libraries),
+        "truncated": len(libraries) > limit,
+    }
 
 
 async def install_library(name: str, arduino_service=None) -> dict[str, Any]:

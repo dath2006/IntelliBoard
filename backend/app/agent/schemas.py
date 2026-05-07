@@ -164,6 +164,12 @@ class ReplaceFileRangeInput(StrictModel):
         return self
 
 
+class ReplaceFileContentInput(StrictModel):
+    groupId: str = Field(min_length=1)
+    fileName: str = Field(min_length=1)
+    content: str
+
+
 class ToolResult(StrictModel):
     ok: bool
     message: str = ""

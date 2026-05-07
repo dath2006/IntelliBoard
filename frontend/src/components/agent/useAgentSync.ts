@@ -88,13 +88,8 @@ export function buildSnapshotFromStores(): ProjectSnapshotV2 {
 }
 
 export function useAgentSync(sessionId: string | null) {
-  const {
-    ingestEvent,
-    markSnapshotSynced,
-    setError,
-    setStreamStatus,
-    upsertSession,
-  } = useAgentStore();
+  const { clearTrace, ingestEvent, markSnapshotSynced, setError, setStreamStatus, upsertSession } =
+    useAgentStore();
 
   const streamRef = useRef<AgentEventStream | null>(null);
   const reconcilingRef = useRef(false);
@@ -384,6 +379,33 @@ export function useAgentSync(sessionId: string | null) {
       setStreamStatus('idle');
       return;
     }
+    let cancelled = false;
+    const loadHistory = async () => {
+      const lastSeq = useAgentStore.getState().lastSeqBySession[sessionId] ?? 0;
+      if (lastSeq > 0) return;
+      clearTrace(sessionId);
+      try {
+        const replay = await listAgentSessionEvents(sessionId, 0);
+        if (cancelled) return;
+        const sorted = [...replay].sort((a, b) => a.seq - b.seq);
+        for (const ev of sorted) {
+          ingestEvent(sessionId, ev);
+          if (ev.eventType === 'run.started') bumpSessionStatus(sessionId, 'running', ev.createdAt);
+          if (ev.eventType === 'run.completed')
+            bumpSessionStatus(sessionId, 'completed', ev.createdAt);
+          if (ev.eventType === 'run.failed') bumpSessionStatus(sessionId, 'failed', ev.createdAt);
+          if (ev.eventType === 'run.cancelled')
+            bumpSessionStatus(sessionId, 'stopped', ev.createdAt);
+        }
+      } catch (err: unknown) {
+        if (!cancelled) {
+          console.warn('Failed to preload session history', err);
+        }
+      }
+    };
+
+    void loadHistory();
+
     streamRef.current?.stop();
     const stream = new AgentEventStream(
       sessionId,
@@ -392,7 +414,9 @@ export function useAgentSync(sessionId: string | null) {
         onStatus: (status) => setStreamStatus(status),
         onError: (msg) => setError(msg),
         onGap: async (expectedNextSeq, actualSeq) => {
-          console.warn(`Stream gap detected (expected ${expectedNextSeq}, got ${actualSeq}). Replaying...`);
+          console.warn(
+            `Stream gap detected (expected ${expectedNextSeq}, got ${actualSeq}). Replaying...`,
+          );
           await reconcileEvents(sessionId, expectedNextSeq);
         },
         onEvent: async (event) => {
@@ -443,10 +467,11 @@ export function useAgentSync(sessionId: string | null) {
     streamRef.current = stream;
     stream.start();
     return () => {
+      cancelled = true;
       stream.stop();
       if (streamRef.current === stream) streamRef.current = null;
     };
-  }, [sessionId, ingestEvent, markSnapshotSynced, setError, setStreamStatus]);
+  }, [sessionId, clearTrace, ingestEvent, markSnapshotSynced, setError, setStreamStatus]);
 
   useEffect(() => {
     if (!sessionId) return;

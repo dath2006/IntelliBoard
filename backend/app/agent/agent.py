@@ -89,7 +89,7 @@ async def _build_contextual_prompt(db, session_id: str, message: str) -> str:
     return "\n".join(lines)
 
 
-def build_agent(model_name: str | None = None, *, defer_model_check: bool = False) -> Agent[AgentDeps, str]:
+def build_agent(model_name: Any | None = None, *, defer_model_check: bool = False) -> Agent[AgentDeps, str]:
     instructions = (
         "You are Velxio's embedded-systems agent. You help users build, wire, and simulate "
         "hardware projects on the Velxio canvas. You write Arduino/C++ or MicroPython firmware, "
@@ -160,7 +160,8 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "- Use read_file(group_id='...', file_name='sketch.ino') to read current code\n\n"
         "WRITING CODE:\n"
         "- For a new file: create_file(group_id='<activeFileGroupId>', name='sketch.ino', content='...')\n"
-        "- To edit existing code: use replace_file_range or apply_file_patch — never recreate the whole file\n\n"
+        "- To edit existing code: use patch_file_lines or apply_file_patch — never recreate the whole file\n"
+        "- Use replace_file_content only when you intentionally want to replace the full file.\n\n"
         "LIBRARY MANAGEMENT (if compilation fails with missing library):\n"
         "1. search_libraries('LibraryName') — find the exact library name\n"
         "2. install_library('ExactLibraryName') — install it\n"
@@ -173,7 +174,7 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "- Always prefer compile_in_frontend(board_id='<id>') — mirrors the UI and returns richer errors\n"
         "- Use board_id from get_project_outline → boards[n].id\n"
         "- If compilation fails: read the full error message, identify the line number, fix with "
-        "replace_file_range or apply_file_patch, then recompile\n"
+        "patch_file_lines or apply_file_patch, then recompile\n"
         "- Do NOT rewrite the whole file to fix a small error — patch only what is broken\n\n"
         "SIMULATING:\n"
         "- run_simulation() — starts the simulation in the UI\n"
@@ -204,7 +205,7 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "- Do not explain what tools you are about to call — just call them and report the outcome"
     )
     agent = Agent(
-        model_name or settings.AGENT_MODEL,
+        model_name if model_name is not None else settings.AGENT_MODEL,
         deps_type=AgentDeps,
         instructions=instructions,
         defer_model_check=defer_model_check,
@@ -650,6 +651,37 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         )
 
     @agent.tool
+    async def patch_file_lines(
+        ctx: RunContext[AgentDeps],
+        group_id: str,
+        file_name: str,
+        start_line: int,
+        end_line: int,
+        replacement: str,
+    ) -> dict[str, Any]:
+        """Patch a range of lines in an existing file. Use for targeted fixes.
+
+        Preferred over rewriting the whole file. Lines are 1-indexed.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "patch_file_lines",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.patch_file_lines(
+                    ctx.deps.snapshot,
+                    group_id=group_id,
+                    file_name=file_name,
+                    start_line=start_line,
+                    end_line=end_line,
+                    replacement=replacement,
+                ),
+                tool_name="patch_file_lines",
+            ),
+        )
+
+    @agent.tool
     async def replace_file_range(
         ctx: RunContext[AgentDeps],
         group_id: str,
@@ -658,25 +690,37 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         end_line: int,
         replacement: str,
     ) -> dict[str, Any]:
-        """Replace a range of lines in an existing file. Use for targeted fixes.
+        """Deprecated alias for patch_file_lines (kept for backward compatibility)."""
+        return await patch_file_lines(
+            ctx,
+            group_id=group_id,
+            file_name=file_name,
+            start_line=start_line,
+            end_line=end_line,
+            replacement=replacement,
+        )
 
-        Preferred over rewriting the whole file. Lines are 1-indexed.
-        """
+    @agent.tool
+    async def replace_file_content(
+        ctx: RunContext[AgentDeps],
+        group_id: str,
+        file_name: str,
+        content: str,
+    ) -> dict[str, Any]:
+        """Replace the entire file content in one operation."""
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(
             ctx,
-            "replace_file_range",
+            "replace_file_content",
             lambda: _apply_mutation(
                 ctx,
-                *snapshot_ops.replace_file_range(
+                *snapshot_ops.replace_file_content(
                     ctx.deps.snapshot,
                     group_id=group_id,
                     file_name=file_name,
-                    start_line=start_line,
-                    end_line=end_line,
-                    replacement=replacement,
+                    content=content,
                 ),
-                tool_name="replace_file_range",
+                tool_name="replace_file_content",
             ),
         )
 
@@ -685,13 +729,15 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         ctx: RunContext[AgentDeps],
         group_id: str,
         file_name: str,
-        original: str,
-        modified: str,
+        original: str | None = None,
+        modified: str | None = None,
+        patch: str | None = None,
     ) -> dict[str, Any]:
-        """Patch a file by matching exact original content and replacing with modified.
+        """Apply a file patch.
 
-        original: exact current content of the file (must match exactly).
-        modified: the new full content to replace it with.
+        Modes:
+        1) Provide unified diff in `patch`.
+        2) Provide `original` + `modified` full contents.
         """
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(
@@ -705,6 +751,7 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
                     file_name=file_name,
                     original=original,
                     modified=modified,
+                    patch=patch,
                 ),
                 tool_name="apply_file_patch",
             ),
@@ -1012,7 +1059,7 @@ async def run_agent_session(
                 raise
 
         agent = build_agent(
-            resolved_model if isinstance(resolved_model, str) else None,
+            resolved_model,
             defer_model_check=model_override is not None or not isinstance(resolved_model, str),
         )
         run_kwargs: dict[str, Any] = {"deps": deps}

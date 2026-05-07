@@ -202,10 +202,26 @@ async def resolve_pydantic_ai_model(
     Returns either a model string (for openai:) or a configured model object
     (for github-copilot:) that pydantic-ai's Agent accepts.
     """
-    if model_id.startswith("github-copilot:"):
-        return await _build_copilot_model(db, user_id, model_id)
+    normalized_model_id = _normalize_model_id(model_id)
+    if normalized_model_id.startswith("github-copilot:"):
+        return await _build_copilot_model(db, user_id, normalized_model_id)
+    if normalized_model_id.startswith("openai:"):
+        return normalized_model_id
 
-    # openai: or unknown prefix — return as plain string, pydantic-ai handles it
+    raise ValueError(
+        f"Unsupported model id '{model_id}'. Expected 'openai:<model>' or 'github-copilot:<model>'."
+    )
+
+
+def _normalize_model_id(model_id: str) -> str:
+    """
+    Normalize provider model IDs from UI/API variants.
+
+    Supported aliases:
+    - github:<name> -> github-copilot:<name>
+    """
+    if model_id.startswith("github:"):
+        return f"github-copilot:{model_id[len('github:'):]}"
     return model_id
 
 
@@ -220,7 +236,11 @@ async def _build_copilot_model(db: AsyncSession, user_id: str, model_id: str) ->
     This is completely isolated from the OpenAI provider.
     """
     from openai import AsyncOpenAI
-    from pydantic_ai.models.openai import OpenAIModel
+    try:
+        from pydantic_ai.models.openai import OpenAIChatModel as OpenAIModel
+    except ImportError:  # pragma: no cover - compatibility with older pydantic-ai
+        from pydantic_ai.models.openai import OpenAIModel  # type: ignore[attr-defined,no-redef]
+    from pydantic_ai.providers.openai import OpenAIProvider
 
     model_name = model_id[len("github-copilot:"):]
 
@@ -249,7 +269,7 @@ async def _build_copilot_model(db: AsyncSession, user_id: str, model_id: str) ->
 
     init_params = getattr(OpenAIModel, "__init__", None)
     if init_params is None:
-        return OpenAIModel(model_name)
+        raise RuntimeError("Installed pydantic-ai OpenAI model has no inspectable constructor.")
     try:
         import inspect
 
@@ -257,13 +277,20 @@ async def _build_copilot_model(db: AsyncSession, user_id: str, model_id: str) ->
     except Exception:
         params = {}
 
+    if "provider" in params:
+        return OpenAIModel(
+            model_name,
+            provider=OpenAIProvider(openai_client=copilot_client),
+        )
     if "openai_client" in params:
         return OpenAIModel(model_name, openai_client=copilot_client)
     if "client" in params:
         return OpenAIModel(model_name, client=copilot_client)
     if "async_client" in params:
         return OpenAIModel(model_name, async_client=copilot_client)
-    return OpenAIModel(model_name)
+    raise RuntimeError(
+        "Installed pydantic-ai OpenAI model constructor does not support a custom Copilot client."
+    )
 
 
 # ---------------------------------------------------------------------------

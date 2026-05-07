@@ -2,9 +2,7 @@
  * Editor Page — main editor + simulator with resizable panels
  */
 
-import React, { useRef, useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
-import { CopilotKitProvider } from '@copilotkit/react-core/v2';
-import { HttpAgent } from '@ag-ui/client';
+import React, { useRef, useState, useCallback, useEffect, lazy, Suspense } from 'react';
 import { wireElectricalSolver } from '../simulation/spice/subscribeToStore';
 import { useSEO } from '../utils/useSEO';
 import { CodeEditor } from '../components/editor/CodeEditor';
@@ -363,10 +361,6 @@ export const EditorPage: React.FC = () => {
     [agentPanelWidth, setAgentPanelWidth],
   );
 
-  const apiBase = import.meta.env.VITE_API_BASE || '/api';
-  const agUiUrl = `${apiBase}/agent/ag-ui`;
-  const agents = useMemo(() => ({ velxio: new HttpAgent({ url: agUiUrl }) }), [agUiUrl]);
-
   return (
     <div className="app">
       <AppHeader />
@@ -608,9 +602,7 @@ export const EditorPage: React.FC = () => {
               <div className="resize-handle-grip" />
             </div>
             <div className="agent-panel-shell" style={{ width: agentPanelWidth }}>
-              <CopilotKitProvider selfManagedAgents={agents} credentials="include">
-                <AgUiPanel />
-              </CopilotKitProvider>
+              <AgUiPanel />
             </div>
           </>
         )}
