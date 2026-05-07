@@ -136,16 +136,15 @@ def verify_system_prompt():
         with open(agent_file, 'r', encoding='utf-8') as f:
             content = f.read()
         
-        # Check for key sections in the instructions string
+        # Check for key sections in the new comprehensive wire routing instructions
         key_sections = [
-            "MANDATORY FIRST STEP",
-            "TASK PLANNING PROTOCOL",
-            "COMPONENT & CATALOG TOOLS",
-            "MANDATORY WIRING PROTOCOL",
-            "FILE & CODE TOOLS",
-            "COMPILATION & SIMULATION TOOLS",
-            "ERROR HANDLING RULES",
-            "OUTPUT STYLE",
+            "SECTION 1 — GENERAL OPERATING RULES",
+            "SECTION 2 — MANDATORY WIRING PROTOCOL",
+            "SECTION 3 — WIRE ROUTING RULES (CRITICAL)",
+            "SECTION 4 — WIRE COLOR & SIGNAL TYPE SEMANTICS",
+            "SECTION 5 — FILE & FIRMWARE RULES",
+            "SECTION 6 — COMPILATION & DEBUG LOOP",
+            "SECTION 7 — REASONING & COMMUNICATION STYLE",
         ]
         
         missing_sections = []
@@ -157,7 +156,29 @@ def verify_system_prompt():
             print(f"✗ System prompt missing sections: {missing_sections}")
             return False
         
+        # Check for critical wire routing rules
+        wire_routing_rules = [
+            "RULE R1: NO DIAGONAL WIRES",
+            "RULE R2: ORTHOGONAL L-SHAPED ROUTING",
+            "RULE R3: PIN EXIT CLEARANCE",
+            "RULE R4: LANE STAGGERING",
+            "RULE R5: POWER BUS CONSOLIDATION",
+            "RULE R6: U-SHAPE FOR SAME-SIDE PINS",
+            "RULE R7: AVOID COMPONENT BODIES",
+            "RULE R8: CONNECTOR-STYLE PIN CLUSTER FANNING",
+        ]
+        
+        missing_rules = []
+        for rule in wire_routing_rules:
+            if rule not in content:
+                missing_rules.append(rule)
+        
+        if missing_rules:
+            print(f"✗ Wire routing rules missing: {missing_rules}")
+            return False
+        
         print(f"✓ System prompt contains all {len(key_sections)} key sections")
+        print(f"✓ All {len(wire_routing_rules)} wire routing rules present")
         return True
         
     except Exception as e:
