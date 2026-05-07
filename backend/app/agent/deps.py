@@ -6,7 +6,7 @@ import time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.schemas import ProjectSnapshotV2, RunState
+from app.agent.schemas import AgentUiState, ProjectSnapshotV2, RunState
 from app.agent.sessions import append_event, set_session_status, update_draft_snapshot
 from app.agent.safety import ensure_snapshot_size, ensure_time_budget, ensure_tool_budget
 
@@ -17,6 +17,7 @@ class AgentDeps:
     session_id: str
     user_id: str
     snapshot: ProjectSnapshotV2
+    state: AgentUiState = field(default_factory=AgentUiState)
     tool_calls: int = 0
     started_at: float = field(default_factory=time.monotonic)
 

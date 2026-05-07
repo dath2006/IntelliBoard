@@ -2,14 +2,16 @@
  * Editor Page — main editor + simulator with resizable panels
  */
 
-import React, { useRef, useState, useCallback, useEffect, lazy, Suspense } from 'react';
+import React, { useRef, useState, useCallback, useEffect, useMemo, lazy, Suspense } from 'react';
+import { CopilotKitProvider } from '@copilotkit/react-core/v2';
+import { HttpAgent } from '@ag-ui/client';
 import { wireElectricalSolver } from '../simulation/spice/subscribeToStore';
 import { useSEO } from '../utils/useSEO';
 import { CodeEditor } from '../components/editor/CodeEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { FileTabs } from '../components/editor/FileTabs';
 import { FileExplorer } from '../components/editor/FileExplorer';
-import { AgentPanel } from '../components/agent/AgentPanel';
+import { AgUiPanel } from '../components/agent/AgUiPanel';
 import { AgentPanelToggle } from '../components/agent/AgentPanelToggle';
 
 // Lazy-load Pi workspace so xterm.js isn't in the main bundle
@@ -361,6 +363,10 @@ export const EditorPage: React.FC = () => {
     [agentPanelWidth, setAgentPanelWidth],
   );
 
+  const apiBase = import.meta.env.VITE_API_BASE || '/api';
+  const agUiUrl = `${apiBase}/agent/ag-ui`;
+  const agents = useMemo(() => ({ velxio: new HttpAgent({ url: agUiUrl }) }), [agUiUrl]);
+
   return (
     <div className="app">
       <AppHeader />
@@ -425,7 +431,12 @@ export const EditorPage: React.FC = () => {
           {explorerOpen && (
             <>
               <div
-                style={{ width: explorerWidth, flexShrink: 0, display: 'flex', overflow: 'hidden' }}
+                style={{
+                  width: explorerWidth,
+                  flexShrink: 0,
+                  display: 'flex',
+                  overflow: 'hidden',
+                }}
               >
                 <FileExplorer onSaveClick={handleSaveClick} />
               </div>
@@ -597,7 +608,9 @@ export const EditorPage: React.FC = () => {
               <div className="resize-handle-grip" />
             </div>
             <div className="agent-panel-shell" style={{ width: agentPanelWidth }}>
-              <AgentPanel />
+              <CopilotKitProvider selfManagedAgents={agents} credentials="include">
+                <AgUiPanel />
+              </CopilotKitProvider>
             </div>
           </>
         )}

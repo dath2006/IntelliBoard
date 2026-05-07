@@ -1,12 +1,11 @@
 import { useSimulatorStore, getEsp32Bridge } from '../../store/useSimulatorStore';
-import React, { useEffect, useState, useRef, useCallback } from 'react';
+import React, { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { ESP32_ADC_PIN_MAP } from '../velxio-components/Esp32Element';
 import { ComponentPickerModal } from '../ComponentPickerModal';
 import { ComponentPropertyDialog } from './ComponentPropertyDialog';
 import { SensorControlPanel } from './SensorControlPanel';
 import { SENSOR_CONTROLS } from '../../simulation/sensorControlConfig';
-import { DynamicComponent, createComponentFromMetadata } from '../DynamicComponent';
-import { InstrumentComponent } from '../components-instruments/InstrumentComponent';
+import { createComponentFromMetadata } from '../DynamicComponent';
 import { ComponentRegistry } from '../../services/ComponentRegistry';
 import { getTabSessionId } from '../../simulation/Esp32Bridge';
 import { WireLayer } from './WireLayer';
@@ -29,6 +28,8 @@ import {
 } from '../../utils/wireHitDetection';
 import { calculateWireOffsets, applyOffsetToWire } from '../../utils/wireOffsetCalculator';
 import { routeWireAroundObstacles } from '../../utils/wireObstacleRouter';
+import { debounce } from '../../utils/performanceUtils';
+import { MemoizedComponentRenderer } from './MemoizedComponentRenderer';
 import type { ComponentMetadata } from '../../types/component-metadata';
 import type { BoardKind } from '../../types/board';
 import { BOARD_KIND_LABELS } from '../../types/board';
@@ -89,6 +90,12 @@ export const SimulatorCanvas = () => {
   const wires = useSimulatorStore((s) => s.wires);
 
   // Compute offset wires: obstacle-avoidance → grid-snap → overlap-offset
+  // Memoized with caching to prevent excessive recalculation
+  const wiresCacheKey = useMemo(() => {
+    // Create a stable key based on wire positions and component positions
+    return `${wires.map(w => `${w.id}:${w.start.x},${w.start.y}-${w.end.x},${w.end.y}`).join('|')}`;
+  }, [wires]);
+
   const offsetWires = React.useMemo(() => {
     // Step 1: Route each wire around component/board bounding boxes
     const routedWires = wires.map((w) =>
@@ -99,7 +106,15 @@ export const SimulatorCanvas = () => {
     // Step 3: Offset overlapping parallel segments
     const offsets = calculateWireOffsets(snappedWires);
     return snappedWires.map((w) => applyOffsetToWire(w, offsets.get(w.id) || 0));
-  }, [wires, components, boards]);
+  }, [wiresCacheKey, components, boards]);
+
+  // Debounced wire recalculation to prevent excessive updates
+  const debouncedRecalculateWires = useMemo(
+    () => debounce(() => {
+      recalculateAllWirePositions();
+    }, 150),
+    [recalculateAllWirePositions]
+  );
 
   // Recalculate when the wire set changes (agent snapshots can add wires without
   // touching components, leaving start/end x/y undefined until we resolve pinInfo).
@@ -971,8 +986,16 @@ export const SimulatorCanvas = () => {
     setSelectedComponentId(componentId);
   };
 
+  // Throttle mouse move to prevent excessive updates (performance optimization)
+  const lastMouseMoveTime = useRef(0);
+  const MOUSE_MOVE_THROTTLE_MS = 16; // ~60 FPS
+
   const handleCanvasMouseMove = (e: React.MouseEvent) => {
-    // Handle active panning (ref-based, no setState lag)
+    // Throttle mouse move events for better performance
+    const now = performance.now();
+    const shouldThrottle = now - lastMouseMoveTime.current < MOUSE_MOVE_THROTTLE_MS;
+    
+    // Handle active panning (ref-based, no setState lag) - never throttle panning
     if (isPanningRef.current) {
       const dx = e.clientX - panStartRef.current.mouseX;
       const dy = e.clientY - panStartRef.current.mouseY;
@@ -988,6 +1011,12 @@ export const SimulatorCanvas = () => {
       }
       return;
     }
+
+    // Throttle other mouse move operations
+    if (shouldThrottle && !draggedComponentId && !wireInProgress && !segmentDragRef.current) {
+      return;
+    }
+    lastMouseMoveTime.current = now;
 
     // Handle component/board dragging
     if (draggedComponentId) {
@@ -1241,28 +1270,10 @@ export const SimulatorCanvas = () => {
   ]);
 
   // Recalculate wire positions when components change (e.g., when loading an example)
+  // Consolidated and debounced for better performance
   useEffect(() => {
-    // Wait for components to render and pinInfo to be available
-    // Use multiple retries to ensure pinInfo is ready
-    const timers: ReturnType<typeof setTimeout>[] = [];
-
-    // Try at 100ms, 300ms, and 500ms to ensure all components have rendered
-    timers.push(setTimeout(() => recalculateAllWirePositions(), 100));
-    timers.push(setTimeout(() => recalculateAllWirePositions(), 300));
-    timers.push(setTimeout(() => recalculateAllWirePositions(), 500));
-
-    return () => timers.forEach((t) => clearTimeout(t));
-  }, [components, recalculateAllWirePositions]);
-
-  // Recalculate wire positions when wires are added/removed via snapshots/imports.
-  // This fixes invisible wires when endpoints have no x/y yet.
-  useEffect(() => {
-    if (!wireIdKey) return;
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    timers.push(setTimeout(() => recalculateAllWirePositions(), 0));
-    timers.push(setTimeout(() => recalculateAllWirePositions(), 120));
-    return () => timers.forEach((t) => clearTimeout(t));
-  }, [wireIdKey, recalculateAllWirePositions]);
+    debouncedRecalculateWires();
+  }, [components, wireIdKey, debouncedRecalculateWires]);
 
   // Auto-pan to keep the board and all components visible after a project import/load.
   // We track the previous component count and only re-center when the count
@@ -1306,86 +1317,35 @@ export const SimulatorCanvas = () => {
     return () => clearTimeout(timer);
   }, [components.length]);
 
-  // Render component using dynamic renderer
-  const renderComponent = (component: any) => {
-    // SPICE probes are React components, not web components — render them
-    // directly and let PinOverlay read the pinInfo we attach in the wrapper.
-    if (component.metadataId === 'instr-voltmeter' || component.metadataId === 'instr-ammeter') {
-      const isSelected = selectedComponentId === component.id;
-      return (
-        <React.Fragment key={component.id}>
-          <InstrumentComponent
-            id={component.id}
-            metadataId={component.metadataId}
-            x={component.x}
-            y={component.y}
-            isSelected={isSelected}
-            onMouseDown={(e) => handleComponentMouseDown(component.id, e)}
-          />
-          {!running && (
-            <PinOverlay
-              componentId={component.id}
-              componentX={component.x}
-              componentY={component.y}
-              onPinClick={handlePinClick}
-              showPins={true}
-              zoom={zoom}
-              wrapperOffsetX={0}
-              wrapperOffsetY={0}
-            />
-          )}
-        </React.Fragment>
-      );
-    }
-
+  // Render component using memoized renderer for better performance
+  const renderComponent = useCallback((component: any) => {
     let metadata = registry.getByRef(component.metadataId);
     if (!metadata) {
-      // Fallback: fuzzy search — handles legacy/agent-generated IDs like
-      // "display-oled-128x64-i2c" that don't match any registry key directly.
+      // Fallback: fuzzy search — handles legacy/agent-generated IDs
       const fallbackResults = registry.search(component.metadataId);
       if (fallbackResults.length > 0) {
         metadata = fallbackResults[0];
         console.info(
           `Metadata resolved via search fallback: ${component.metadataId} → ${metadata.id}`,
         );
-      } else {
-        console.warn(`Metadata not found for component: ${component.metadataId}`);
-        return null;
       }
     }
 
     const isSelected = selectedComponentId === component.id;
-    // Always show pins for better UX when creating wires
-    const showPinsForComponent = true;
 
     return (
-      <React.Fragment key={component.id}>
-        <DynamicComponent
-          id={component.id}
-          metadata={metadata}
-          properties={component.properties}
-          x={component.x}
-          y={component.y}
-          isSelected={isSelected}
-          onMouseDown={(e) => {
-            handleComponentMouseDown(component.id, e);
-          }}
-        />
-
-        {/* Pin overlay for wire creation - hide when running */}
-        {!running && (
-          <PinOverlay
-            componentId={component.id}
-            componentX={component.x}
-            componentY={component.y}
-            onPinClick={handlePinClick}
-            showPins={showPinsForComponent}
-            zoom={zoom}
-          />
-        )}
-      </React.Fragment>
+      <MemoizedComponentRenderer
+        key={component.id}
+        component={component}
+        metadata={metadata}
+        isSelected={isSelected}
+        running={running}
+        zoom={zoom}
+        onMouseDown={(e) => handleComponentMouseDown(component.id, e)}
+        onPinClick={handlePinClick}
+      />
     );
-  };
+  }, [registry, selectedComponentId, running, zoom, handleComponentMouseDown, handlePinClick]);
 
   return (
     <div className="simulator-canvas-container">

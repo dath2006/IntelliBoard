@@ -210,6 +210,30 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         defer_model_check=defer_model_check,
     )
 
+    @agent.instructions
+    def _ui_state_prompt(ctx: RunContext[AgentDeps]) -> str:
+        state = ctx.deps.state
+        if state is None:
+            return ""
+        parts: list[str] = []
+        if state.projectId:
+            parts.append(f"projectId={state.projectId}")
+        if state.sessionId:
+            parts.append(f"sessionId={state.sessionId}")
+        if state.activeBoardId:
+            parts.append(f"activeBoardId={state.activeBoardId}")
+        if state.activeGroupId:
+            parts.append(f"activeGroupId={state.activeGroupId}")
+        if state.activeFileId:
+            parts.append(f"activeFileId={state.activeFileId}")
+        if state.activeFileName:
+            parts.append(f"activeFileName={state.activeFileName}")
+        if state.selectedWireId:
+            parts.append(f"selectedWireId={state.selectedWireId}")
+        if not parts:
+            return ""
+        return "UI state: " + ", ".join(parts)
+
     async def _safe_tool_call(ctx: RunContext[AgentDeps], tool_name: str, fn) -> Any:
         try:
             result = fn()

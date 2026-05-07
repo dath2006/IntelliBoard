@@ -1,5 +1,6 @@
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import '@copilotkit/react-core/v2/styles.css';
 import './components/velxio-components/IC74HC595';
 import './components/velxio-components/LogicGateElements';
 import './components/velxio-components/TransistorElements';

@@ -41,8 +41,18 @@ function buildSnapshotFromStores(): ProjectSnapshotV2 {
     })),
     wires: sim.wires.map((w) => ({
       id: w.id,
-      start: { componentId: w.start.componentId, pinName: w.start.pinName, x: w.start.x ?? 0, y: w.start.y ?? 0 },
-      end: { componentId: w.end.componentId, pinName: w.end.pinName, x: w.end.x ?? 0, y: w.end.y ?? 0 },
+      start: {
+        componentId: w.start.componentId,
+        pinName: w.start.pinName,
+        x: w.start.x ?? 0,
+        y: w.start.y ?? 0,
+      },
+      end: {
+        componentId: w.end.componentId,
+        pinName: w.end.pinName,
+        x: w.end.x ?? 0,
+        y: w.end.y ?? 0,
+      },
       waypoints: w.waypoints ?? [],
       color: w.color ?? '#22c55e',
       signalType: w.signalType ?? null,

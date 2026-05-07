@@ -3,14 +3,19 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+import logfire
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
+from pydantic_ai.ui.ag_ui import AGUIAdapter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.agent import cancel_agent_run, start_agent_run
+from app.agent.agent import build_agent, cancel_agent_run, start_agent_run
+from app.agent.deps import AgentDeps
 from app.agent.schemas import (
+    AgentUiState,
     AgentSessionCreateRequest,
     AgentSessionEventResponse,
     AgentSessionMessageRequest,
@@ -38,6 +43,7 @@ from app.core.dependencies import require_auth
 from app.database.session import get_db
 from app.models.project import Project
 from app.models.user import User
+from app.services.llm_providers import resolve_pydantic_ai_model
 from app.services.project_files import read_files
 
 router = APIRouter()
@@ -206,6 +212,100 @@ async def stream_agent_events(
             await asyncio.sleep(0.5)
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/ag-ui")
+async def run_ag_ui_agent(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    raw_body = await request.body()
+    print(f"DEBUG: ag_ui raw body: {raw_body.decode(errors='ignore')}")
+    try:
+        run_input = AGUIAdapter.build_run_input(raw_body)
+        print(f"DEBUG: ag_ui run_input state: {run_input.state}")
+    except ValidationError as exc:
+        print(f"DEBUG: ag_ui build_run_input failed: {exc}")
+        raise HTTPException(status_code=422, detail=f"Invalid AG-UI payload: {exc}") from exc
+
+    try:
+        state = AgentUiState.model_validate(run_input.state or {})
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid AG-UI state: {exc}") from exc
+
+    if not state.sessionId:
+        raise HTTPException(status_code=422, detail="state.sessionId is required.")
+
+    session = await get_session_for_user(db, session_id=state.sessionId, user_id=user.id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Agent session not found.")
+
+    snapshot = await load_draft_snapshot(db, session_id=session.id, user_id=user.id)
+    deps = AgentDeps(
+        db=db,
+        session_id=session.id,
+        user_id=user.id,
+        snapshot=snapshot,
+        state=state,
+    )
+
+    resolved_model = session.model_name
+    model_override = None
+    try:
+        if session.model_name:
+            resolved_model = await resolve_pydantic_ai_model(db, user.id, session.model_name)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Model resolution failed: {exc}") from exc
+
+    if isinstance(resolved_model, str):
+        agent = build_agent(resolved_model)
+    else:
+        agent = build_agent(defer_model_check=True)
+        model_override = resolved_model
+
+    latest_msg = "AG-UI Request"
+    if run_input.messages:
+        for m in reversed(run_input.messages):
+            if getattr(m, "role", None) == "user" and getattr(m, "content", None):
+                if isinstance(m.content, list):
+                    latest_msg = " ".join(getattr(c, "text", "") for c in m.content)
+                else:
+                    latest_msg = str(m.content)
+                break
+
+    await set_session_status(db, session_id=session.id, user_id=user.id, status="running")
+    await append_event(
+        db,
+        session_id=session.id,
+        event_type="run.started",
+        payload={"message": latest_msg},
+    )
+
+    with logfire.span("ag_ui.dispatch_request", session_id=session.id, user_id=user.id, latest_msg=latest_msg):
+        response = await AGUIAdapter.dispatch_request(
+            request,
+            agent=agent,
+            deps=deps,
+            model=model_override,
+            manage_system_prompt="server",
+        )
+
+    from starlette.background import BackgroundTask
+    from app.database.session import AsyncSessionLocal
+
+    async def on_complete():
+        async with AsyncSessionLocal() as db_bg:
+            await set_session_status(db_bg, session_id=session.id, user_id=user.id, status="completed")
+            await append_event(
+                db_bg,
+                session_id=session.id,
+                event_type="run.completed",
+                payload={"output": "AG-UI run completed"}
+            )
+
+    response.background = BackgroundTask(on_complete)
+    return response
 
 
 @router.patch("/sessions/{session_id}/canvas", response_model=AgentSessionResponse)

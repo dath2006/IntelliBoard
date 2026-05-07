@@ -27,7 +27,24 @@ interface WireLayerProps {
   onHandleTouchStart?: (e: React.TouchEvent, segIndex: number) => void;
 }
 
-export const WireLayer: React.FC<WireLayerProps> = ({
+// Memoize WireRenderer to prevent unnecessary re-renders
+const MemoizedWireRenderer = React.memo(WireRenderer, (prev, next) => {
+  // Only re-render if these specific props change
+  return (
+    prev.wire.id === next.wire.id &&
+    prev.wire.start.x === next.wire.start.x &&
+    prev.wire.start.y === next.wire.start.y &&
+    prev.wire.end.x === next.wire.end.x &&
+    prev.wire.end.y === next.wire.end.y &&
+    prev.wire.color === next.wire.color &&
+    prev.wire.waypoints === next.wire.waypoints &&
+    prev.isSelected === next.isSelected &&
+    prev.isHovered === next.isHovered &&
+    prev.overridePath === next.overridePath
+  );
+});
+
+export const WireLayer: React.FC<WireLayerProps> = React.memo(({
   wires,
   hoveredWireId,
   segmentDragPreview,
@@ -53,7 +70,7 @@ export const WireLayer: React.FC<WireLayerProps> = ({
       }}
     >
       {wires.map((wire) => (
-        <WireRenderer
+        <MemoizedWireRenderer
           key={wire.id}
           wire={wire}
           isSelected={wire.id === selectedWireId}
@@ -87,4 +104,12 @@ export const WireLayer: React.FC<WireLayerProps> = ({
       {wireInProgress && <WireInProgressRenderer wireInProgress={wireInProgress} />}
     </svg>
   );
-};
+}, (prev, next) => {
+  // Only re-render WireLayer if wires array or selection changes
+  return (
+    prev.wires === next.wires &&
+    prev.hoveredWireId === next.hoveredWireId &&
+    prev.segmentDragPreview === next.segmentDragPreview &&
+    prev.segmentHandles === next.segmentHandles
+  );
+});

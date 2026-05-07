@@ -558,13 +558,23 @@ export function wireElectricalSolver(): () => void {
   // Periodic re-solve while any board is running, so SPICE picks up
   // MCU pin-state changes (e.g. analogWrite → PWM → voltage source).
   let solveInterval: ReturnType<typeof setInterval> | null = null;
-  const SOLVE_INTERVAL_MS = 200;
+  const SOLVE_INTERVAL_MS = 500; // Reduced from 200ms to 500ms for better performance
+  let lastSolveTime = 0;
+  const MIN_SOLVE_INTERVAL = 300; // Minimum time between solves to prevent spam
 
   function updateSolveTimer() {
     const anyRunning = useSimulatorStore.getState().boards.some((b) => b.running);
     if (anyRunning) {
       if (!solveInterval) {
-        solveInterval = setInterval(maybeSolve, SOLVE_INTERVAL_MS);
+        solveInterval = setInterval(() => {
+          // Debounce: skip if too soon since last solve
+          const now = performance.now();
+          if (now - lastSolveTime < MIN_SOLVE_INTERVAL) {
+            return;
+          }
+          lastSolveTime = now;
+          maybeSolve();
+        }, SOLVE_INTERVAL_MS);
       }
     } else if (solveInterval) {
       clearInterval(solveInterval);
