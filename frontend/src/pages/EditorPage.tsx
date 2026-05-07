@@ -9,7 +9,7 @@ import { CodeEditor } from '../components/editor/CodeEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { FileTabs } from '../components/editor/FileTabs';
 import { FileExplorer } from '../components/editor/FileExplorer';
-import { AgentPanel } from '../components/agent/AgentPanel';
+import { AgUiPanel } from '../components/agent/AgUiPanel';
 import { AgentPanelToggle } from '../components/agent/AgentPanelToggle';
 
 // Lazy-load Pi workspace so xterm.js isn't in the main bundle
@@ -425,7 +425,12 @@ export const EditorPage: React.FC = () => {
           {explorerOpen && (
             <>
               <div
-                style={{ width: explorerWidth, flexShrink: 0, display: 'flex', overflow: 'hidden' }}
+                style={{
+                  width: explorerWidth,
+                  flexShrink: 0,
+                  display: 'flex',
+                  overflow: 'hidden',
+                }}
               >
                 <FileExplorer onSaveClick={handleSaveClick} />
               </div>
@@ -597,7 +602,7 @@ export const EditorPage: React.FC = () => {
               <div className="resize-handle-grip" />
             </div>
             <div className="agent-panel-shell" style={{ width: agentPanelWidth }}>
-              <AgentPanel />
+              <AgUiPanel />
             </div>
           </>
         )}

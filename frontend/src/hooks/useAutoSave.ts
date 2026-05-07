@@ -17,9 +17,16 @@ function buildFingerprint(
   sim: ReturnType<typeof useSimulatorStore.getState>,
   editor: ReturnType<typeof useEditorStore.getState>,
 ): string {
-  const boards = sim.boards.map((b) => `${b.id}:${b.boardKind}:${b.x}:${b.y}:${b.activeFileGroupId}`).join('|');
+  const boards = sim.boards
+    .map((b) => `${b.id}:${b.boardKind}:${b.x}:${b.y}:${b.activeFileGroupId}`)
+    .join('|');
   const components = sim.components.map((c) => `${c.id}:${c.metadataId}:${c.x}:${c.y}`).join('|');
-  const wires = sim.wires.map((w) => `${w.id}:${w.start.componentId}:${w.start.pinName}:${w.end.componentId}:${w.end.pinName}`).join('|');
+  const wires = sim.wires
+    .map(
+      (w) =>
+        `${w.id}:${w.start.componentId}:${w.start.pinName}:${w.end.componentId}:${w.end.pinName}`,
+    )
+    .join('|');
   const files = Object.entries(editor.fileGroups)
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([gid, fs]) => `${gid}:${fs.map((f) => `${f.name}=${f.content}`).join(',')}`)
@@ -75,6 +82,11 @@ export function useAutoSave() {
             fileGroupsSnap[groupId] = files.map((f) => ({ name: f.name, content: f.content }));
           }
 
+          const entityIds = new Set<string>([
+            ...simNow.boards.map((b) => b.id),
+            ...simNow.components.map((c) => c.id),
+          ]);
+
           const snapshot = {
             version: 2 as const,
             boards: simNow.boards.map((b) => ({
@@ -93,28 +105,47 @@ export function useAutoSave() {
               y: c.y,
               properties: (c.properties ?? {}) as Record<string, unknown>,
             })),
-            wires: simNow.wires.map((w) => ({
-              id: w.id,
-              start: { componentId: w.start.componentId, pinName: w.start.pinName, x: w.start.x ?? 0, y: w.start.y ?? 0 },
-              end: { componentId: w.end.componentId, pinName: w.end.pinName, x: w.end.x ?? 0, y: w.end.y ?? 0 },
-              waypoints: w.waypoints ?? [],
-              color: w.color ?? '#22c55e',
-              signalType: (w.signalType as string | null | undefined) ?? null,
-            })),
+            wires: simNow.wires
+              .filter((w) => entityIds.has(w.start.componentId) && entityIds.has(w.end.componentId))
+              .map((w) => ({
+                id: w.id,
+                start: {
+                  componentId: w.start.componentId,
+                  pinName: w.start.pinName,
+                  x: w.start.x ?? 0,
+                  y: w.start.y ?? 0,
+                },
+                end: {
+                  componentId: w.end.componentId,
+                  pinName: w.end.pinName,
+                  x: w.end.x ?? 0,
+                  y: w.end.y ?? 0,
+                },
+                waypoints: w.waypoints ?? [],
+                color: w.color ?? '#22c55e',
+                signalType: (w.signalType as string | null | undefined) ?? null,
+              })),
             fileGroups: fileGroupsSnap,
             activeGroupId: editorNow.activeGroupId,
           };
 
-          const activeBoard = simNow.boards.find((b) => b.id === simNow.activeBoardId) ?? simNow.boards[0];
-          const activeGroupFiles = editorNow.fileGroups[activeBoard?.activeFileGroupId ?? ''] ?? editorNow.files;
-          const code = activeGroupFiles.find((f) => f.name.endsWith('.ino'))?.content
-            ?? activeGroupFiles[0]?.content
-            ?? '';
+          const activeBoard =
+            simNow.boards.find((b) => b.id === simNow.activeBoardId) ?? simNow.boards[0];
+          const activeGroupFiles =
+            editorNow.fileGroups[activeBoard?.activeFileGroupId ?? ''] ?? editorNow.files;
+          const code =
+            activeGroupFiles.find((f) => f.name.endsWith('.ino'))?.content ??
+            activeGroupFiles[0]?.content ??
+            '';
+
+          const filteredWires = simNow.wires.filter(
+            (w) => entityIds.has(w.start.componentId) && entityIds.has(w.end.componentId),
+          );
 
           await updateProject(currentProjectId, {
             snapshot_json: JSON.stringify(snapshot),
             components_json: JSON.stringify(simNow.components),
-            wires_json: JSON.stringify(simNow.wires),
+            wires_json: JSON.stringify(filteredWires),
             board_type: activeBoard?.boardKind ?? 'arduino-uno',
             files: activeGroupFiles.map((f) => ({ name: f.name, content: f.content })),
             code,

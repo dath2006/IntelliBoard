@@ -89,7 +89,7 @@ async def _build_contextual_prompt(db, session_id: str, message: str) -> str:
     return "\n".join(lines)
 
 
-def build_agent(model_name: str | None = None, *, defer_model_check: bool = False) -> Agent[AgentDeps, str]:
+def build_agent(model_name: Any | None = None, *, defer_model_check: bool = False) -> Agent[AgentDeps, str]:
     instructions = (
         "You are the Velxio embedded hardware engineering agent. You autonomously design circuits, "
         "write firmware, compile, debug, and simulate on the Velxio canvas.\n\n"
@@ -249,7 +249,8 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "════════════════════════════════════════════\n\n"
         "- Before writing any code, call get_project_outline() → check fileGroups to see "
         "what files already exist. Never create a file that already exists; use "
-        "replace_file_range() or apply_file_patch() to edit existing files.\n"
+        "- To edit existing code: use patch_file_lines or apply_file_patch — never recreate the whole file\n"
+        "- Use replace_file_content only when you intentionally want to replace the full file.\n\n"
         "- When writing Arduino (.ino) code:\n"
         "    - Pin numbers must exactly match the pin names used in connect_pins() calls.\n"
         "    - #define or const int your pin assignments at the top of the file.\n"
@@ -274,7 +275,7 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "     a. Read the full error output carefully.\n"
         "     b. Identify the exact file, line number, and error type.\n"
         "     c. Call read_file() to see the offending code in context.\n"
-        "     d. Apply the fix with replace_file_range() or apply_file_patch().\n"
+        "     d. Apply the fix with patch_file_lines or apply_file_patch, then recompile\n"
         "     e. Recompile. Repeat until success.\n"
         "  4. If compilation SUCCEEDS:\n"
         "     a. Call run_simulation(board_id).\n"
@@ -303,11 +304,35 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         "    ✅ Simulation: [what serial output confirmed]"
     )
     agent = Agent(
-        model_name or settings.AGENT_MODEL,
+        model_name if model_name is not None else settings.AGENT_MODEL,
         deps_type=AgentDeps,
         instructions=instructions,
         defer_model_check=defer_model_check,
     )
+
+    @agent.instructions
+    def _ui_state_prompt(ctx: RunContext[AgentDeps]) -> str:
+        state = ctx.deps.state
+        if state is None:
+            return ""
+        parts: list[str] = []
+        if state.projectId:
+            parts.append(f"projectId={state.projectId}")
+        if state.sessionId:
+            parts.append(f"sessionId={state.sessionId}")
+        if state.activeBoardId:
+            parts.append(f"activeBoardId={state.activeBoardId}")
+        if state.activeGroupId:
+            parts.append(f"activeGroupId={state.activeGroupId}")
+        if state.activeFileId:
+            parts.append(f"activeFileId={state.activeFileId}")
+        if state.activeFileName:
+            parts.append(f"activeFileName={state.activeFileName}")
+        if state.selectedWireId:
+            parts.append(f"selectedWireId={state.selectedWireId}")
+        if not parts:
+            return ""
+        return "UI state: " + ", ".join(parts)
 
     async def _safe_tool_call(ctx: RunContext[AgentDeps], tool_name: str, fn) -> Any:
         try:
@@ -725,6 +750,37 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         )
 
     @agent.tool
+    async def patch_file_lines(
+        ctx: RunContext[AgentDeps],
+        group_id: str,
+        file_name: str,
+        start_line: int,
+        end_line: int,
+        replacement: str,
+    ) -> dict[str, Any]:
+        """Patch a range of lines in an existing file. Use for targeted fixes.
+
+        Preferred over rewriting the whole file. Lines are 1-indexed.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "patch_file_lines",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.patch_file_lines(
+                    ctx.deps.snapshot,
+                    group_id=group_id,
+                    file_name=file_name,
+                    start_line=start_line,
+                    end_line=end_line,
+                    replacement=replacement,
+                ),
+                tool_name="patch_file_lines",
+            ),
+        )
+
+    @agent.tool
     async def replace_file_range(
         ctx: RunContext[AgentDeps],
         group_id: str,
@@ -733,25 +789,37 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         end_line: int,
         replacement: str,
     ) -> dict[str, Any]:
-        """Replace a range of lines in an existing file. Use for targeted fixes.
+        """Deprecated alias for patch_file_lines (kept for backward compatibility)."""
+        return await patch_file_lines(
+            ctx,
+            group_id=group_id,
+            file_name=file_name,
+            start_line=start_line,
+            end_line=end_line,
+            replacement=replacement,
+        )
 
-        Preferred over rewriting the whole file. Lines are 1-indexed.
-        """
+    @agent.tool
+    async def replace_file_content(
+        ctx: RunContext[AgentDeps],
+        group_id: str,
+        file_name: str,
+        content: str,
+    ) -> dict[str, Any]:
+        """Replace the entire file content in one operation."""
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(
             ctx,
-            "replace_file_range",
+            "replace_file_content",
             lambda: _apply_mutation(
                 ctx,
-                *snapshot_ops.replace_file_range(
+                *snapshot_ops.replace_file_content(
                     ctx.deps.snapshot,
                     group_id=group_id,
                     file_name=file_name,
-                    start_line=start_line,
-                    end_line=end_line,
-                    replacement=replacement,
+                    content=content,
                 ),
-                tool_name="replace_file_range",
+                tool_name="replace_file_content",
             ),
         )
 
@@ -760,13 +828,15 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
         ctx: RunContext[AgentDeps],
         group_id: str,
         file_name: str,
-        original: str,
-        modified: str,
+        original: str | None = None,
+        modified: str | None = None,
+        patch: str | None = None,
     ) -> dict[str, Any]:
-        """Patch a file by matching exact original content and replacing with modified.
+        """Apply a file patch.
 
-        original: exact current content of the file (must match exactly).
-        modified: the new full content to replace it with.
+        Modes:
+        1) Provide unified diff in `patch`.
+        2) Provide `original` + `modified` full contents.
         """
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(
@@ -780,6 +850,7 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
                     file_name=file_name,
                     original=original,
                     modified=modified,
+                    patch=patch,
                 ),
                 tool_name="apply_file_patch",
             ),
@@ -795,15 +866,20 @@ def build_agent(model_name: str | None = None, *, defer_model_check: bool = Fals
     async def compile_in_frontend(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
         """Preferred compilation method. Mirrors the UI compile button and returns richer errors."""
         ctx.deps.guard_tool_call()
-        return await _safe_tool_call(
-            ctx,
-            "compile_in_frontend",
-            lambda: _run_frontend_action(
+
+        async def _compile_action() -> dict[str, Any]:
+            result = await _run_frontend_action(
                 ctx,
                 "compile",
                 {"boardId": board_id} if board_id else {},
                 timeout_ms=180000,
-            ),
+            )
+            return _sanitize_hex_content(result)
+
+        return await _safe_tool_call(
+            ctx,
+            "compile_in_frontend",
+            _compile_action,
         )
 
     @agent.tool
@@ -1087,7 +1163,7 @@ async def run_agent_session(
                 raise
 
         agent = build_agent(
-            resolved_model if isinstance(resolved_model, str) else None,
+            resolved_model,
             defer_model_check=model_override is not None or not isinstance(resolved_model, str),
         )
         run_kwargs: dict[str, Any] = {"deps": deps}
@@ -1191,6 +1267,25 @@ def _jsonable(value: Any) -> Any:
         return str(value)
 
 
+def _sanitize_hex_content(value: Any) -> Any:
+    """Strip large hex blobs from agent-visible payloads to avoid token bloat."""
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            if key == "hex_content" and isinstance(item, str):
+                sanitized[key] = f"<omitted hex_content ({len(item)} chars)>"
+                sanitized["hex_content_omitted"] = True
+                sanitized["hex_content_length"] = len(item)
+            else:
+                sanitized[str(key)] = _sanitize_hex_content(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_hex_content(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_hex_content(item) for item in value)
+    return value
+
+
 def _extract_tool_call_input(event: FunctionToolCallEvent) -> Any:
     part = event.part
     # Different pydantic-ai versions expose args in slightly different shapes.
@@ -1237,6 +1332,8 @@ async def _event_stream_handler(ctx: RunContext[AgentDeps], events: AsyncIterabl
         elif isinstance(event, FunctionToolResultEvent):
             tool_name = getattr(event.result, "tool_name", None)
             tool_output = _extract_tool_call_output(event)
+            if tool_name == "compile_in_frontend":
+                tool_output = _sanitize_hex_content(tool_output)
             await ctx.deps.emit_event(
                 "tool.call.result",
                 {"tool": tool_name, "toolCallId": event.tool_call_id, "output": tool_output},

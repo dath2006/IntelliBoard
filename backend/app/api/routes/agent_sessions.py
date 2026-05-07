@@ -3,14 +3,29 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import AsyncIterator
+from contextlib import nullcontext
+from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
+try:
+    import logfire  # type: ignore[import-not-found]
+except ImportError:  # pragma: no cover
+    logfire = None
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
+from pydantic import ValidationError
+try:
+    from pydantic_ai.ui.ag_ui import AGUIApp  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover
+    AGUIApp = None  # type: ignore[assignment]
+from pydantic_ai.ui.ag_ui import AGUIAdapter
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agent.agent import cancel_agent_run, start_agent_run
+from app.agent.agent import build_agent, cancel_agent_run, start_agent_run
+from app.agent.deps import AgentDeps
 from app.agent.schemas import (
+    AgentUiState,
     AgentSessionCreateRequest,
     AgentSessionEventResponse,
     AgentSessionMessageRequest,
@@ -23,6 +38,7 @@ from app.agent.sessions import (
     append_event,
     apply_draft_to_project,
     create_session,
+    delete_session,
     discard_draft,
     get_session_for_user,
     list_sessions,
@@ -35,12 +51,103 @@ from app.agent.runtime_pin_catalog import record_pin_observation
 from app.agent.snapshot_compat import legacy_to_snapshot_v2, load_snapshot_json
 from app.core.config import settings
 from app.core.dependencies import require_auth
-from app.database.session import get_db
+from app.database.session import AsyncSessionLocal, get_db
 from app.models.project import Project
 from app.models.user import User
+from app.services.llm_providers import resolve_pydantic_ai_model
 from app.services.project_files import read_files
 
 router = APIRouter()
+
+
+def _looks_like_agent_ui_state(value: Any) -> bool:
+    if not isinstance(value, dict):
+        return False
+    keys = {
+        "projectId",
+        "sessionId",
+        "activeBoardId",
+        "activeGroupId",
+        "activeFileId",
+        "activeFileName",
+        "selectedWireId",
+    }
+    return any(k in value for k in keys)
+
+
+def _extract_state_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    candidates: list[Any] = [
+        payload.get("state"),
+        payload.get("input", {}).get("state") if isinstance(payload.get("input"), dict) else None,
+        payload.get("context", {}).get("state") if isinstance(payload.get("context"), dict) else None,
+    ]
+
+    messages = payload.get("messages")
+    if isinstance(messages, list):
+        for message in reversed(messages):
+            if not isinstance(message, dict):
+                continue
+            for key in ("state", "metadata", "meta", "annotations", "context"):
+                candidate = message.get(key)
+                if isinstance(candidate, dict) and "state" in candidate:
+                    candidates.append(candidate.get("state"))
+                else:
+                    candidates.append(candidate)
+
+    for candidate in candidates:
+        if _looks_like_agent_ui_state(candidate):
+            return candidate
+    return {}
+
+
+def _extract_requested_model(
+    request: Request,
+    payload: dict[str, Any],
+    extracted_state: dict[str, Any],
+) -> str | None:
+    for key in ("modelName", "model"):
+        raw = request.query_params.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+    for key in ("modelName", "model"):
+        raw = payload.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+    for key in ("modelName", "model"):
+        raw = extracted_state.get(key)
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+
+    configurable = payload.get("configurable")
+    if isinstance(configurable, dict):
+        raw = configurable.get("model")
+        if isinstance(raw, str) and raw.strip():
+            return raw.strip()
+    return None
+
+
+async def _finalize_ag_ui_run(
+    *,
+    session_id: str,
+    user_id: str,
+    status_value: str,
+    output: str,
+) -> None:
+    async with AsyncSessionLocal() as db_bg:
+        await set_session_status(
+            db_bg,
+            session_id=session_id,
+            user_id=user_id,
+            status=status_value,
+        )
+        await append_event(
+            db_bg,
+            session_id=session_id,
+            event_type="run.completed" if status_value == "completed" else "run.failed",
+            payload={"output": output},
+        )
 
 
 @router.post("/sessions", response_model=AgentSessionResponse, status_code=status.HTTP_201_CREATED)
@@ -208,6 +315,172 @@ async def stream_agent_events(
     return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 
+@router.api_route("/ag-ui", methods=["POST", "PUT"])
+async def run_ag_ui_agent(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    raw_body = await request.body()
+    try:
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid AG-UI payload: {exc}") from exc
+
+    extracted_state = _extract_state_payload(payload)
+    query_session_id = request.query_params.get("sessionId")
+    payload_session_id = payload.get("sessionId")
+    if isinstance(query_session_id, str) and query_session_id.strip():
+        extracted_state = {**extracted_state, "sessionId": query_session_id.strip()}
+    elif isinstance(payload_session_id, str) and payload_session_id.strip():
+        extracted_state = {**extracted_state, "sessionId": payload_session_id.strip()}
+
+    try:
+        state = AgentUiState.model_validate(extracted_state)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid AG-UI state: {exc}") from exc
+
+    if not state.sessionId:
+        raise HTTPException(status_code=422, detail="state.sessionId is required.")
+
+    session = await get_session_for_user(db, session_id=state.sessionId, user_id=user.id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Agent session not found.")
+
+    snapshot = await load_draft_snapshot(db, session_id=session.id, user_id=user.id)
+    deps = AgentDeps(
+        db=db,
+        session_id=session.id,
+        user_id=user.id,
+        snapshot=snapshot,
+        state=state,
+    )
+
+    requested_model_name = _extract_requested_model(request, payload, extracted_state)
+
+    model_id = requested_model_name.strip() if isinstance(requested_model_name, str) and requested_model_name.strip() else session.model_name
+
+    resolved_model = model_id
+    model_override = None
+    try:
+        if model_id:
+            resolved_model = await resolve_pydantic_ai_model(db, user.id, model_id)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Model resolution failed: {exc}") from exc
+
+    if isinstance(resolved_model, str):
+        agent = build_agent(resolved_model)
+    else:
+        agent = build_agent(resolved_model, defer_model_check=True)
+
+    latest_msg = "AG-UI Request"
+    messages = payload.get("messages")
+    if isinstance(messages, list):
+        for m in reversed(messages):
+            if not isinstance(m, dict):
+                continue
+            if m.get("role") == "user" and m.get("content"):
+                content = m.get("content")
+                if isinstance(content, list):
+                    parts: list[str] = []
+                    for c in content:
+                        if isinstance(c, dict) and c.get("text"):
+                            parts.append(str(c["text"]))
+                    if parts:
+                        latest_msg = " ".join(parts)
+                else:
+                    latest_msg = str(content)
+                break
+
+    await set_session_status(db, session_id=session.id, user_id=user.id, status="running")
+    await append_event(
+        db,
+        session_id=session.id,
+        event_type="run.started",
+        payload={"message": latest_msg, "modelName": model_id},
+    )
+
+    dispatch_span = (
+        logfire.span(
+            "ag_ui.dispatch_request",
+            session_id=session.id,
+            user_id=user.id,
+            latest_msg=latest_msg,
+        )
+        if logfire is not None
+        else nullcontext()
+    )
+    with dispatch_span:
+        response = None
+        if AGUIApp is not None:
+            adapter_model_arg_supported = True
+            try:
+                if model_override is not None:
+                    adapter = AGUIApp(agent, deps=deps, model=model_override)
+                else:
+                    adapter = AGUIApp(agent, deps=deps)
+            except TypeError:
+                adapter_model_arg_supported = False
+                adapter = AGUIApp(agent, deps=deps)
+
+            model_override_ctx = nullcontext()
+            if (
+                model_override is not None
+                and not adapter_model_arg_supported
+                and hasattr(agent, "override")
+            ):
+                model_override_ctx = agent.override(model=model_override)
+
+            with model_override_ctx:
+                response = await adapter.handle(request)
+        else:
+            # pydantic-ai versions exposing AG-UI through AGUIAdapter.
+            dispatch_kwargs = {
+                "agent": agent,
+                "deps": deps,
+                "manage_system_prompt": "server",
+            }
+            if model_override is not None:
+                dispatch_kwargs["model"] = model_override
+            response = await AGUIAdapter.dispatch_request(request, **dispatch_kwargs)
+
+    if isinstance(response, StreamingResponse):
+        original_iterator = response.body_iterator
+
+        async def wrapped_iterator():
+            failed = False
+            try:
+                async for chunk in original_iterator:
+                    yield chunk
+            except Exception as exc:
+                failed = True
+                await _finalize_ag_ui_run(
+                    session_id=session.id,
+                    user_id=user.id,
+                    status_value="failed",
+                    output=f"AG-UI stream failed: {exc}",
+                )
+                raise
+            finally:
+                if not failed:
+                    await _finalize_ag_ui_run(
+                        session_id=session.id,
+                        user_id=user.id,
+                        status_value="completed",
+                        output="AG-UI run completed",
+                    )
+
+        response.body_iterator = wrapped_iterator()
+    else:
+        await _finalize_ag_ui_run(
+            session_id=session.id,
+            user_id=user.id,
+            status_value="completed",
+            output="AG-UI run completed",
+        )
+    return response
+
+
 @router.patch("/sessions/{session_id}/canvas", response_model=AgentSessionResponse)
 async def sync_canvas_snapshot(
     session_id: str,
@@ -291,6 +564,19 @@ async def stop_agent_session(
     cancel_agent_run(session.id)
     await append_event(db, session_id=session.id, event_type="session.stopped", payload={})
     return _session_response(session)
+
+
+@router.delete("/sessions/{session_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_agent_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    try:
+        await delete_session(db, session_id=session_id, user_id=user.id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 async def _owned_project(db: AsyncSession, project_id: str, user_id: str) -> Project:

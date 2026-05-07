@@ -324,7 +324,7 @@ def create_file(
     )
 
 
-def replace_file_range(
+def patch_file_lines(
     snapshot: ProjectSnapshotV2,
     *,
     group_id: str,
@@ -355,21 +355,78 @@ def replace_file_range(
     )
 
 
+def replace_file_range(
+    snapshot: ProjectSnapshotV2,
+    *,
+    group_id: str,
+    file_name: str,
+    start_line: int,
+    end_line: int,
+    replacement: str,
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Backward-compatible alias for line patching."""
+    return patch_file_lines(
+        snapshot,
+        group_id=group_id,
+        file_name=file_name,
+        start_line=start_line,
+        end_line=end_line,
+        replacement=replacement,
+    )
+
+
+def replace_file_content(
+    snapshot: ProjectSnapshotV2,
+    *,
+    group_id: str,
+    file_name: str,
+    content: str,
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    updated = snapshot.model_copy(deep=True)
+    ensure_safe_file_name(file_name)
+    file = _file(updated, group_id, file_name)
+    file.content = content
+    invalidated = _invalidate_boards_for_group(updated, group_id, "file_changed")
+    return _validate(updated), ToolResult(
+        ok=True,
+        changedFileGroups=[group_id],
+        invalidatedBoardIds=invalidated,
+    )
+
+
 def apply_file_patch(
     snapshot: ProjectSnapshotV2,
     *,
     group_id: str,
     file_name: str,
-    original: str,
-    modified: str,
+    original: str | None = None,
+    modified: str | None = None,
+    patch: str | None = None,
 ) -> tuple[ProjectSnapshotV2, ToolResult]:
     updated = snapshot.model_copy(deep=True)
     ensure_safe_file_name(file_name)
     file = _file(updated, group_id, file_name)
-    if file.content != original:
-        diff = "\n".join(difflib.unified_diff(original.splitlines(), file.content.splitlines()))
-        raise ValueError(f"file content does not match patch base\n{diff}")
-    file.content = modified
+    current = file.content
+
+    if patch:
+        file.content = _apply_unified_patch(current, patch)
+    else:
+        if original is None or modified is None:
+            raise ValueError("apply_file_patch requires either patch or original+modified")
+        # Be tolerant to newline encoding differences from model/tool payloads.
+        if _normalize_newlines(current) != _normalize_newlines(original):
+            diff = "\n".join(
+                difflib.unified_diff(
+                    _normalize_newlines(original).splitlines(),
+                    _normalize_newlines(current).splitlines(),
+                    fromfile="provided_original",
+                    tofile="current_file",
+                    lineterm="",
+                )
+            )
+            raise ValueError(f"file content does not match patch base\n{diff}")
+        file.content = modified
+
     invalidated = _invalidate_boards_for_group(updated, group_id, "file_changed")
     return _validate(updated), ToolResult(
         ok=True,
@@ -462,6 +519,79 @@ def _normalize_replacement_text(replacement: str) -> str:
     if "\\n" in replacement or "\\r" in replacement:
         replacement = replacement.replace("\\r\\n", "\n").replace("\\n", "\n").replace("\\r", "\n")
     return replacement
+
+
+def _normalize_newlines(text: str) -> str:
+    return text.replace("\r\n", "\n").replace("\r", "\n")
+
+
+def _apply_unified_patch(original: str, patch: str) -> str:
+    """Apply a unified diff patch string to original content.
+
+    Supports standard @@ -a,b +c,d @@ hunks and preserves unchanged lines.
+    """
+    source_lines = _normalize_newlines(original).splitlines(keepends=True)
+    patch_lines = _normalize_newlines(patch).splitlines(keepends=False)
+    out: list[str] = []
+    src_idx = 0
+    i = 0
+
+    while i < len(patch_lines):
+        line = patch_lines[i]
+        if line.startswith(("--- ", "+++ ")):
+            i += 1
+            continue
+        if not line.startswith("@@"):
+            i += 1
+            continue
+
+        # Parse hunk header: @@ -start,count +start,count @@
+        header = line
+        try:
+            left = header.split(" ")[1]  # -a,b
+            start_old = int(left.split(",")[0][1:])
+        except Exception as exc:
+            raise ValueError(f"invalid patch hunk header: {header}") from exc
+
+        # Emit unchanged content before this hunk.
+        target_idx = max(start_old - 1, 0)
+        if target_idx < src_idx:
+            raise ValueError("patch hunks overlap or are out of order")
+        out.extend(source_lines[src_idx:target_idx])
+        src_idx = target_idx
+        i += 1
+
+        while i < len(patch_lines):
+            hline = patch_lines[i]
+            if hline.startswith("@@"):
+                break
+            if hline.startswith("\\ No newline at end of file"):
+                i += 1
+                continue
+            if not hline:
+                # Empty line in patch payload; treat as context empty line.
+                marker = " "
+                content = ""
+            else:
+                marker = hline[0]
+                content = hline[1:]
+            if marker == " ":
+                if src_idx >= len(source_lines) or source_lines[src_idx].rstrip("\n") != content:
+                    raise ValueError("patch context mismatch")
+                out.append(source_lines[src_idx])
+                src_idx += 1
+            elif marker == "-":
+                if src_idx >= len(source_lines) or source_lines[src_idx].rstrip("\n") != content:
+                    raise ValueError("patch removal mismatch")
+                src_idx += 1
+            elif marker == "+":
+                out.append(content + "\n")
+            else:
+                raise ValueError(f"unsupported patch marker: {marker!r}")
+            i += 1
+
+    out.extend(source_lines[src_idx:])
+    return "".join(out)
 
 
 def _resolve_entity_id(snapshot: ProjectSnapshotV2, entity_id: str) -> str | None:

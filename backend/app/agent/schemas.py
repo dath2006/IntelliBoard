@@ -111,6 +111,17 @@ class ProjectSnapshotV2(StrictModel):
         return self
 
 
+class AgentUiState(BaseModel):
+    model_config = ConfigDict(extra="allow")
+    projectId: str | None = None
+    sessionId: str | None = None
+    activeBoardId: str | None = None
+    activeGroupId: str | None = None
+    activeFileId: str | None = None
+    activeFileName: str | None = None
+    selectedWireId: str | None = None
+
+
 def _ensure_unique(label: str, values: list[str]) -> None:
     seen: set[str] = set()
     duplicates = sorted({value for value in values if value in seen or seen.add(value)})
@@ -151,6 +162,12 @@ class ReplaceFileRangeInput(StrictModel):
         if self.endLine < self.startLine:
             raise ValueError("endLine must be greater than or equal to startLine")
         return self
+
+
+class ReplaceFileContentInput(StrictModel):
+    groupId: str = Field(min_length=1)
+    fileName: str = Field(min_length=1)
+    content: str
 
 
 class ToolResult(StrictModel):

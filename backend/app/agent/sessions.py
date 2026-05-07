@@ -182,6 +182,20 @@ async def discard_draft(
         return session
 
 
+async def delete_session(
+    db: AsyncSession,
+    *,
+    session_id: str,
+    user_id: str,
+) -> None:
+    async with get_session_lock(session_id):
+        session = await get_session_for_user(db, session_id=session_id, user_id=user_id)
+        if session is None:
+            raise ValueError("agent session not found")
+        await db.delete(session)
+        await db.commit()
+
+
 async def sync_canvas_to_session(
     db: AsyncSession,
     *,

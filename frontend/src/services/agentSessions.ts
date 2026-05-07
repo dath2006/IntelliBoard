@@ -112,6 +112,10 @@ export async function stopAgentSession(sessionId: string): Promise<AgentSession>
   return data;
 }
 
+export async function deleteAgentSession(sessionId: string): Promise<void> {
+  await api.delete(`/agent/sessions/${sessionId}`);
+}
+
 export async function postFrontendActionResult(
   sessionId: string,
   actionId: string,

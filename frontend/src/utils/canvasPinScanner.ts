@@ -50,13 +50,43 @@ export interface CanvasScanOptions {
 export async function scanAndReportCanvasPins(opts: CanvasScanOptions): Promise<number> {
   const { boards, components, upgradeDelayMs = 200 } = opts;
 
-  // Wait one animation frame so React has committed the new DOM nodes, then
-  // wait the upgrade delay for wokwi custom elements to hydrate their pinInfo.
-  await new Promise<void>((resolve) => {
-    requestAnimationFrame(() => {
-      setTimeout(resolve, upgradeDelayMs);
-    });
-  });
+  // Fast polling mechanism to wait for Wokwi custom elements to upgrade
+  // and hydrate their pinInfo property, rather than a slow blind delay.
+  const maxWaitMs = Math.max(500, upgradeDelayMs);
+  const start = Date.now();
+  let allReady = false;
+
+  while (Date.now() - start < maxWaitMs) {
+    let missingAny = false;
+    
+    // Check boards
+    for (const board of boards) {
+      const element = document.getElementById(board.id);
+      if (!element || !((element as any).pinInfo)) {
+        missingAny = true;
+        break;
+      }
+    }
+
+    // Check components if boards are ready
+    if (!missingAny) {
+      for (const comp of components) {
+        const element = document.getElementById(comp.id);
+        if (!element || !((element as any).pinInfo)) {
+          missingAny = true;
+          break;
+        }
+      }
+    }
+
+    if (!missingAny) {
+      allReady = true;
+      break; // Everything upgraded!
+    }
+
+    // Wait a brief moment before polling again (let the main thread breathe)
+    await new Promise((resolve) => setTimeout(resolve, 30));
+  }
 
   // Collect unique observations keyed by metadataId.
   const byMetadataId = new Map<string, { tagName: string | null; pinNames: string[] }>();
