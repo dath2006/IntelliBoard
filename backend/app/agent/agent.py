@@ -767,15 +767,20 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
     async def compile_in_frontend(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
         """Preferred compilation method. Mirrors the UI compile button and returns richer errors."""
         ctx.deps.guard_tool_call()
-        return await _safe_tool_call(
-            ctx,
-            "compile_in_frontend",
-            lambda: _run_frontend_action(
+
+        async def _compile_action() -> dict[str, Any]:
+            result = await _run_frontend_action(
                 ctx,
                 "compile",
                 {"boardId": board_id} if board_id else {},
                 timeout_ms=180000,
-            ),
+            )
+            return _sanitize_hex_content(result)
+
+        return await _safe_tool_call(
+            ctx,
+            "compile_in_frontend",
+            _compile_action,
         )
 
     @agent.tool
@@ -1163,6 +1168,25 @@ def _jsonable(value: Any) -> Any:
         return str(value)
 
 
+def _sanitize_hex_content(value: Any) -> Any:
+    """Strip large hex blobs from agent-visible payloads to avoid token bloat."""
+    if isinstance(value, dict):
+        sanitized: dict[str, Any] = {}
+        for key, item in value.items():
+            if key == "hex_content" and isinstance(item, str):
+                sanitized[key] = f"<omitted hex_content ({len(item)} chars)>"
+                sanitized["hex_content_omitted"] = True
+                sanitized["hex_content_length"] = len(item)
+            else:
+                sanitized[str(key)] = _sanitize_hex_content(item)
+        return sanitized
+    if isinstance(value, list):
+        return [_sanitize_hex_content(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_sanitize_hex_content(item) for item in value)
+    return value
+
+
 def _extract_tool_call_input(event: FunctionToolCallEvent) -> Any:
     part = event.part
     # Different pydantic-ai versions expose args in slightly different shapes.
@@ -1209,6 +1233,8 @@ async def _event_stream_handler(ctx: RunContext[AgentDeps], events: AsyncIterabl
         elif isinstance(event, FunctionToolResultEvent):
             tool_name = getattr(event.result, "tool_name", None)
             tool_output = _extract_tool_call_output(event)
+            if tool_name == "compile_in_frontend":
+                tool_output = _sanitize_hex_content(tool_output)
             await ctx.deps.emit_event(
                 "tool.call.result",
                 {"tool": tool_name, "toolCallId": event.tool_call_id, "output": tool_output},
