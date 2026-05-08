@@ -49,7 +49,23 @@ const isTouchDevice =
 
 const isEsp32Kind = isEsp32BoardKind;
 
-export const SimulatorCanvas = () => {
+export const SimulatorCanvas = ({ 
+  hideHeader = false,
+  onZoomChange,
+  onControlsReady,
+  showComponentPicker,
+  onShowComponentPickerChange,
+}: { 
+  hideHeader?: boolean;
+  onZoomChange?: (zoom: number) => void;
+  onControlsReady?: (controls: {
+    handleZoomIn: () => void;
+    handleZoomOut: () => void;
+    handleResetView: () => void;
+  }) => void;
+  showComponentPicker?: boolean;
+  onShowComponentPickerChange?: (show: boolean) => void;
+}) => {
   const {
     boards,
     activeBoardId,
@@ -130,7 +146,9 @@ export const SimulatorCanvas = () => {
   const dismissEsp32Crash = useSimulatorStore((s) => s.dismissEsp32Crash);
 
   // Component picker modal
-  const [showComponentPicker, setShowComponentPicker] = useState(false);
+  const [internalShowComponentPicker, setInternalShowComponentPicker] = useState(false);
+  const showPicker = showComponentPicker ?? internalShowComponentPicker;
+  const setShowPicker = onShowComponentPickerChange ?? setInternalShowComponentPicker;
   const [registry] = useState(() => ComponentRegistry.getInstance());
   const [registryLoaded, setRegistryLoaded] = useState(registry.isLoaded);
 
@@ -949,7 +967,7 @@ export const SimulatorCanvas = () => {
     const component = createComponentFromMetadata(metadata, x, y);
     trackAddComponent(metadata.id);
     addComponent(component as any);
-    setShowComponentPicker(false);
+    setShowPicker(false);
   };
 
   // Component rotation
@@ -1217,6 +1235,57 @@ export const SimulatorCanvas = () => {
     setPan({ x: 0, y: 0 });
   };
 
+  // Helper functions for zoom controls
+  const handleZoomIn = useCallback(() => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const factor = 1.1;
+    const newZoom = Math.min(5, Math.max(0.1, zoomRef.current * factor));
+    const mx = rect.width / 2;
+    const my = rect.height / 2;
+    const worldX = (mx - panRef.current.x) / zoomRef.current;
+    const worldY = (my - panRef.current.y) / zoomRef.current;
+    const newPan = { x: mx - worldX * newZoom, y: my - worldY * newZoom };
+    zoomRef.current = newZoom;
+    panRef.current = newPan;
+    setZoom(newZoom);
+    setPan(newPan);
+  }, []);
+
+  const handleZoomOut = useCallback(() => {
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const factor = 0.9;
+    const newZoom = Math.min(5, Math.max(0.1, zoomRef.current * factor));
+    const mx = rect.width / 2;
+    const my = rect.height / 2;
+    const worldX = (mx - panRef.current.x) / zoomRef.current;
+    const worldY = (my - panRef.current.y) / zoomRef.current;
+    const newPan = { x: mx - worldX * newZoom, y: my - worldY * newZoom };
+    zoomRef.current = newZoom;
+    panRef.current = newPan;
+    setZoom(newZoom);
+    setPan(newPan);
+  }, []);
+
+  // Expose controls to parent
+  useEffect(() => {
+    if (onControlsReady) {
+      onControlsReady({
+        handleZoomIn,
+        handleZoomOut,
+        handleResetView,
+      });
+    }
+  }, [onControlsReady, handleZoomIn, handleZoomOut]);
+
+  // Notify zoom changes
+  useEffect(() => {
+    if (onZoomChange) {
+      onZoomChange(zoom);
+    }
+  }, [zoom, onZoomChange]);
+
   // Wire creation via pin clicks
   const handlePinClick = (componentId: string, pinName: string, x: number, y: number) => {
     // Close property dialog when starting wire creation
@@ -1337,7 +1406,7 @@ export const SimulatorCanvas = () => {
       <MemoizedComponentRenderer
         key={component.id}
         component={component}
-        metadata={metadata}
+        metadata={metadata ?? null}
         isSelected={isSelected}
         running={running}
         zoom={zoom}
@@ -1391,7 +1460,8 @@ export const SimulatorCanvas = () => {
 
       {/* Main Canvas */}
       <div className="simulator-canvas">
-        <div className="canvas-header">
+        {!hideHeader && (
+          <div className="canvas-header">
           <div className="canvas-header-left">
             {/* Status LED */}
             <span
@@ -1628,7 +1698,7 @@ export const SimulatorCanvas = () => {
             {/* Add Component */}
             <button
               className="add-component-btn"
-              onClick={() => setShowComponentPicker(true)}
+              onClick={() => setShowPicker(true)}
               title="Add Component"
               disabled={running}
             >
@@ -1649,6 +1719,7 @@ export const SimulatorCanvas = () => {
             </button>
           </div>
         </div>
+        )}
         <div
           ref={canvasRef}
           className="canvas-content"
@@ -1820,8 +1891,8 @@ export const SimulatorCanvas = () => {
 
       {/* Component Picker Modal */}
       <ComponentPickerModal
-        isOpen={showComponentPicker}
-        onClose={() => setShowComponentPicker(false)}
+        isOpen={showPicker}
+        onClose={() => setShowPicker(false)}
         onSelectComponent={handleSelectComponent}
         onSelectBoard={(kind: BoardKind) => {
           trackSelectBoard(kind);

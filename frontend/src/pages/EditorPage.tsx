@@ -10,7 +10,6 @@ import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { FileTabs } from '../components/editor/FileTabs';
 import { FileExplorer } from '../components/editor/FileExplorer';
 import { AgUiPanel } from '../components/agent/AgUiPanel';
-import { AgentPanelToggle } from '../components/agent/AgentPanelToggle';
 
 // Lazy-load Pi workspace so xterm.js isn't in the main bundle
 const RaspberryPiWorkspace = lazy(() =>
@@ -100,6 +99,15 @@ export const EditorPage: React.FC = () => {
   const [saveModalOpen, setSaveModalOpen] = useState(false);
   const [loginPromptOpen, setLoginPromptOpen] = useState(false);
   const [showStarBanner, setShowStarBanner] = useState(false);
+
+  // Canvas control state
+  const [canvasZoom, setCanvasZoom] = useState(1);
+  const [showComponentPicker, setShowComponentPicker] = useState(false);
+  const canvasControlsRef = useRef<{
+    handleZoomIn: () => void;
+    handleZoomOut: () => void;
+    handleResetView: () => void;
+  } | null>(null);
 
   // ── Electrical simulation subscriber (one-time, idempotent) ───────────────
   useEffect(() => {
@@ -411,6 +419,24 @@ export const EditorPage: React.FC = () => {
         </nav>
       )}
 
+      {/* ── Editor Toolbar (full width at top) ── */}
+      <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
+        <EditorToolbar
+          consoleOpen={consoleOpen}
+          setConsoleOpen={setConsoleOpen}
+          compileLogs={compileLogs}
+          setCompileLogs={setCompileLogs}
+          onAddComponent={() => setShowComponentPicker(true)}
+          zoom={canvasZoom}
+          onZoomIn={() => canvasControlsRef.current?.handleZoomIn()}
+          onZoomOut={() => canvasControlsRef.current?.handleZoomOut()}
+          onResetView={() => canvasControlsRef.current?.handleResetView()}
+          componentCount={components.length}
+          explorerOpen={explorerOpen}
+          setExplorerOpen={setExplorerOpen}
+        />
+      </div>
+
       <div className="app-container" ref={containerRef}>
         {/* ── Editor side ── */}
         <div
@@ -453,37 +479,6 @@ export const EditorPage: React.FC = () => {
               minWidth: 0,
             }}
           >
-            {/* Explorer toggle + toolbar */}
-            <div style={{ display: 'flex', alignItems: 'stretch', flexShrink: 0 }}>
-              <button
-                className="explorer-toggle-btn"
-                onClick={() => setExplorerOpen((v) => !v)}
-                title={explorerOpen ? 'Hide file explorer' : 'Show file explorer'}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                </svg>
-              </button>
-              <AgentPanelToggle open={agentPanelOpen} onToggle={toggleAgentPanel} />
-              <div style={{ flex: 1 }}>
-                <EditorToolbar
-                  consoleOpen={consoleOpen}
-                  setConsoleOpen={setConsoleOpen}
-                  compileLogs={compileLogs}
-                  setCompileLogs={setCompileLogs}
-                />
-              </div>
-            </div>
-
             {/* File tabs — hidden when Pi workspace is active */}
             {!isRaspberryPi3 && <FileTabs />}
 
@@ -542,7 +537,15 @@ export const EditorPage: React.FC = () => {
           }}
         >
           <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 }}>
-            <SimulatorCanvas />
+            <SimulatorCanvas 
+              hideHeader={true}
+              onZoomChange={setCanvasZoom}
+              onControlsReady={(controls) => {
+                canvasControlsRef.current = controls;
+              }}
+              showComponentPicker={showComponentPicker}
+              onShowComponentPickerChange={setShowComponentPicker}
+            />
             {/* ── Debug snapshot button ── */}
             <button
               onClick={logSnapshot}

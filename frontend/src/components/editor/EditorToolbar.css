@@ -3,24 +3,32 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 10px;
+  padding: 0 16px;
+  gap: 24px;
   height: 46px;
   background: #252526;
   border-bottom: 1px solid #333;
   flex-shrink: 0;
-  gap: 8px;
+  width: 100%;
 }
 
 /* ── Groups ─────────────────────────────────────── */
+.toolbar-group-left {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
 .toolbar-group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 12px;
 }
 
 .toolbar-group-right {
-  margin-left: auto;
-  gap: 6px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 /* ── Divider ─────────────────────────────────────── */
@@ -28,7 +36,7 @@
   width: 1px;
   height: 20px;
   background: #3a3a3a;
-  margin: 0 4px;
+  margin: 0;
 }
 
 /* ── Icon buttons ───────────────────────────────── */
@@ -94,8 +102,8 @@
 .tb-btn-libraries {
   display: flex;
   align-items: center;
-  gap: 5px;
-  padding: 4px 10px 4px 8px;
+  gap: 8px;
+  padding: 4px 12px 4px 10px;
   border: 1px solid rgba(0, 184, 212, 0.3);
   border-radius: 6px;
   cursor: pointer;
@@ -190,6 +198,32 @@
 .tb-btn-output-active:hover {
   background: rgba(79, 195, 247, 0.18);
   color: #81d4fa;
+}
+
+/* Explorer toggle */
+.tb-btn-explorer {
+  color: #9d9d9d;
+}
+.tb-btn-explorer:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+}
+.tb-btn-explorer-active {
+  color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.1);
+}
+
+/* Agent toggle */
+.tb-btn-agent {
+  color: #9d9d9d;
+}
+.tb-btn-agent:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+}
+.tb-btn-agent-active {
+  color: #10b981; /* Greenish/Teal for AI agent */
+  background: rgba(16, 185, 129, 0.1);
 }
 
 /* ── Spin animation (compiling) ─────────────────── */
@@ -371,4 +405,230 @@
   overflow-y: auto;
   white-space: pre-wrap;
   line-height: 1.4;
+}
+
+/* ── Canvas Controls Section ────────────────────── */
+
+/* Board selector in toolbar */
+.tb-board-select {
+  background: #2d2d2d;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s, background 0.15s;
+  max-width: 150px;
+}
+
+.tb-board-select:hover:not(:disabled) {
+  border-color: #555;
+  background: #333;
+}
+
+.tb-board-select:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tb-board-select-empty {
+  opacity: 0.55;
+  font-style: italic;
+  cursor: default;
+  border-color: #3a3a3a;
+}
+
+/* Canvas control buttons (Serial, Scope) */
+.tb-btn-canvas {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  background: transparent;
+  color: #9d9d9d;
+  font-size: 12px;
+  font-family: inherit;
+  transition: background 0.12s, color 0.12s;
+  flex-shrink: 0;
+}
+
+.tb-btn-canvas:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ccc;
+}
+
+.tb-btn-canvas-active {
+  color: #4fc3f7;
+  background: rgba(79, 195, 247, 0.1);
+}
+
+.tb-btn-canvas-active:hover {
+  background: rgba(79, 195, 247, 0.18);
+  color: #81d4fa;
+}
+
+.tb-btn-label {
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* WiFi status badge */
+.tb-wifi-badge {
+  display: flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  background: rgba(255, 255, 255, 0.05);
+  color: #888;
+  flex-shrink: 0;
+}
+
+.tb-wifi-got_ip {
+  background: rgba(76, 175, 80, 0.15);
+  color: #66bb6a;
+}
+
+.tb-wifi-connected {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffb74d;
+}
+
+.tb-wifi-initializing {
+  background: rgba(33, 150, 243, 0.15);
+  color: #64b5f6;
+}
+
+.tb-wifi-clickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tb-wifi-clickable:hover {
+  background: rgba(76, 175, 80, 0.25);
+}
+
+/* BLE status badge */
+.tb-ble-badge {
+  display: flex;
+  align-items: center;
+  padding: 3px 5px;
+  border-radius: 4px;
+  background: rgba(103, 58, 183, 0.15);
+  color: #9575cd;
+  flex-shrink: 0;
+}
+
+.tb-ble-advertising {
+  background: rgba(103, 58, 183, 0.25);
+  color: #b39ddb;
+}
+
+/* Zoom controls */
+.tb-zoom-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #2d2d2d;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.tb-zoom-btn {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  background: transparent;
+  color: #9d9d9d;
+  transition: background 0.12s, color 0.12s;
+}
+
+.tb-zoom-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ccc;
+}
+
+.tb-zoom-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.tb-zoom-level {
+  min-width: 48px;
+  padding: 2px 6px;
+  border: none;
+  background: transparent;
+  color: #ccc;
+  font-size: 11px;
+  font-family: 'Cascadia Code', 'Fira Code', monospace;
+  cursor: pointer;
+  transition: color 0.12s;
+  text-align: center;
+}
+
+.tb-zoom-level:hover:not(:disabled) {
+  color: #fff;
+}
+
+.tb-zoom-level:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Component count */
+.tb-component-count {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #888;
+  font-size: 11px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+/* Add button */
+.tb-btn-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 14px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #0d7377;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: background 0.15s, transform 0.1s;
+  flex-shrink: 0;
+}
+
+.tb-btn-add:hover:not(:disabled) {
+  background: #0e8388;
+  transform: translateY(-1px);
+}
+
+.tb-btn-add:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.tb-btn-add:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }

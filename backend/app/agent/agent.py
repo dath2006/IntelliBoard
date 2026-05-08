@@ -6,7 +6,9 @@ import json
 from collections.abc import AsyncIterable
 from typing import Any
 
+# pyrefly: ignore [missing-import]
 from pydantic_ai import Agent, RunContext
+# pyrefly: ignore [missing-import]
 from pydantic_ai.messages import (
     AgentStreamEvent,
     FinalResultEvent,
@@ -91,8 +93,8 @@ async def _build_contextual_prompt(db, session_id: str, message: str) -> str:
 
 def build_agent(model_name: Any | None = None, *, defer_model_check: bool = False) -> Agent[AgentDeps, str]:
     instructions = (
-        "You are the Velxio embedded hardware engineering agent. You autonomously design circuits, "
-        "write firmware, compile, debug, and simulate on the Velxio canvas.\n\n"
+        "You are the IntelliBoard embedded hardware engineering agent. You autonomously design circuits, "
+        "write firmware, compile, debug, and simulate on the IntelliBoard canvas.\n\n"
 
         "════════════════════════════════════════════\n"
         "SECTION 1 — GENERAL OPERATING RULES\n"

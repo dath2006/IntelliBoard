@@ -12,7 +12,7 @@ import { InstallLibrariesModal } from '../simulator/InstallLibrariesModal';
 import type { CompilationLog } from '../../utils/compilationLogger';
 import { exportToWokwiZip, importFromWokwiZip } from '../../utils/wokwiZip';
 import { readFirmwareFile } from '../../utils/firmwareLoader';
-import { trackOpenLibraryManager } from '../../utils/analytics';
+import { trackOpenLibraryManager, trackToggleSerialMonitor } from '../../utils/analytics';
 import { isEsp32BoardKind } from '../../utils/boardResolver';
 import { runCompileAction } from '../../utils/compileActions';
 import {
@@ -20,6 +20,9 @@ import {
   stopSimulationAction,
   resetSimulationAction,
 } from '../../utils/simulatorActions';
+import { useOscilloscopeStore } from '../../store/useOscilloscopeStore';
+import { useAgentStore } from '../../store/useAgentStore';
+import { getTabSessionId } from '../../simulation/Esp32Bridge';
 import './EditorToolbar.css';
 
 interface EditorToolbarProps {
@@ -27,6 +30,15 @@ interface EditorToolbarProps {
   setConsoleOpen: (open: boolean | ((v: boolean) => boolean)) => void;
   compileLogs: CompilationLog[];
   setCompileLogs: (logs: CompilationLog[] | ((prev: CompilationLog[]) => CompilationLog[])) => void;
+  // Canvas controls props
+  onAddComponent?: () => void;
+  zoom?: number;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onResetView?: () => void;
+  componentCount?: number;
+  explorerOpen: boolean;
+  setExplorerOpen: (open: boolean | ((v: boolean) => boolean)) => void;
 }
 
 const BOARD_PILL_ICON: Partial<Record<BoardKind, string>> = {
@@ -55,6 +67,14 @@ export const EditorToolbar = ({
   consoleOpen,
   setConsoleOpen,
   setCompileLogs,
+  onAddComponent,
+  zoom = 1,
+  onZoomIn,
+  onZoomOut,
+  onResetView,
+  componentCount = 0,
+  explorerOpen,
+  setExplorerOpen,
 }: EditorToolbarProps) => {
   const { files, markCompiled } = useEditorStore();
   const { boards, activeBoardId, compileBoardProgram, setBoardLanguageMode, updateBoard } =
@@ -74,6 +94,17 @@ export const EditorToolbar = ({
   const [overflowOpen, setOverflowOpen] = useState(false);
   const overflowMenuRef = useRef<HTMLDivElement>(null);
   const [missingLibHint, setMissingLibHint] = useState(false);
+
+  // Canvas controls state
+  const serialMonitorOpen = useSimulatorStore((s) => s.serialMonitorOpen);
+  const toggleSerialMonitor = useSimulatorStore((s) => s.toggleSerialMonitor);
+  const oscilloscopeOpen = useOscilloscopeStore((s) => s.open);
+  const toggleOscilloscope = useOscilloscopeStore((s) => s.toggleOscilloscope);
+  const components = useSimulatorStore((s) => s.components);
+
+  // Agent store
+  const agentPanelOpen = useAgentStore((s) => s.panelOpen);
+  const toggleAgentPanel = useAgentStore((s) => s.togglePanel);
 
   // (ResizeObserver removed — Library Manager is always visible now,
   // only import/export live in the overflow menu)
@@ -311,51 +342,75 @@ export const EditorToolbar = ({
           />
         )}
         <div className="editor-toolbar" ref={toolbarRef}>
-          {/* Active board context pill */}
-          {activeBoard && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-              <div
-                className="tb-board-pill"
-                style={{
-                  borderColor: BOARD_PILL_COLOR[activeBoard.boardKind],
-                  color: BOARD_PILL_COLOR[activeBoard.boardKind],
-                }}
-                title={`Editing: ${BOARD_KIND_LABELS[activeBoard.boardKind]}`}
-              >
-                <span className="tb-board-pill-icon">{BOARD_PILL_ICON[activeBoard.boardKind]}</span>
-                <span className="tb-board-pill-label">
-                  {BOARD_KIND_LABELS[activeBoard.boardKind]}
-                </span>
-                {activeBoard.running && <span className="tb-board-pill-running" title="Running" />}
-              </div>
-              {BOARD_SUPPORTS_MICROPYTHON.has(activeBoard.boardKind) && (
-                <select
-                  className="tb-lang-select"
-                  value={activeBoard.languageMode ?? 'arduino'}
-                  onChange={(e) => {
-                    if (activeBoardId)
-                      setBoardLanguageMode(activeBoardId, e.target.value as LanguageMode);
-                  }}
-                  title="Language mode"
-                  style={{
-                    background: '#2d2d2d',
-                    color: '#ccc',
-                    border: '1px solid #444',
-                    borderRadius: 4,
-                    padding: '2px 4px',
-                    fontSize: 11,
-                    cursor: 'pointer',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="arduino">Arduino C++</option>
-                  <option value="micropython">MicroPython</option>
-                </select>
-              )}
-            </div>
-          )}
+          {/* File Explorer Toggle (Far Left) */}
+          <button
+            className={`tb-btn tb-btn-explorer${explorerOpen ? ' tb-btn-explorer-active' : ''}`}
+            onClick={() => setExplorerOpen((v) => !v)}
+            title={explorerOpen ? 'Hide File Explorer' : 'Show File Explorer'}
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+            </svg>
+          </button>
 
-          <div className="toolbar-group">
+          <div className="tb-divider" />
+
+          {/* Left side - Editor controls */}
+          <div className="toolbar-group-left">
+            {/* Active board context pill */}
+            {activeBoard && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div
+                  className="tb-board-pill"
+                  style={{
+                    borderColor: BOARD_PILL_COLOR[activeBoard.boardKind],
+                    color: BOARD_PILL_COLOR[activeBoard.boardKind],
+                  }}
+                  title={`Editing: ${BOARD_KIND_LABELS[activeBoard.boardKind]}`}
+                >
+                  <span className="tb-board-pill-icon">{BOARD_PILL_ICON[activeBoard.boardKind]}</span>
+                  <span className="tb-board-pill-label">
+                    {BOARD_KIND_LABELS[activeBoard.boardKind]}
+                  </span>
+                  {activeBoard.running && <span className="tb-board-pill-running" title="Running" />}
+                </div>
+                {BOARD_SUPPORTS_MICROPYTHON.has(activeBoard.boardKind) && (
+                  <select
+                    className="tb-lang-select"
+                    value={activeBoard.languageMode ?? 'arduino'}
+                    onChange={(e) => {
+                      if (activeBoardId)
+                        setBoardLanguageMode(activeBoardId, e.target.value as LanguageMode);
+                    }}
+                    title="Language mode"
+                    style={{
+                      background: '#2d2d2d',
+                      color: '#ccc',
+                      border: '1px solid #444',
+                      borderRadius: 4,
+                      padding: '2px 4px',
+                      fontSize: 11,
+                      cursor: 'pointer',
+                      outline: 'none',
+                    }}
+                  >
+                    <option value="arduino">Arduino C++</option>
+                    <option value="micropython">MicroPython</option>
+                  </select>
+                )}
+              </div>
+            )}
+
+            <div className="toolbar-group">
             {/* Compile */}
             <button
               onClick={handleCompile}
@@ -495,9 +550,257 @@ export const EditorToolbar = ({
                 </button>
               </>
             )}
+            </div>
           </div>
+          
+          {/* Spacer to push groups apart */}
+          <div style={{ flex: 1 }} />
 
-          <div className="toolbar-group toolbar-group-right">
+          <div className="toolbar-group-right">
+            {/* Canvas Controls Section */}
+            <div className="tb-divider" />
+
+            {/* Board Selector */}
+            {boards.length > 0 ? (
+              <select
+                className="tb-board-select"
+                value={activeBoardId ?? ''}
+                onChange={(e) => useSimulatorStore.getState().setActiveBoardId(e.target.value)}
+                disabled={isRunning}
+                title="Active board on canvas"
+              >
+                {boards.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {BOARD_KIND_LABELS[b.boardKind] ?? b.id}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span
+                className="tb-board-select tb-board-select-empty"
+                title="No board on canvas — add one with the Add button"
+              >
+                No board
+              </span>
+            )}
+
+            {/* Serial Monitor toggle */}
+            <button
+              onClick={() => {
+                toggleSerialMonitor();
+                trackToggleSerialMonitor(!serialMonitorOpen);
+              }}
+              className={`tb-btn tb-btn-canvas${serialMonitorOpen ? ' tb-btn-canvas-active' : ''}`}
+              title="Toggle Serial Monitor"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <path d="M8 21h8M12 17v4" />
+              </svg>
+              <span className="tb-btn-label">Serial</span>
+            </button>
+
+            {/* WiFi status indicator (ESP32 boards only) */}
+            {activeBoard &&
+              isEsp32BoardKind(activeBoard.boardKind) &&
+              activeBoard.wifiStatus &&
+              (() => {
+                const status = activeBoard.wifiStatus.status;
+                const hasIp = status === 'got_ip';
+                const sessionId = getTabSessionId();
+                const clientId = `${sessionId}::${activeBoard.id}`;
+                const backendBase =
+                  (import.meta.env.VITE_API_BASE as string | undefined) ??
+                  'http://localhost:8001/api';
+                const gatewayUrl = `${backendBase}/gateway/${clientId}/`;
+
+                return (
+                  <span
+                    className={`tb-wifi-badge tb-wifi-${status}${hasIp ? ' tb-wifi-clickable' : ''}`}
+                    onClick={() => hasIp && window.open(gatewayUrl, '_blank')}
+                    title={
+                      hasIp
+                        ? `WiFi: ${activeBoard.wifiStatus.ssid ?? 'Velxio-GUEST'} — IP: ${activeBoard.wifiStatus.ip}\nClick to open IoT Gateway ↗`
+                        : status === 'connected'
+                          ? `WiFi: ${activeBoard.wifiStatus.ssid ?? 'Velxio-GUEST'} — Connecting...`
+                          : status === 'initializing'
+                            ? 'WiFi: Initializing...'
+                            : 'WiFi: Disconnected'
+                    }
+                  >
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12.55a11 11 0 0 1 14.08 0" />
+                      <path d="M1.42 9a16 16 0 0 1 21.16 0" />
+                      <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                      <circle cx="12" cy="20" r="1" />
+                    </svg>
+                  </span>
+                );
+              })()}
+
+            {/* BLE status indicator (ESP32 boards only) */}
+            {activeBoard && isEsp32BoardKind(activeBoard.boardKind) && activeBoard.bleStatus && (
+              <span
+                className={`tb-ble-badge tb-ble-${activeBoard.bleStatus.status}`}
+                title={
+                  activeBoard.bleStatus.status === 'advertising'
+                    ? 'BLE: Advertising'
+                    : 'BLE: Initialized'
+                }
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <polyline points="6.5 6.5 17.5 17.5 12 23 12 1 17.5 6.5 6.5 17.5" />
+                </svg>
+              </span>
+            )}
+
+            {/* Oscilloscope toggle */}
+            <button
+              onClick={toggleOscilloscope}
+              className={`tb-btn tb-btn-canvas${oscilloscopeOpen ? ' tb-btn-canvas-active' : ''}`}
+              title="Toggle Oscilloscope / Logic Analyzer"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <polyline points="2 14 6 8 10 14 14 6 18 14 22 10" />
+              </svg>
+              <span className="tb-btn-label">Scope</span>
+            </button>
+
+            <div className="tb-divider" />
+            <div className="tb-divider" />
+
+            {/* Zoom controls */}
+            <div className="tb-zoom-controls">
+              <button
+                className="tb-zoom-btn"
+                onClick={onZoomOut}
+                title="Zoom out"
+                disabled={!onZoomOut}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+              <button
+                className="tb-zoom-level"
+                onClick={onResetView}
+                title="Reset view (click to reset)"
+                disabled={!onResetView}
+              >
+                {Math.round(zoom * 100)}%
+              </button>
+              <button
+                className="tb-zoom-btn"
+                onClick={onZoomIn}
+                title="Zoom in"
+                disabled={!onZoomIn}
+              >
+                <svg
+                  width="12"
+                  height="12"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                >
+                  <line x1="12" y1="5" x2="12" y2="19" />
+                  <line x1="5" y1="12" x2="19" y2="12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Component count */}
+            <span
+              className="tb-component-count"
+              title={`${components.length} component${components.length !== 1 ? 's' : ''}`}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="2" y="7" width="20" height="14" rx="2" />
+                <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" />
+              </svg>
+              {components.length}
+            </span>
+
+            <div className="tb-divider" />
+
+            {/* Add Component */}
+            <button
+              className="tb-btn-add"
+              onClick={onAddComponent}
+              title="Add Component"
+              disabled={isRunning || !onAddComponent}
+            >
+              <svg
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
+              <span className="tb-btn-label">Add</span>
+            </button>
+
+            <div className="tb-divider" />
             {/* Hidden file input for import (always present) */}
             <input
               ref={importInputRef}
@@ -651,6 +954,28 @@ export const EditorToolbar = ({
               >
                 <polyline points="4 17 10 11 4 5" />
                 <line x1="12" y1="19" x2="20" y2="19" />
+              </svg>
+            </button>
+
+            <div className="tb-divider" />
+
+            {/* Agent Panel Toggle (Far Right) */}
+            <button
+              className={`tb-btn tb-btn-agent${agentPanelOpen ? ' tb-btn-agent-active' : ''}`}
+              onClick={toggleAgentPanel}
+              title={agentPanelOpen ? 'Hide Agent Panel' : 'Show Agent Panel'}
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
               </svg>
             </button>
           </div>
