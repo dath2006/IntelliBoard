@@ -5,8 +5,8 @@ const AGENT_PANEL_OPEN_KEY = 'velxio.agent.panel.open';
 const AGENT_PANEL_WIDTH_KEY = 'velxio.agent.panel.width';
 const AGENT_PANEL_COMPACT_KEY = 'velxio.agent.panel.compact';
 
-const AGENT_PANEL_DEFAULT_WIDTH = 360;
-const AGENT_PANEL_MIN = 280;
+const AGENT_PANEL_DEFAULT_WIDTH = 420;
+const AGENT_PANEL_MIN = 360; // Increased from 280 to prevent text truncation
 const AGENT_PANEL_MAX = 720;
 
 interface AgentState {

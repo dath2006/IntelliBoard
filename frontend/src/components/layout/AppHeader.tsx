@@ -65,7 +65,7 @@ export const AppHeader: React.FC<AppHeaderProps> = () => {
               <path d="M9 1v4M15 1v4M9 19v4M15 19v4M1 9h4M1 15h4M19 9h4M19 15h4" />
             </svg>
             <Link to="/" style={{ textDecoration: 'none', color: 'inherit' }}>
-              <span className="header-title">Velxio</span>
+              <span className="header-title">IntelliBoard</span>
             </Link>
           </div>
 

@@ -134,6 +134,7 @@ async def _finalize_ag_ui_run(
     user_id: str,
     status_value: str,
     output: str,
+    store_output: bool = True,
 ) -> None:
     async with AsyncSessionLocal() as db_bg:
         await set_session_status(
@@ -142,12 +143,14 @@ async def _finalize_ag_ui_run(
             user_id=user_id,
             status=status_value,
         )
-        await append_event(
-            db_bg,
-            session_id=session_id,
-            event_type="run.completed" if status_value == "completed" else "run.failed",
-            payload={"output": output},
-        )
+        # Only store meaningful outputs, not generic completion messages
+        if store_output and output and output != "AG-UI run completed":
+            await append_event(
+                db_bg,
+                session_id=session_id,
+                event_type="run.completed" if status_value == "completed" else "run.failed",
+                payload={"output": output},
+            )
 
 
 @router.post("/sessions", response_model=AgentSessionResponse, status_code=status.HTTP_201_CREATED)
@@ -348,6 +351,64 @@ async def run_ag_ui_agent(
         raise HTTPException(status_code=404, detail="Agent session not found.")
 
     snapshot = await load_draft_snapshot(db, session_id=session.id, user_id=user.id)
+    
+    # Load conversation history from stored events
+    events = await replay_events(db, session_id=session.id, after_seq=0)
+    conversation_history: list[dict[str, Any]] = []
+    
+    for event in events:
+        event_payload = json.loads(event.payload_json or "{}")
+        if event.event_type == "run.started":
+            msg = event_payload.get("message", "").strip()
+            if msg:
+                conversation_history.append({
+                    "role": "user",
+                    "content": msg,
+                })
+        elif event.event_type == "run.completed":
+            output = event_payload.get("output", "").strip()
+            if output:
+                conversation_history.append({
+                    "role": "assistant",
+                    "content": output,
+                })
+    
+    print(f"[AG-UI] Loaded {len(conversation_history)} history messages for session {session.id}")
+    if conversation_history:
+        print(f"[AG-UI] First message: {conversation_history[0]}")
+        print(f"[AG-UI] Last message: {conversation_history[-1]}")
+    
+    # Inject conversation history into the payload messages
+    if conversation_history:
+        existing_messages = payload.get("messages", [])
+        # Merge history with current messages, avoiding duplicates
+        if isinstance(existing_messages, list):
+            # Keep only the latest user message from existing_messages
+            latest_user_msg = None
+            for m in reversed(existing_messages):
+                if isinstance(m, dict) and m.get("role") == "user":
+                    latest_user_msg = m
+                    break
+            
+            # Build final message list: history + latest message
+            if latest_user_msg and conversation_history:
+                # Check if the latest message is already in history
+                last_history_msg = conversation_history[-1] if conversation_history else None
+                if (last_history_msg and 
+                    last_history_msg.get("role") == "user" and 
+                    latest_user_msg.get("content") == last_history_msg.get("content")):
+                    # Already in history, use history as-is
+                    payload["messages"] = conversation_history
+                else:
+                    # Append new message to history
+                    payload["messages"] = conversation_history + [latest_user_msg]
+            elif latest_user_msg:
+                payload["messages"] = conversation_history + [latest_user_msg]
+            else:
+                payload["messages"] = conversation_history
+        else:
+            payload["messages"] = conversation_history
+    
     deps = AgentDeps(
         db=db,
         session_id=session.id,
@@ -410,6 +471,77 @@ async def run_ag_ui_agent(
         if logfire is not None
         else nullcontext()
     )
+    
+    # Define completion handler to persist agent response
+    async def handle_agent_completion(result) -> None:
+        """
+        Callback invoked after the agent stream completes.
+        Captures the final agent response and stores it in the database.
+        """
+        try:
+            # Extract the final text output from the result
+            final_output = ""
+            if hasattr(result, 'data') and result.data:
+                final_output = str(result.data)
+            elif hasattr(result, 'output') and result.output:
+                final_output = str(result.output)
+            
+            # Get all messages from the run if available
+            if hasattr(result, 'all_messages'):
+                messages = result.all_messages()
+                # Extract assistant messages
+                for msg in reversed(messages):
+                    if hasattr(msg, 'role') and msg.role == 'assistant':
+                        if hasattr(msg, 'content'):
+                            content = msg.content
+                            if isinstance(content, str):
+                                final_output = content
+                            elif isinstance(content, list):
+                                text_parts = []
+                                for part in content:
+                                    if hasattr(part, 'text'):
+                                        text_parts.append(part.text)
+                                    elif isinstance(part, dict) and 'text' in part:
+                                        text_parts.append(part['text'])
+                                if text_parts:
+                                    final_output = ''.join(text_parts)
+                        break
+            
+            # Store the response if we captured any text
+            if final_output and final_output.strip():
+                async with AsyncSessionLocal() as db_bg:
+                    await set_session_status(
+                        db_bg,
+                        session_id=session.id,
+                        user_id=user.id,
+                        status="completed",
+                    )
+                    await append_event(
+                        db_bg,
+                        session_id=session.id,
+                        event_type="run.completed",
+                        payload={"output": final_output.strip()},
+                    )
+            else:
+                # No output captured, just mark as completed
+                async with AsyncSessionLocal() as db_bg:
+                    await set_session_status(
+                        db_bg,
+                        session_id=session.id,
+                        user_id=user.id,
+                        status="completed",
+                    )
+        except Exception as exc:
+            # Log error but don't fail the response
+            print(f"Error in handle_agent_completion: {exc}")
+            async with AsyncSessionLocal() as db_bg:
+                await set_session_status(
+                    db_bg,
+                    session_id=session.id,
+                    user_id=user.id,
+                    status="completed",
+                )
+    
     with dispatch_span:
         response = None
         if AGUIApp is not None:
@@ -432,7 +564,12 @@ async def run_ag_ui_agent(
                 model_override_ctx = agent.override(model=model_override)
 
             with model_override_ctx:
-                response = await adapter.handle(request)
+                # Check if adapter.handle supports on_complete callback
+                try:
+                    response = await adapter.handle(request, on_complete=handle_agent_completion)
+                except TypeError:
+                    # Fallback if on_complete is not supported
+                    response = await adapter.handle(request)
         else:
             # pydantic-ai versions exposing AG-UI through AGUIAdapter.
             dispatch_kwargs = {
@@ -442,42 +579,19 @@ async def run_ag_ui_agent(
             }
             if model_override is not None:
                 dispatch_kwargs["model"] = model_override
-            response = await AGUIAdapter.dispatch_request(request, **dispatch_kwargs)
-
-    if isinstance(response, StreamingResponse):
-        original_iterator = response.body_iterator
-
-        async def wrapped_iterator():
-            failed = False
+            
+            # Try to use on_complete if supported
             try:
-                async for chunk in original_iterator:
-                    yield chunk
-            except Exception as exc:
-                failed = True
-                await _finalize_ag_ui_run(
-                    session_id=session.id,
-                    user_id=user.id,
-                    status_value="failed",
-                    output=f"AG-UI stream failed: {exc}",
+                response = await AGUIAdapter.dispatch_request(
+                    request, 
+                    on_complete=handle_agent_completion,
+                    **dispatch_kwargs
                 )
-                raise
-            finally:
-                if not failed:
-                    await _finalize_ag_ui_run(
-                        session_id=session.id,
-                        user_id=user.id,
-                        status_value="completed",
-                        output="AG-UI run completed",
-                    )
+            except TypeError:
+                # Fallback without on_complete
+                response = await AGUIAdapter.dispatch_request(request, **dispatch_kwargs)
 
-        response.body_iterator = wrapped_iterator()
-    else:
-        await _finalize_ag_ui_run(
-            session_id=session.id,
-            user_id=user.id,
-            status_value="completed",
-            output="AG-UI run completed",
-        )
+    # Return the response directly - completion handler will persist the result
     return response
 
 

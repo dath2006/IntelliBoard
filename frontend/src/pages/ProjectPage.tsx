@@ -22,6 +22,20 @@ export const ProjectPage: React.FC = () => {
 
   useEffect(() => {
     if (!username || !projectName) return;
+    
+    // CRITICAL FIX: Clear stores before loading new project to prevent
+    // cross-contamination between projects
+    const editorState = useEditorStore.getState();
+    const simulatorState = useSimulatorStore.getState();
+    
+    // Clear editor state
+    editorState.loadFiles([{ name: 'sketch.ino', content: '' }]);
+    
+    // Clear simulator state
+    simulatorState.setComponents([]);
+    simulatorState.setWires([]);
+    simulatorState.setBoardType('arduino-uno');
+    
     getProject(username, projectName)
       .then((project) => {
         const files =

@@ -53,6 +53,19 @@ export const ProjectByIdPage: React.FC = () => {
     // right after saving) skip the fetch to avoid overwriting unsaved state.
     if (currentProject?.id === id && ready) return;
 
+    // CRITICAL FIX: Clear stores before loading new project to prevent
+    // cross-contamination between projects
+    const editorState = useEditorStore.getState();
+    const simulatorState = useSimulatorStore.getState();
+    
+    // Clear editor state
+    editorState.loadFiles([{ name: 'sketch.ino', content: '' }]);
+    
+    // Clear simulator state
+    simulatorState.setComponents([]);
+    simulatorState.setWires([]);
+    simulatorState.setBoardType('arduino-uno');
+
     getProjectById(id)
       .then((project) => {
         const files =

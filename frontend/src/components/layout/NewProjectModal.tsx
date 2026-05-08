@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useProjectStore } from '../../store/useProjectStore';
+import { useEditorStore } from '../../store/useEditorStore';
+import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { createProject } from '../../services/projectService';
 import { trackCreateProject } from '../../utils/analytics';
 
@@ -56,16 +58,30 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose }) => 
       const saved = await createProject(payload);
       trackCreateProject();
 
+      // CRITICAL FIX: Clear stores before navigating to new project
+      // This ensures the new project starts with a clean slate
+      const editorState = useEditorStore.getState();
+      const simulatorState = useSimulatorStore.getState();
+      
+      // Clear editor state
+      editorState.loadFiles([{ name: `main${defaultExt}`, content: defaultCode }]);
+      
+      // Clear simulator state
+      simulatorState.setComponents([]);
+      simulatorState.setWires([]);
+      simulatorState.setBoardType(boardType as any);
+
       setCurrentProject({
         id: saved.id,
         slug: saved.slug,
         ownerUsername: saved.owner_username,
         isPublic: saved.is_public,
       });
+      
       navigate(`/project/${saved.id}`, { replace: true });
       onClose();
-      // Optional: force a reload so the editor initializes cleanly
-      window.location.reload();
+      
+      // Note: Removed window.location.reload() - stores are now properly cleared
     } catch (err: any) {
       if (!err?.response) {
         setError('Server unreachable. Check your connection and try again.');
