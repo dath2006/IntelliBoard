@@ -7,7 +7,7 @@ from collections.abc import AsyncIterable
 from typing import Any
 
 # pyrefly: ignore [missing-import]
-from pydantic_ai import Agent, RunContext
+from pydantic_ai import Agent, RunContext, WebSearchTool
 # pyrefly: ignore [missing-import]
 from pydantic_ai.messages import (
     AgentStreamEvent,
@@ -287,7 +287,37 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "and serial output observed.\n\n"
 
         "════════════════════════════════════════════\n"
-        "SECTION 7 — REASONING & COMMUNICATION STYLE\n"
+        "SECTION 7 — GLOBAL CATALOG DISCOVERY & BROAD QUESTIONS\n"
+        "════════════════════════════════════════════\n\n"
+        "When the user asks questions that require a broad understanding of all available "
+        "possibilities or architecture patterns (e.g., 'what can I build?', 'how should I "
+        "architect X?', 'give me project ideas', 'compare available sensors') you MUST follow "
+        "this protocol:\n\n"
+        "STEP 1 — COMPREHENSIVE DISCOVERY\n"
+        "  Call get_full_component_catalog() to retrieve the entire component list grouped "
+        "  by category. Avoid search_component_catalog() for broad discovery as it filters "
+        "  results and may miss relevant categories.\n\n"
+        "STEP 2 — CATEGORY ANALYSIS\n"
+        "  Analyze the distribution of components across categories. Identify unique or "
+        "  high-value parts that can drive complex, professional project architectures.\n\n"
+        "STEP 3 — STRUCTURED RESPONSE\n"
+        "  a) For 'Project Ideas' & 'Architecture': Generate 5–8 distinct projects or "
+        "     patterns using DIFFERENT categories. Provide a name, required component IDs, "
+        "     a 2-sentence description, and difficulty rating.\n"
+        "  b) For 'Inventory/Catalog': List categories and summarize the types of components "
+        "     available in each, highlighting key items and their capabilities.\n"
+        "  c) For 'Comparisons': Use the full data to compare specifications (pin count, "
+        "     description, tags) across relevant parts to provide an informed recommendation.\n\n"
+        "STEP 4 — ENRICHMENT\n"
+        "  If web search is available (OpenAI provider), use it to find real-world examples, "
+        "  advanced library documentation, or wiring diagrams to supplement your response.\n\n"
+        "STEP 5 — CALL TO ACTION\n"
+        "  Always end by asking the user which path they'd like to explore further (e.g., 'Would "
+        "  you like to start building the Smart Weather Station?') and offer to begin the design "
+        "  or setup process automatically.\n\n"
+
+        "════════════════════════════════════════════\n"
+        "SECTION 8 — REASONING & COMMUNICATION STYLE\n"
         "════════════════════════════════════════════\n\n"
         "- Think step by step before each tool call. State what you are about to do and why.\n"
         "- When planning a circuit, list the complete connection table first:\n"
@@ -303,13 +333,40 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "    ✅ Circuit: [what was wired]\n"
         "    ✅ Firmware: [what the code does]\n"
         "    ✅ Compilation: [success/warnings]\n"
-        "    ✅ Simulation: [what serial output confirmed]"
+        "    ✅ Simulation: [what serial output confirmed]\n\n"
+
+        "════════════════════════════════════════════\n"
+        "SECTION 9 — WEB SEARCH PROTOCOL\n"
+        "════════════════════════════════════════════\n\n"
+        "- Use the web search tool to look up technical details that are missing from your "
+        "internal knowledge base or the project outline.\n"
+        "- Specifically, use it for:\n"
+        "    - Verifying component pinouts (e.g., ESP32-S3 GPIO mapping, sensor I2C addresses).\n"
+        "    - Researching Arduino or MicroPython library APIs for specialized hardware.\n"
+        "    - Finding recommended circuit patterns (e.g., pull-up resistor values, decoupling capacitors).\n"
+        "    - Debugging obscure compilation errors or firmware runtime behaviors.\n"
+        "- Always cite your sources briefly (e.g., 'According to the SSD1306 datasheet...') when "
+        "making design decisions based on search results.\n"
+        "- Do not use web search for information that is already available in the "
+        "get_project_outline() or get_canvas_runtime_pins() responses."
     )
+
+    model = model_name if model_name is not None else settings.AGENT_MODEL
+    builtin_tools = []
+
+    # Enable OpenAI native web search when using OpenAI models.
+    # Note: Using built-in tools requires the 'openai-responses:' prefix.
+    if isinstance(model, str) and (model.startswith("openai:") or model.startswith("openai-responses:")):
+        if model.startswith("openai:"):
+            model = model.replace("openai:", "openai-responses:", 1)
+        builtin_tools.append(WebSearchTool())
+
     agent = Agent(
-        model_name if model_name is not None else settings.AGENT_MODEL,
+        model,
         deps_type=AgentDeps,
         instructions=instructions,
         defer_model_check=defer_model_check,
+        builtin_tools=builtin_tools,
     )
 
     @agent.instructions
@@ -421,6 +478,46 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "search_component_catalog",
             lambda: agent_tools.search_component_catalog(query, category=category, limit=limit),
         )
+
+    @agent.tool
+    async def get_full_component_catalog(ctx: RunContext[AgentDeps]) -> dict[str, Any]:
+        """Return every component available on the canvas, grouped by category.
+
+        Use this (instead of repeated search_component_catalog calls) when you need
+        a complete picture of what is available — for example when the user asks for
+        project ideas, what components are available, or anything that requires
+        knowing the full catalog rather than searching for a specific part.
+
+        Returns a dict:
+          {
+            "total": int,
+            "categories": {
+              "sensors":  [{"id": ..., "name": ..., "description": ...}, ...],
+              "displays": [...],
+              "output":   [...],
+              ...
+            }
+          }
+        """
+        ctx.deps.guard_tool_call()
+
+        def _build_catalog() -> dict[str, Any]:
+            from app.agent.catalog import load_component_catalog
+            components = load_component_catalog()
+            grouped: dict[str, list[dict]] = {}
+            for comp in components:
+                cat = str(comp.get("category") or "other")
+                entry = {
+                    "id":          comp.get("id", ""),
+                    "name":        comp.get("name", ""),
+                    "description": comp.get("description") or "",
+                    "pinCount":    comp.get("pinCount", 0),
+                    "tags":        comp.get("tags", []),
+                }
+                grouped.setdefault(cat, []).append(entry)
+            return {"total": len(components), "categories": grouped}
+
+        return await _safe_tool_call(ctx, "get_full_component_catalog", _build_catalog)
 
     @agent.tool
     async def get_component_schema(ctx: RunContext[AgentDeps], component_id: str) -> dict[str, Any]:

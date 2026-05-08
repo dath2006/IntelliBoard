@@ -1,3 +1,4 @@
+# pyrefly: ignore [missing-import]
 from pydantic_settings import BaseSettings
 
 
@@ -32,9 +33,9 @@ class Settings(BaseSettings):
             return
         if ":" not in self.AGENT_MODEL:
             raise RuntimeError("AGENT_MODEL must use the provider:model format.")
-        # OpenAI API key is only required for openai: models
-        if self.AGENT_MODEL.startswith("openai:") and not self.OPENAI_API_KEY:
-            raise RuntimeError("OPENAI_API_KEY is required when using openai: models.")
+        # OpenAI API key is only required for openai: or openai-responses: models
+        if (self.AGENT_MODEL.startswith("openai:") or self.AGENT_MODEL.startswith("openai-responses:")) and not self.OPENAI_API_KEY:
+            raise RuntimeError("OPENAI_API_KEY is required when using OpenAI models.")
 
 
 settings = Settings()

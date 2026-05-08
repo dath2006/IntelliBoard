@@ -3011,7 +3011,10 @@ body {
 /* Specifically target user message wrappers */
 .agu-chat [class*='user'] > div,
 .agu-chat [data-message-role='user'] > div,
-.agu-chat [class*='UserMessage'] > div {
+.agu-chat [class*='UserMessage'] > div,
+.agu-history-messages [class*='user'] > div,
+.agu-history-messages [data-message-role='user'] > div,
+.agu-history-messages [class*='UserMessage'] > div {
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
@@ -3101,7 +3104,8 @@ body {
 }
 
 /* Disable the scroll-to-bottom animation that causes visible jumps */
-.agu-chat [class*='copilotKitMessages'] {
+.agu-chat [class*='copilotKitMessages'],
+.agu-history-messages {
   scroll-snap-type: none !important;
 }
 
@@ -4126,6 +4130,63 @@ body {
   flex-direction: column;
   overflow: hidden;
   min-height: 0;
+}
+
+/* ── Manual History + CopilotChat Wrapper ── */
+.agu-chat-with-history-manual {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  overflow-y: auto; /* Enable scrolling for the entire thread */
+  background: #0f0f0f;
+}
+
+.agu-history-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px 12px;
+  flex-shrink: 0; /* Ensure history doesn't collapse */
+  border-bottom: 1px solid #1a1a1a;
+}
+
+/* Ensure history messages look like CopilotKit messages */
+.agu-history-messages .copilotKitMessage {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.agu-history-messages .copilotKitUserMessage {
+  align-self: flex-end;
+  max-width: 85%;
+  background: #2563eb !important;
+  color: white !important;
+  padding: 8px 12px !important;
+  border-radius: 12px 12px 2px 12px !important;
+  font-size: 13px !important;
+  margin-bottom: 4px !important;
+}
+
+.agu-history-messages .copilotKitAssistantMessage {
+  align-self: flex-start;
+  max-width: 85%;
+  background: #1a1a1a !important;
+  border: 1px solid #2a2a2a !important;
+  color: #e5e5e5 !important;
+  padding: 10px 14px !important;
+  border-radius: 12px 12px 12px 2px !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+
+/* Adjust the active chat to not have its own scroll if the parent is scrolling */
+/* Note: CopilotKit UI might still try to scroll internally, so we might need
+   to enforce height: auto or similar if it still truncates. */
+.agu-chat {
+  flex: 0 0 auto; /* Don't let it grow infinitely if parent is scrolling */
+  min-height: 500px;
 }
 
 .agent-panel__empty {
