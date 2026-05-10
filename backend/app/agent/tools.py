@@ -129,6 +129,63 @@ async def get_canvas_runtime_pins(snapshot: ProjectSnapshotV2, instance_id: str)
 
 
 
+async def get_canvas_runtime_pins_batch(
+    snapshot: ProjectSnapshotV2, instance_ids: list[str]
+) -> dict[str, Any]:
+    """Return runtime pin info for multiple instances, deduplicating by metadata_id.
+
+    Instances that share the same underlying metadata_id (e.g. ten 'wokwi-led'
+    components) only trigger one actual catalog lookup + retry loop instead of N.
+    Each instance still gets its own entry in the results list with the correct
+    instanceId, but pin data is shared from the single lookup.
+    """
+    if not instance_ids:
+        return {"results": []}
+
+    # Build a mapping: instance_id → (metadata_key, instance_type)
+    instance_meta: dict[str, tuple[str, str]] = {}
+    not_found: list[str] = []
+    for iid in instance_ids:
+        board = next((b for b in snapshot.boards if b.id == iid), None)
+        if board is not None:
+            instance_meta[iid] = (board.boardKind, "board")
+            continue
+        component = next((c for c in snapshot.components if c.id == iid), None)
+        if component is not None:
+            instance_meta[iid] = (component.metadataId, "component")
+            continue
+        not_found.append(iid)
+
+    # Deduplicate: only poll each unique metadata_key once.
+    unique_keys = set(meta_key for meta_key, _ in instance_meta.values())
+    resolved: dict[str, dict[str, Any]] = {}
+    for meta_key in unique_keys:
+        for attempt in range(5):
+            result = _get_canvas_runtime_pins(meta_key)
+            if result.get("available"):
+                break
+            if attempt < 4:
+                await asyncio.sleep(0.5)
+        resolved[meta_key] = result
+
+    # Build per-instance results.
+    results: list[dict[str, Any]] = []
+    for iid in instance_ids:
+        if iid in instance_meta:
+            meta_key, itype = instance_meta[iid]
+            entry = {**resolved[meta_key], "instanceId": iid, "instanceType": itype}
+            results.append(entry)
+        else:
+            results.append({
+                "instanceId": iid,
+                "available": False,
+                "pinNames": [],
+                "error": f"instance not found in snapshot: {iid!r}",
+            })
+
+    return {"results": results}
+
+
 def list_component_schema_gaps(limit: int = 20) -> dict[str, Any]:
     return _list_component_schema_gaps(limit=limit)
 

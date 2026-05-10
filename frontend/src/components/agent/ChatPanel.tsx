@@ -284,9 +284,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         )}
 
         <Conversation
-          className="flex-1 min-h-0 chat-panel-scroll"
-          initial={isBusy ? 'instant' : 'smooth'}
-          resize={isBusy ? 'instant' : 'smooth'}
+          className={cn('flex-1 min-h-0 chat-panel-scroll', !isBusy && 'chat-panel-scroll--smooth')}
+          initial="instant"
+          resize="instant"
         >
           <ConversationContent className="pb-4 pt-4 px-4 gap-6">
             {messages.length === 0 && (

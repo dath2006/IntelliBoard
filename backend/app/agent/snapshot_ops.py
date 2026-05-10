@@ -284,6 +284,68 @@ def _canonical_schema_pin(*, entity_id: str, schema_component_id: str, pin_name:
     )
 
 
+def connect_pins_batch(
+    snapshot: ProjectSnapshotV2,
+    *,
+    wires: list[dict],
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Connect multiple wires in a single snapshot mutation.
+
+    Each entry in *wires* is a dict with keys:
+      wire_id (optional), start_component_id, start_pin,
+      end_component_id, end_pin, color (optional), signal_type (optional).
+
+    All wires are validated and appended atomically — if any single wire
+    spec is invalid the entire batch is rejected.
+    """
+    if not wires:
+        raise ValueError("connect_pins_batch requires at least one wire spec")
+
+    updated = snapshot.model_copy(deep=True)
+    existing_wire_ids = {w.id for w in updated.wires}
+    changed_ids: list[str] = []
+
+    for idx, spec in enumerate(wires):
+        wire_id = spec.get("wire_id") or _unique_id("wire", existing_wire_ids | set(changed_ids))
+        _ensure_missing(wire_id, existing_wire_ids | set(changed_ids), "wire")
+
+        start_component_id = spec.get("start_component_id")
+        end_component_id = spec.get("end_component_id")
+        start_pin = spec.get("start_pin")
+        end_pin = spec.get("end_pin")
+        color = spec.get("color", "#22c55e")
+        signal_type = spec.get("signal_type")
+
+        if not start_component_id or not end_component_id:
+            raise ValueError(f"wire[{idx}]: start_component_id and end_component_id are required")
+        if not start_pin or not end_pin:
+            raise ValueError(f"wire[{idx}]: start_pin and end_pin are required")
+
+        resolved_start = _resolve_entity_id(updated, start_component_id)
+        resolved_end = _resolve_entity_id(updated, end_component_id)
+        if resolved_start is None or resolved_end is None:
+            raise ValueError(f"wire[{idx}]: endpoints must reference existing boards or components")
+
+        start_pin = _canonical_entity_pin(updated, resolved_start, start_pin)
+        end_pin = _canonical_entity_pin(updated, resolved_end, end_pin)
+
+        updated.wires.append(
+            SnapshotWire.model_validate(
+                {
+                    "id": wire_id,
+                    "start": {"componentId": resolved_start, "pinName": start_pin, "x": 0.0, "y": 0.0},
+                    "end": {"componentId": resolved_end, "pinName": end_pin, "x": 0.0, "y": 0.0},
+                    "waypoints": [],
+                    "color": color,
+                    "signalType": signal_type,
+                }
+            )
+        )
+        changed_ids.append(wire_id)
+
+    return _validate(updated), ToolResult(ok=True, changedWireIds=changed_ids)
+
+
 def disconnect_wire(snapshot: ProjectSnapshotV2, *, wire_id: str) -> tuple[ProjectSnapshotV2, ToolResult]:
     updated = snapshot.model_copy(deep=True)
     _wire(updated, wire_id)
@@ -301,6 +363,204 @@ def route_wire(
     wire = _wire(updated, wire_id)
     wire.waypoints = [WireWaypoint.model_validate(point) for point in waypoints]
     return _validate(updated), ToolResult(ok=True, changedWireIds=[wire_id])
+
+
+def route_wire_batch(
+    snapshot: ProjectSnapshotV2,
+    *,
+    routes: list[dict],
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Set waypoints for multiple wires in a single snapshot mutation.
+
+    Each entry in *routes* is a dict with keys:
+      wire_id (required), waypoints (required — list of {x, y} dicts).
+
+    All routes are applied atomically — if any wire_id is invalid the
+    entire batch is rejected.
+    """
+    if not routes:
+        raise ValueError("route_wire_batch requires at least one route spec")
+
+    updated = snapshot.model_copy(deep=True)
+    changed_ids: list[str] = []
+
+    for idx, spec in enumerate(routes):
+        wire_id = spec.get("wire_id")
+        waypoints = spec.get("waypoints")
+        if not wire_id:
+            raise ValueError(f"route[{idx}]: wire_id is required")
+        if waypoints is None:
+            raise ValueError(f"route[{idx}]: waypoints is required")
+        wire = _wire(updated, wire_id)
+        wire.waypoints = [WireWaypoint.model_validate(point) for point in waypoints]
+        changed_ids.append(wire_id)
+
+    return _validate(updated), ToolResult(ok=True, changedWireIds=changed_ids)
+
+
+def disconnect_wire_batch(
+    snapshot: ProjectSnapshotV2,
+    *,
+    wire_ids: list[str],
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Remove multiple wires in a single snapshot mutation.
+
+    All wire_ids are validated first — if any is invalid the entire batch
+    is rejected (no partial removal).
+    """
+    if not wire_ids:
+        raise ValueError("disconnect_wire_batch requires at least one wire_id")
+
+    updated = snapshot.model_copy(deep=True)
+    existing = {w.id for w in updated.wires}
+    for wire_id in wire_ids:
+        if wire_id not in existing:
+            raise ValueError(f"wire not found: {wire_id}")
+    updated.wires = [w for w in updated.wires if w.id not in set(wire_ids)]
+    return _validate(updated), ToolResult(ok=True, changedWireIds=list(wire_ids))
+
+
+def add_component_batch(
+    snapshot: ProjectSnapshotV2,
+    *,
+    components: list[dict],
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Add multiple components in a single snapshot mutation.
+
+    Each entry in *components* is a dict with keys:
+      component_id (required), metadata_id (required), x (required), y (required),
+      properties (optional dict).
+
+    All components are validated and appended atomically.
+    """
+    if not components:
+        raise ValueError("add_component_batch requires at least one component spec")
+
+    updated = snapshot.model_copy(deep=True)
+    existing_ids = _entity_ids(updated)
+    changed_ids: list[str] = []
+
+    for idx, spec in enumerate(components):
+        component_id = spec.get("component_id")
+        metadata_id = spec.get("metadata_id")
+        x = spec.get("x")
+        y = spec.get("y")
+        properties = spec.get("properties") or {}
+
+        if not component_id or not metadata_id:
+            raise ValueError(f"component[{idx}]: component_id and metadata_id are required")
+        if x is None or y is None:
+            raise ValueError(f"component[{idx}]: x and y are required")
+
+        _ensure_missing(component_id, existing_ids | set(changed_ids), "entity")
+
+        updated.components.append(
+            SnapshotComponent(
+                id=component_id,
+                metadataId=metadata_id,
+                x=float(x),
+                y=float(y),
+                properties=properties,
+            )
+        )
+        changed_ids.append(component_id)
+
+    return _validate(updated), ToolResult(ok=True, changedComponentIds=changed_ids)
+
+
+def duplicate_component(
+    snapshot: ProjectSnapshotV2,
+    *,
+    source_id: str,
+    new_id: str,
+    x: float,
+    y: float,
+    property_overrides: dict | None = None,
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Clone an existing component's metadataId and properties to a new position.
+
+    Copies the source component's metadataId and properties, applies any
+    property_overrides on top, and creates a new component at (x, y).
+    """
+    updated = snapshot.model_copy(deep=True)
+    source = _component(updated, source_id)
+    _ensure_missing(new_id, _entity_ids(updated), "entity")
+
+    merged_props = {**source.properties}
+    if property_overrides:
+        merged_props.update(property_overrides)
+
+    updated.components.append(
+        SnapshotComponent(
+            id=new_id,
+            metadataId=source.metadataId,
+            x=x,
+            y=y,
+            properties=merged_props,
+        )
+    )
+    return _validate(updated), ToolResult(ok=True, changedComponentIds=[new_id])
+
+
+def delete_file(
+    snapshot: ProjectSnapshotV2,
+    *,
+    group_id: str,
+    file_name: str,
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Delete a file from a file group."""
+    updated = snapshot.model_copy(deep=True)
+    if group_id not in updated.fileGroups:
+        raise ValueError(f"file group not found: {group_id}")
+    files = updated.fileGroups[group_id]
+    original_len = len(files)
+    updated.fileGroups[group_id] = [f for f in files if f.name != file_name]
+    if len(updated.fileGroups[group_id]) == original_len:
+        raise ValueError(f"file not found: {file_name}")
+    invalidated = _invalidate_boards_for_group(updated, group_id, "file_deleted")
+    return _validate(updated), ToolResult(
+        ok=True,
+        changedFileGroups=[group_id],
+        invalidatedBoardIds=invalidated,
+    )
+
+
+def rename_file(
+    snapshot: ProjectSnapshotV2,
+    *,
+    group_id: str,
+    old_name: str,
+    new_name: str,
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Rename a file within a file group."""
+    updated = snapshot.model_copy(deep=True)
+    ensure_safe_file_name(new_name)
+    file = _file(updated, group_id, old_name)
+    if any(f.name == new_name for f in updated.fileGroups[group_id]):
+        raise ValueError(f"file already exists: {new_name}")
+    file.name = new_name
+    invalidated = _invalidate_boards_for_group(updated, group_id, "file_renamed")
+    return _validate(updated), ToolResult(
+        ok=True,
+        changedFileGroups=[group_id],
+        invalidatedBoardIds=invalidated,
+    )
+
+
+def set_language_mode(
+    snapshot: ProjectSnapshotV2,
+    *,
+    board_id: str,
+    language_mode: str,
+) -> tuple[ProjectSnapshotV2, ToolResult]:
+    """Switch a board's language mode between 'arduino' and 'micropython'."""
+    if language_mode not in ("arduino", "micropython"):
+        raise ValueError(f"language_mode must be 'arduino' or 'micropython', got: {language_mode}")
+    updated = snapshot.model_copy(deep=True)
+    board = _board(updated, board_id)
+    board.languageMode = language_mode
+    _invalidate_board(updated, board_id, "language_mode_changed")
+    return _validate(updated), ToolResult(ok=True, changedBoardIds=[board_id], invalidatedBoardIds=[board_id])
 
 
 def create_file(

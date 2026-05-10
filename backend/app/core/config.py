@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     AGENT_MODEL: str = "openai:gpt-5.4-mini"
     AGENT_FALLBACK_MODEL: str = ""
     AGENT_ENABLED: bool = True
-    AGENT_MAX_TOOL_CALLS: int = 40
+    AGENT_MAX_TOOL_CALLS: int = 200
     AGENT_MAX_PROMPT_CHARS: int = 12000
     AGENT_SNAPSHOT_MAX_BYTES: int = 1_000_000
     AGENT_MAX_RUN_SECONDS: int = 180

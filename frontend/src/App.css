@@ -568,6 +568,36 @@ body {
   scrollbar-color: rgba(148, 163, 184, 0.3) transparent;
 }
 
+/* Chat scroll container optimizations for smooth streaming */
+.chat-panel-scroll [data-stick-to-bottom-scroll-container] {
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  scroll-behavior: auto;
+  will-change: scroll-position;
+  contain: layout style paint;
+}
+
+/* Enable smooth scrolling only when not streaming */
+.chat-panel-scroll--smooth [data-stick-to-bottom-scroll-container] {
+  scroll-behavior: smooth;
+}
+
+/* Content containment for performance */
+.chat-panel-scroll [data-stick-to-bottom-content] {
+  contain: layout style;
+}
+
+/* Message streaming performance - prevent layout thrashing */
+.chat-panel-scroll .group {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 100px;
+}
+
+/* Last message (streaming) should not use content-visibility for smooth updates */
+.chat-panel-scroll [data-stick-to-bottom-content] > *:last-child {
+  content-visibility: visible;
+}
+
 .ag-ui-panel--pro :where(.copilotKitChat, .cpk\\:bg-background) {
   background: #0f141a !important;
   color: #d8e1ea !important;

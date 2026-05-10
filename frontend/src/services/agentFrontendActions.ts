@@ -153,6 +153,92 @@ export async function runFrontendAction(
         resetSimulationAction(boardId);
         return { ok: true, payload: { boardId } };
       }
+      case 'sim_status': {
+        const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
+        const board = sim.boards.find((b) => b.id === boardId);
+        return {
+          ok: true,
+          payload: {
+            boardId,
+            running: board?.running ?? false,
+            compiledProgram: board?.compiledProgram ? true : false,
+            serialMonitorOpen: board?.serialMonitorOpen ?? false,
+          },
+        };
+      }
+      case 'compile_last_result': {
+        const logs = compilation.logs;
+        const lastOutcome = logs.length > 0 ? logs[logs.length - 1] : null;
+        return {
+          ok: true,
+          payload: {
+            hasResult: logs.length > 0,
+            logs: serializeLogs(logs.slice(-50)),
+            lastMessage: lastOutcome?.message ?? null,
+            lastType: lastOutcome?.type ?? null,
+          },
+        };
+      }
+      case 'get_component_bounds': {
+        const componentId = typeof payload?.componentId === 'string' ? payload.componentId : null;
+        if (!componentId) {
+          return { ok: false, error: 'componentId is required' };
+        }
+        const el = document.querySelector(
+          `[data-component-id="${componentId}"]`,
+        ) as HTMLElement | null;
+        if (!el) {
+          // Fallback: try to find component in store and return position-based estimate
+          const comp = sim.components.find((c) => c.id === componentId);
+          if (comp) {
+            return {
+              ok: true,
+              payload: {
+                componentId,
+                x: comp.x,
+                y: comp.y,
+                width: 60,
+                height: 60,
+                estimated: true,
+                pinPositions: [],
+              },
+            };
+          }
+          return { ok: false, error: `Component not found on canvas: ${componentId}` };
+        }
+        const rect = el.getBoundingClientRect();
+        // Attempt to read pin positions from the wokwi element inside
+        const pinPositions: Array<{ name: string; x: number; y: number; side: string }> = [];
+        const wokwiEl = el.querySelector('[pininfo]') ?? el.shadowRoot?.querySelector('[pininfo]');
+        if (wokwiEl && 'pinInfo' in wokwiEl) {
+          const pinInfo = (wokwiEl as any).pinInfo;
+          if (Array.isArray(pinInfo)) {
+            for (const pin of pinInfo) {
+              const side =
+                pin.x < rect.width * 0.25
+                  ? 'left'
+                  : pin.x > rect.width * 0.75
+                    ? 'right'
+                    : pin.y < rect.height * 0.25
+                      ? 'top'
+                      : 'bottom';
+              pinPositions.push({ name: pin.name, x: pin.x, y: pin.y, side });
+            }
+          }
+        }
+        return {
+          ok: true,
+          payload: {
+            componentId,
+            x: rect.x,
+            y: rect.y,
+            width: rect.width,
+            height: rect.height,
+            estimated: false,
+            pinPositions,
+          },
+        };
+      }
       default:
         return { ok: false, error: `Unknown action: ${action}` };
     }

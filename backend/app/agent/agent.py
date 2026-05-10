@@ -102,7 +102,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "- Always begin any task by calling get_project_outline() to understand the current "
         "canvas state: which boards, components, wires, and file groups exist.\n"
         "- Never replace the full snapshot. Use granular operation tools for all mutations "
-        "(add_component, connect_pins, replace_file_range, etc.).\n"
+        "(add_component, connect_pins, patch_file_lines, etc.).\n"
         "- Prefer minimal edits. Do not move or rewire things that are already correct.\n"
         "- After every mutation that changes the snapshot, re-read the affected part of the "
         "outline before proceeding to the next step.\n"
@@ -114,9 +114,15 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "Follow this exact sequence for every wire you place. Violating this order will "
         "produce incorrect or broken circuits.\n\n"
         "STEP 1 — ADD THE COMPONENT OR BOARD\n"
-        "  Call add_component() or add_board() and note the exact id returned.\n\n"
+        "  Call add_component() or add_board() and note the exact id returned.\n"
+        "  When adding 2+ components, use add_component_batch() to place them all\n"
+        "  in a single atomic tool call.\n\n"
         "STEP 2 — FETCH RUNTIME PINS (MANDATORY, NO EXCEPTIONS)\n"
-        "  Immediately call get_canvas_runtime_pins(instance_id) using the id from Step 1.\n"
+        "  Call get_canvas_runtime_pins(instance_id) for a single component, OR\n"
+        "  call get_canvas_runtime_pins_batch(instance_ids) when you added multiple\n"
+        "  components. The batch variant deduplicates by metadata_id internally —\n"
+        "  so adding 10 LEDs only performs ONE catalog lookup, not 10.\n"
+        "  - PREFER get_canvas_runtime_pins_batch whenever you added 2+ components.\n"
         "  - The pinNames list is the ONLY authoritative source for valid pin names.\n"
         "  - Never invent, guess, or normalize pin names from your training data.\n"
         "  - If available=False after retries, stop wiring and tell the user to open the "
@@ -129,20 +135,21 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "  c) Group wires by corridor: which wires will share the same X or Y axis segment?\n"
         "  d) Assign lane offsets to each group (see Section 3 — Wire Routing Rules).\n"
         "  e) Compute waypoints for every wire.\n\n"
-        "STEP 4 — CONNECT POWER/GROUND FIRST\n"
-        "  Always wire VCC and GND connections before signal pins.\n"
-        "  This ensures the simulation has valid power before any logic is evaluated.\n\n"
-        "STEP 5 — CONNECT SIGNAL PINS\n"
-        "  Wire all remaining signal pins (SDA, SCL, MOSI, MISO, SCK, CS, TX, RX, "
-        "digital I/O, analog) in this order:\n"
-        "  - Shared bus signals first (I2C, SPI buses shared by multiple components).\n"
-        "  - Unique point-to-point signals last.\n\n"
-        "STEP 6 — CALL route_wire() FOR EVERY WIRE\n"
-        "  After calling connect_pins(), immediately call route_wire() with the computed "
-        "waypoints for that wire. Never leave a wire without explicit waypoints.\n\n"
-        "STEP 7 — VALIDATE\n"
-        "  After all wires are placed, call validate_pin_mapping_state() and "
-        "validate_snapshot_state() to confirm structural integrity.\n\n"
+        "STEP 4 — CONNECT ALL WIRES (USE BATCH)\n"
+        "  When you have 2+ wires to place, use connect_pins_batch(wires=[...]) to\n"
+        "  place them ALL in a single tool call. Order: VCC/GND first, then shared\n"
+        "  bus signals (I2C, SPI), then unique point-to-point signals.\n"
+        "  - connect_pins_batch saves massive latency vs calling connect_pins() in a loop.\n"
+        "  - Use connect_pins() only when placing exactly 1 wire.\n"
+        "  - All wires in a batch are applied atomically: if one fails, none are applied.\n\n"
+        "STEP 5 — ROUTE ALL WIRES (USE BATCH)\n"
+        "  After placing wires, call route_wire_batch(routes=[...]) to set waypoints\n"
+        "  for ALL wires in a single tool call. Use route_wire() only for 1 wire.\n"
+        "  Use get_component_bounds(component_id) to get accurate bounding boxes\n"
+        "  for R3 pin exit clearance and R7 component body avoidance.\n\n"
+        "STEP 6 — VALIDATE\n"
+        "  After all wires are placed and routed, call validate_pin_mapping_state() and \n"
+        "  validate_snapshot_state() to confirm structural integrity.\n\n"
 
         "════════════════════════════════════════════\n"
         "SECTION 3 — WIRE ROUTING RULES (CRITICAL)\n"
@@ -249,10 +256,13 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "════════════════════════════════════════════\n"
         "SECTION 5 — FILE & FIRMWARE RULES\n"
         "════════════════════════════════════════════\n\n"
-        "- Before writing any code, call get_project_outline() → check fileGroups to see "
-        "what files already exist. Never create a file that already exists; use "
-        "- To edit existing code: use patch_file_lines or apply_file_patch — never recreate the whole file\n"
-        "- Use replace_file_content only when you intentionally want to replace the full file.\n\n"
+        "- Before writing any code, call get_project_outline() → check fileGroups to see \n"
+        "  what files already exist. Never create a file that already exists.\n"
+        "- To edit existing code: use patch_file_lines or apply_file_patch — never recreate the whole file.\n"
+        "- Use replace_file_content only when you intentionally want to replace the full file.\n"
+        "- Use delete_file() to remove unwanted files, rename_file() to rename them.\n"
+        "- Use set_language_mode(board_id, 'micropython') before writing MicroPython code\n"
+        "  for ESP32/Pico boards. This switches the board's language mode accordingly.\n\n"
         "- When writing Arduino (.ino) code:\n"
         "    - Pin numbers must exactly match the pin names used in connect_pins() calls.\n"
         "    - #define or const int your pin assignments at the top of the file.\n"
@@ -280,11 +290,15 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "     d. Apply the fix with patch_file_lines or apply_file_patch, then recompile\n"
         "     e. Recompile. Repeat until success.\n"
         "  4. If compilation SUCCEEDS:\n"
-        "     a. Call run_simulation(board_id).\n"
-        "     b. Wait 3–5 seconds, then call capture_serial_monitor() to read output.\n"
-        "     c. Verify the output matches expected behavior.\n"
-        "     d. Report success with a summary of: board, components wired, firmware behavior, "
-        "and serial output observed.\n\n"
+        "     a. Call get_simulation_status(board_id) to check if already running.\n"
+        "     b. Call run_simulation(board_id).\n"
+        "     c. Use wait_for_serial_output(pattern, timeout_seconds) to reliably wait\n"
+        "        for expected output instead of guessing with wait_seconds.\n"
+        "     d. Verify the output matches expected behavior.\n"
+        "     e. Report success with a summary of: board, components wired, firmware behavior, "
+        "and serial output observed.\n"
+        "  5. If the user says 'fix the error' without context, call get_last_compile_result()\n"
+        "     to retrieve the cached error log — avoids an unnecessary recompile.\n\n"
 
         "════════════════════════════════════════════\n"
         "SECTION 7 — GLOBAL CATALOG DISCOVERY & BROAD QUESTIONS\n"
@@ -552,6 +566,29 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         )
 
     @agent.tool
+    async def get_canvas_runtime_pins_batch(
+        ctx: RunContext[AgentDeps], instance_ids: list[str]
+    ) -> dict[str, Any]:
+        """Get runtime pin names for multiple instances in ONE call.
+
+        Pass a list of instance ids (e.g. ['led1', 'led2', 'led3']).
+        Internally deduplicates by metadata_id so adding 10 identical LEDs
+        only performs a single catalog lookup instead of 10.
+
+        Returns {"results": [{instanceId, instanceType, available, pinNames}, ...]}.
+
+        USE THIS instead of calling get_canvas_runtime_pins() in a loop when you
+        have added multiple components of the same type. You still get per-instance
+        results but save tool calls and latency.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "get_canvas_runtime_pins_batch",
+            lambda: agent_tools.get_canvas_runtime_pins_batch(ctx.deps.snapshot, instance_ids),
+        )
+
+    @agent.tool
     async def list_component_schema_gaps(ctx: RunContext[AgentDeps], limit: int = 20) -> dict[str, Any]:
         """List components in the catalog that are missing pin name metadata."""
         ctx.deps.guard_tool_call()
@@ -672,7 +709,10 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         metadata_id: the 'id' field from search_component_catalog results (e.g. 'wokwi-led').
         component_id: your chosen unique identifier for this instance (e.g. 'led1').
         properties: optional dict of component properties (e.g. {'color': 'red'}).
-        After calling this, you MUST call get_canvas_runtime_pins(component_id) before wiring.
+        After calling this, you MUST call get_canvas_runtime_pins or
+        get_canvas_runtime_pins_batch before wiring.
+        When adding multiple components of the same type, use
+        get_canvas_runtime_pins_batch to avoid redundant lookups.
         """
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(
@@ -760,7 +800,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         color: str = "#22c55e",
         signal_type: str | None = None,
     ) -> dict[str, Any]:
-        """Connect two pins with a wire.
+        """Connect two pins with a wire. Use connect_pins_batch for 2+ wires.
 
         start_pin and end_pin MUST be exact values from get_canvas_runtime_pins — never invented.
         color: '#22c55e'=signal(green), '#ef4444'=power(red), '#1e1e1e'=ground(black), '#facc15'=data(yellow).
@@ -785,6 +825,48 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
                     signal_type=signal_type,
                 ),
                 tool_name="connect_pins",
+            ),
+        )
+
+    @agent.tool
+    async def connect_pins_batch(
+        ctx: RunContext[AgentDeps],
+        wires: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Connect multiple wires in ONE call instead of calling connect_pins N times.
+
+        wires: list of dicts, each with keys:
+          - start_component_id (required)
+          - start_pin (required)
+          - end_component_id (required)
+          - end_pin (required)
+          - wire_id (optional — auto-assigned if omitted)
+          - color (optional — defaults to '#22c55e')
+          - signal_type (optional)
+
+        Example:
+          connect_pins_batch(wires=[
+            {"start_component_id": "esp32-1", "start_pin": "23", "end_component_id": "led1", "end_pin": "A", "color": "#22c55e"},
+            {"start_component_id": "led1", "start_pin": "C", "end_component_id": "esp32-1", "end_pin": "GND", "color": "#374151", "signal_type": "ground"},
+          ])
+
+        All wires are applied atomically. If any wire spec is invalid, the
+        entire batch is rejected (no partial application).
+
+        USE THIS whenever you need to place 2 or more wires. It saves tool calls
+        and latency compared to calling connect_pins() in a loop.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "connect_pins_batch",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.connect_pins_batch(
+                    ctx.deps.snapshot,
+                    wires=wires,
+                ),
+                tool_name="connect_pins_batch",
             ),
         )
 
@@ -817,6 +899,138 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
                     waypoints=waypoints,
                 ),
                 tool_name="route_wire",
+            ),
+        )
+
+    @agent.tool
+    async def route_wire_batch(
+        ctx: RunContext[AgentDeps],
+        routes: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Set waypoints for multiple wires in ONE call instead of calling route_wire N times.
+
+        routes: list of dicts, each with keys:
+          - wire_id (required)
+          - waypoints (required — list of {x, y} dicts)
+
+        Example:
+          route_wire_batch(routes=[
+            {"wire_id": "wire-1", "waypoints": [{"x": 100, "y": 50}, {"x": 100, "y": 150}]},
+            {"wire_id": "wire-2", "waypoints": [{"x": 110, "y": 50}, {"x": 110, "y": 200}]},
+          ])
+
+        All routes are applied atomically. USE THIS whenever you route 2+ wires.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "route_wire_batch",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.route_wire_batch(
+                    ctx.deps.snapshot,
+                    routes=routes,
+                ),
+                tool_name="route_wire_batch",
+            ),
+        )
+
+    @agent.tool
+    async def disconnect_wire_batch(
+        ctx: RunContext[AgentDeps],
+        wire_ids: list[str],
+    ) -> dict[str, Any]:
+        """Remove multiple wires in ONE call. Use when rewiring or clearing connections.
+
+        wire_ids: list of wire IDs to remove (from get_project_outline).
+        All removals are atomic — if any wire_id is invalid, none are removed.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "disconnect_wire_batch",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.disconnect_wire_batch(
+                    ctx.deps.snapshot,
+                    wire_ids=wire_ids,
+                ),
+                tool_name="disconnect_wire_batch",
+            ),
+        )
+
+    @agent.tool
+    async def add_component_batch(
+        ctx: RunContext[AgentDeps],
+        components: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Add multiple components in ONE call instead of calling add_component N times.
+
+        components: list of dicts, each with keys:
+          - component_id (required — your chosen unique ID)
+          - metadata_id (required — from search_component_catalog)
+          - x (required)
+          - y (required)
+          - properties (optional dict)
+
+        Example:
+          add_component_batch(components=[
+            {"component_id": "led1", "metadata_id": "wokwi-led", "x": 200, "y": 100, "properties": {"color": "red"}},
+            {"component_id": "led2", "metadata_id": "wokwi-led", "x": 200, "y": 150, "properties": {"color": "green"}},
+          ])
+
+        All components are added atomically. After calling this, you MUST call
+        get_canvas_runtime_pins_batch before wiring.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "add_component_batch",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.add_component_batch(
+                    ctx.deps.snapshot,
+                    components=components,
+                ),
+                tool_name="add_component_batch",
+            ),
+        )
+
+    @agent.tool
+    async def duplicate_component(
+        ctx: RunContext[AgentDeps],
+        source_id: str,
+        new_id: str,
+        x: float,
+        y: float,
+        property_overrides: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Clone an existing component to a new position.
+
+        Copies the source component's metadataId and all properties, then places
+        a new component at (x, y) with the given new_id.
+
+        property_overrides: optional dict to change specific properties on the clone
+        (e.g. {"color": "blue"} to change just the LED color).
+
+        After calling this, you MUST call get_canvas_runtime_pins before wiring
+        (the clone shares the same metadataId so batch is efficient).
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "duplicate_component",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.duplicate_component(
+                    ctx.deps.snapshot,
+                    source_id=source_id,
+                    new_id=new_id,
+                    x=x,
+                    y=y,
+                    property_overrides=property_overrides,
+                ),
+                tool_name="duplicate_component",
             ),
         )
 
@@ -880,25 +1094,6 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         )
 
     @agent.tool
-    async def replace_file_range(
-        ctx: RunContext[AgentDeps],
-        group_id: str,
-        file_name: str,
-        start_line: int,
-        end_line: int,
-        replacement: str,
-    ) -> dict[str, Any]:
-        """Deprecated alias for patch_file_lines (kept for backward compatibility)."""
-        return await patch_file_lines(
-            ctx,
-            group_id=group_id,
-            file_name=file_name,
-            start_line=start_line,
-            end_line=end_line,
-            replacement=replacement,
-        )
-
-    @agent.tool
     async def replace_file_content(
         ctx: RunContext[AgentDeps],
         group_id: str,
@@ -952,6 +1147,88 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
                     patch=patch,
                 ),
                 tool_name="apply_file_patch",
+            ),
+        )
+
+    @agent.tool
+    async def delete_file(
+        ctx: RunContext[AgentDeps],
+        group_id: str,
+        file_name: str,
+    ) -> dict[str, Any]:
+        """Delete a file from a file group.
+
+        group_id: the board's activeFileGroupId from get_project_outline.
+        file_name: the file to remove (e.g. 'helpers.h').
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "delete_file",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.delete_file(
+                    ctx.deps.snapshot,
+                    group_id=group_id,
+                    file_name=file_name,
+                ),
+                tool_name="delete_file",
+            ),
+        )
+
+    @agent.tool
+    async def rename_file(
+        ctx: RunContext[AgentDeps],
+        group_id: str,
+        old_name: str,
+        new_name: str,
+    ) -> dict[str, Any]:
+        """Rename a file within a file group.
+
+        group_id: the board's activeFileGroupId from get_project_outline.
+        old_name: current file name.
+        new_name: desired new file name.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "rename_file",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.rename_file(
+                    ctx.deps.snapshot,
+                    group_id=group_id,
+                    old_name=old_name,
+                    new_name=new_name,
+                ),
+                tool_name="rename_file",
+            ),
+        )
+
+    @agent.tool
+    async def set_language_mode(
+        ctx: RunContext[AgentDeps],
+        board_id: str,
+        language_mode: str,
+    ) -> dict[str, Any]:
+        """Switch a board between 'arduino' and 'micropython' language modes.
+
+        board_id: existing board ID from get_project_outline.
+        language_mode: 'arduino' or 'micropython'.
+        After switching, update the file group contents to match the new language.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "set_language_mode",
+            lambda: _apply_mutation(
+                ctx,
+                *snapshot_ops.set_language_mode(
+                    ctx.deps.snapshot,
+                    board_id=board_id,
+                    language_mode=language_mode,
+                ),
+                tool_name="set_language_mode",
             ),
         )
 
@@ -1174,6 +1451,109 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         return await _safe_tool_call(
             ctx, "validate_compile_readiness_state", lambda: validate_compile_readiness(ctx.deps.snapshot, board_id=board_id).model_dump()
         )
+
+    @agent.tool
+    async def get_simulation_status(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        """Check whether a simulation is currently running, paused, or stopped.
+
+        Returns: {running: bool, boardId: str, ...}
+        Call this before run_simulation to avoid starting a duplicate,
+        or after run_simulation to confirm it started successfully.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "get_simulation_status",
+            lambda: _run_frontend_action(
+                ctx,
+                "sim_status",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
+    async def get_last_compile_result(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
+        """Retrieve the result of the last compilation without recompiling.
+
+        Returns the cached compile output (success/failure, error messages, warnings).
+        Useful when the user says 'fix the error' — avoids a redundant recompile just
+        to re-read the error log.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "get_last_compile_result",
+            lambda: _run_frontend_action(
+                ctx,
+                "compile_last_result",
+                {"boardId": board_id} if board_id else {},
+            ),
+        )
+
+    @agent.tool
+    async def get_component_bounds(ctx: RunContext[AgentDeps], component_id: str) -> dict[str, Any]:
+        """Get the bounding box (x, y, width, height) of a component on the canvas.
+
+        Returns: {x, y, width, height, pinPositions: [{name, x, y, side}...]}
+        Use this for accurate wire routing — avoids guessing component dimensions.
+        Essential for R3 (pin exit clearance) and R7 (avoid component bodies).
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "get_component_bounds",
+            lambda: _run_frontend_action(
+                ctx,
+                "get_component_bounds",
+                {"componentId": component_id},
+            ),
+        )
+
+    @agent.tool
+    async def wait_for_serial_output(
+        ctx: RunContext[AgentDeps],
+        pattern: str,
+        timeout_seconds: float = 10.0,
+        board_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Wait until serial output contains a specific pattern (substring match).
+
+        pattern: text to search for in serial output (case-sensitive substring).
+        timeout_seconds: max wait time (1-30s, default 10s).
+        board_id: optional, defaults to active board.
+
+        Returns: {matched: bool, output: str, elapsed_seconds: float}
+        Use this instead of wait_seconds + capture_serial_monitor for reliable
+        verification that firmware produced expected output.
+        """
+        ctx.deps.guard_tool_call()
+        import time
+        timeout_seconds = max(1.0, min(timeout_seconds, 30.0))
+        start = time.monotonic()
+        poll_interval = 0.5
+        last_output = ""
+
+        while True:
+            elapsed = time.monotonic() - start
+            if elapsed >= timeout_seconds:
+                return {"matched": False, "output": last_output, "elapsed_seconds": round(elapsed, 2)}
+
+            result = await _run_frontend_action(
+                ctx,
+                "serial_capture",
+                {"maxLines": 200, **({"boardId": board_id} if board_id else {})},
+            )
+            output = ""
+            if isinstance(result, dict):
+                output = result.get("output", "") or result.get("text", "") or ""
+            elif isinstance(result, str):
+                output = result
+            last_output = output
+
+            if pattern in output:
+                return {"matched": True, "output": output, "elapsed_seconds": round(time.monotonic() - start, 2)}
+
+            await asyncio.sleep(poll_interval)
 
     @agent.tool
     async def wait_seconds(ctx: RunContext[AgentDeps], seconds: float = 1.0) -> dict[str, Any]:
