@@ -9,7 +9,7 @@ import { CodeEditor } from '../components/editor/CodeEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { FileTabs } from '../components/editor/FileTabs';
 import { FileExplorer } from '../components/editor/FileExplorer';
-import { AgentPanelV2 } from '../components/agent/AgentPanelV2';
+import { AgUiPanel } from '../components/agent/AgUiPanel';
 
 // Lazy-load Pi workspace so xterm.js isn't in the main bundle
 const RaspberryPiWorkspace = lazy(() =>
@@ -216,12 +216,9 @@ export const EditorPage: React.FC = () => {
   const [mobileView, setMobileView] = useState<'code' | 'circuit'>('code');
   const user = useAuthStore((s) => s.user);
   const agentPanelOpen = useAgentStore((s) => s.panelOpen);
-  const rawAgentPanelWidth = useAgentStore((s) => s.panelWidth);
+  const agentPanelWidth = useAgentStore((s) => s.panelWidth);
   const setAgentPanelWidth = useAgentStore((s) => s.setPanelWidth);
   const toggleAgentPanel = useAgentStore((s) => s.togglePanel);
-
-  // Safeguard: Ensure agent panel width is always valid (min 360px)
-  const agentPanelWidth = Math.max(360, Math.min(800, rawAgentPanelWidth || 480));
 
   const handleSaveClick = useCallback(() => {
     if (!user) {
@@ -608,7 +605,7 @@ export const EditorPage: React.FC = () => {
               <div className="resize-handle-grip" />
             </div>
             <div className="agent-panel-shell" style={{ width: agentPanelWidth }}>
-              <AgentPanelV2 />
+              <AgUiPanel />
             </div>
           </>
         )}

@@ -151,20 +151,26 @@ export function generatePreviewPath(
 export function snapWireToGrid(wire: Wire, gridSize: number = 10): Wire {
   const newWaypoints = [...(wire.waypoints || [])];
   
-  if (newWaypoints.length > 0) {
+  if (newWaypoints.length === 0) {
+    // If there are no waypoints, the implicit L-shape might not be on the grid.
+    // We add 1 or 2 snapped waypoints to force it onto the grid.
+    const dx = Math.abs(wire.end.x - wire.start.x);
+    const dy = Math.abs(wire.end.y - wire.start.y);
+    const isHorizontalFirst = dx >= dy;
+
+    if (isHorizontalFirst) {
+      const cornerX = Math.round(wire.end.x / gridSize) * gridSize;
+      newWaypoints.push({ x: cornerX, y: wire.start.y });
+      newWaypoints.push({ x: cornerX, y: Math.round(wire.end.y / gridSize) * gridSize });
+    } else {
+      const cornerY = Math.round(wire.end.y / gridSize) * gridSize;
+      newWaypoints.push({ x: wire.start.x, y: cornerY });
+      newWaypoints.push({ x: Math.round(wire.end.x / gridSize) * gridSize, y: cornerY });
+    }
+  } else {
     for (let i = 0; i < newWaypoints.length; i++) {
-      // Snap waypoint, but if it's closely aligned to start/end, keep the exact pin alignment
-      // to avoid creating tiny jagged hooks (overshoots) near the pins.
-      let snappedX = Math.round(newWaypoints[i].x / gridSize) * gridSize;
-      let snappedY = Math.round(newWaypoints[i].y / gridSize) * gridSize;
-
-      if (Math.abs(snappedX - wire.start.x) < gridSize) snappedX = wire.start.x;
-      if (Math.abs(snappedY - wire.start.y) < gridSize) snappedY = wire.start.y;
-      if (Math.abs(snappedX - wire.end.x) < gridSize) snappedX = wire.end.x;
-      if (Math.abs(snappedY - wire.end.y) < gridSize) snappedY = wire.end.y;
-
-      newWaypoints[i].x = snappedX;
-      newWaypoints[i].y = snappedY;
+      newWaypoints[i].x = Math.round(newWaypoints[i].x / gridSize) * gridSize;
+      newWaypoints[i].y = Math.round(newWaypoints[i].y / gridSize) * gridSize;
     }
   }
 

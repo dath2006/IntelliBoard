@@ -99,7 +99,6 @@ export const SimulatorCanvas = ({
   const cancelWireCreation = useSimulatorStore((s) => s.cancelWireCreation);
   const wireInProgress = useSimulatorStore((s) => s.wireInProgress);
   const recalculateAllWirePositions = useSimulatorStore((s) => s.recalculateAllWirePositions);
-  const clearAttachedWireWaypoints = useSimulatorStore((s) => s.clearAttachedWireWaypoints);
   const selectedWireId = useSimulatorStore((s) => s.selectedWireId);
   const setSelectedWire = useSimulatorStore((s) => s.setSelectedWire);
   const removeWire = useSimulatorStore((s) => s.removeWire);
@@ -109,10 +108,8 @@ export const SimulatorCanvas = ({
   // Compute offset wires: obstacle-avoidance → grid-snap → overlap-offset
   // Memoized with caching to prevent excessive recalculation
   const wiresCacheKey = useMemo(() => {
-    // Create a stable key based on wire positions, waypoints, and component positions
-    return `${wires.map(w => 
-      `${w.id}:${w.start.x},${w.start.y}-${w.end.x},${w.end.y}:${w.waypoints?.map(wp => `${wp.x},${wp.y}`).join(',') || ''}`
-    ).join('|')}`;
+    // Create a stable key based on wire positions and component positions
+    return `${wires.map(w => `${w.id}:${w.start.x},${w.start.y}-${w.end.x},${w.end.y}`).join('|')}`;
   }, [wires]);
 
   const offsetWires = React.useMemo(() => {
@@ -1140,15 +1137,6 @@ export const SimulatorCanvas = ({
             }
           }
         }
-      } else {
-        // It was an actual drag (moved > 5px or held > 300ms)
-        // Clear manual waypoints on attached wires so they auto-route cleanly to the new position
-        const targetId = draggedComponentId.startsWith('__board__:')
-          ? draggedComponentId.slice('__board__:'.length)
-          : draggedComponentId === '__board__'
-            ? 'arduino-uno' // fallback
-            : draggedComponentId;
-        clearAttachedWireWaypoints(targetId);
       }
 
       recalculateAllWirePositions();

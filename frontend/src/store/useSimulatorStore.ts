@@ -373,7 +373,6 @@ interface SimulatorState {
   cancelWireCreation: () => void;
   updateWirePositions: (componentId: string) => void;
   recalculateAllWirePositions: () => void;
-  clearAttachedWireWaypoints: (componentId: string) => void;
 
   // ── Serial monitor ──────────────────────────────────────────────────────
   toggleSerialMonitor: () => void;
@@ -1587,18 +1586,6 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         return updated;
       });
       set({ wires: updatedWires });
-    },
-
-    clearAttachedWireWaypoints: (componentId) => {
-      set((state) => {
-        const updatedWires = state.wires.map((wire) => {
-          if (wire.start.componentId === componentId || wire.end.componentId === componentId) {
-            return { ...wire, waypoints: [] };
-          }
-          return wire;
-        });
-        return { wires: updatedWires };
-      });
     },
 
     toggleSerialMonitor: () => set((s) => ({ serialMonitorOpen: !s.serialMonitorOpen })),
