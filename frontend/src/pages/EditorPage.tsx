@@ -150,7 +150,7 @@ export const EditorPage: React.FC = () => {
   // them to the backend's in-memory pin catalog so the agent gets accurate
   // pin names instead of potentially stale data from components-metadata.json.
   //
-  // The actual scan logic lives in canvasPinScanner.ts so AgentPanel can also
+  // The actual scan logic lives in canvasPinScanner.ts (used by the agent sidebar).
   // call it eagerly right after applySnapshotToStores() — ensuring that a
   // freshly-added component's pins are observable before the agent's next
   // get_canvas_runtime_pins call fires.
@@ -540,7 +540,7 @@ export const EditorPage: React.FC = () => {
           }}
         >
           <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 0 }}>
-            <SimulatorCanvas 
+            <SimulatorCanvas
               hideHeader={true}
               onZoomChange={setCanvasZoom}
               onControlsReady={(controls) => {

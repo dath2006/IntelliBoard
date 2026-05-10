@@ -46,10 +46,19 @@ const BOARD_PILL_ICON: Partial<Record<BoardKind, string>> = {
   'arduino-nano': '▪',
   'arduino-mega': '▬',
   'raspberry-pi-pico': '◆',
+  'pi-pico-w': '◆',
   'raspberry-pi-3': '⬛',
   esp32: '⬡',
+  'esp32-devkit-c-v4': '⬡',
+  'esp32-cam': '⬡',
+  'wemos-lolin32-lite': '⬡',
   'esp32-s3': '⬡',
+  'xiao-esp32-s3': '⬡',
+  'arduino-nano-esp32': '⬡',
   'esp32-c3': '⬡',
+  'xiao-esp32-c3': '⬡',
+  'aitewinrobot-esp32c3-supermini': '⬡',
+  attiny85: '▪',
 };
 
 const BOARD_PILL_COLOR: Partial<Record<BoardKind, string>> = {
@@ -57,10 +66,19 @@ const BOARD_PILL_COLOR: Partial<Record<BoardKind, string>> = {
   'arduino-nano': '#4fc3f7',
   'arduino-mega': '#4fc3f7',
   'raspberry-pi-pico': '#ce93d8',
+  'pi-pico-w': '#ce93d8',
   'raspberry-pi-3': '#ef9a9a',
   esp32: '#a5d6a7',
+  'esp32-devkit-c-v4': '#a5d6a7',
+  'esp32-cam': '#a5d6a7',
+  'wemos-lolin32-lite': '#a5d6a7',
   'esp32-s3': '#a5d6a7',
+  'xiao-esp32-s3': '#a5d6a7',
+  'arduino-nano-esp32': '#a5d6a7',
   'esp32-c3': '#a5d6a7',
+  'xiao-esp32-c3': '#a5d6a7',
+  'aitewinrobot-esp32c3-supermini': '#a5d6a7',
+  attiny85: '#ffb74d',
 };
 
 export const EditorToolbar = ({

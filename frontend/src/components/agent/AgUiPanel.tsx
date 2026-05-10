@@ -1,26 +1,17 @@
-import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { CopilotChat, CopilotKitProvider } from '@copilotkit/react-core/v2';
-import { useCoAgent } from '@copilotkit/react-core';
-import { useDefaultRenderTool } from '@copilotkit/react-core/v2';
-import { HttpAgent } from '@ag-ui/client';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Plus,
   Trash2,
-  StopCircle,
   Clock,
   CheckCircle2,
   XCircle,
   Loader2,
-  ChevronRight,
-  Terminal,
   Cpu,
-  Plug,
-  Settings2,
-  Zap,
+  StopCircle,
+  History,
 } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useEditorStore } from '../../store/useEditorStore';
-import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { useAgentStore } from '../../store/useAgentStore';
 import {
   createAgentSession,
@@ -28,42 +19,59 @@ import {
   listAgentSessions,
   type AgentSession,
 } from '../../services/agentSessions';
-import { useAgentSync, buildSnapshotFromStores } from './useAgentSync';
+import { buildSnapshotFromStores } from './useAgentSync';
 import { CompactModelSelector } from './ModelSelector';
-// import './agent-panel.css';
+import { ChatPanel } from './ChatPanel';
+import { Button } from '@/components/ui/button';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { cn } from '@/lib/utils';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// ── Session status ───────────────────────────────────────────────────────────
 
-type AgentUiState = {
-  projectId: string | null;
-  sessionId: string | null;
-  modelName: string | null;
-  activeBoardId: string | null;
-  activeGroupId: string | null;
-  activeFileId: string | null;
-  activeFileName: string | null;
-  selectedWireId: string | null;
-};
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function statusMeta(status: string): { label: string; color: string; icon: React.ReactNode } {
+function sessionStatusTone(status: string): 'default' | 'secondary' | 'destructive' | 'outline' {
   switch (status) {
     case 'running':
     case 'queued':
-      return {
-        label: status === 'queued' ? 'Queued' : 'Running',
-        color: '#f59e0b',
-        icon: <Loader2 size={11} className="spin" />,
-      };
-    case 'completed':
-      return { label: 'Done', color: '#10b981', icon: <CheckCircle2 size={11} /> };
+      return 'secondary';
     case 'failed':
-      return { label: 'Failed', color: '#ef4444', icon: <XCircle size={11} /> };
+      return 'destructive';
     case 'stopped':
-      return { label: 'Stopped', color: '#6b7280', icon: <StopCircle size={11} /> };
+      return 'outline';
     default:
-      return { label: 'Idle', color: '#4b5563', icon: <Clock size={11} /> };
+      return 'default';
+  }
+}
+
+function statusLabel(status: string): string {
+  switch (status) {
+    case 'running':
+      return 'Running';
+    case 'queued':
+      return 'Queued';
+    case 'completed':
+      return 'Done';
+    case 'failed':
+      return 'Failed';
+    case 'stopped':
+      return 'Stopped';
+    default:
+      return 'Idle';
+  }
+}
+
+function statusIcon(status: string): React.ReactNode {
+  switch (status) {
+    case 'running':
+    case 'queued':
+      return <Loader2 size={11} className="animate-spin" aria-hidden />;
+    case 'completed':
+      return <CheckCircle2 size={11} className="text-emerald-500" aria-hidden />;
+    case 'failed':
+      return <XCircle size={11} className="text-destructive" aria-hidden />;
+    case 'stopped':
+      return <StopCircle size={11} className="text-muted-foreground" aria-hidden />;
+    default:
+      return <Clock size={11} className="text-muted-foreground" aria-hidden />;
   }
 }
 
@@ -80,317 +88,106 @@ function formatSessionLabel(iso: string): string {
   return when.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
-// ── Tool renderer ─────────────────────────────────────────────────────────────
+// ── Sessions column (docks left; width 0 when History is closed) ─────────────
 
-const ToolCallCard: React.FC<{
-  name: string;
-  parameters: unknown;
-  status: 'inProgress' | 'executing' | 'complete';
-  result: string | undefined;
-}> = ({ name, parameters, status, result }) => {
-  const [expanded, setExpanded] = useState(false);
-
-  const isPending = status === 'inProgress' || status === 'executing';
-
-  let parsedResult: unknown = undefined;
-  let isError = false;
-  if (typeof result === 'string' && result.trim()) {
-    try {
-      const p = JSON.parse(result) as Record<string, unknown>;
-      parsedResult = p;
-      isError = p.ok === false || typeof p.error === 'string';
-    } catch {
-      parsedResult = result;
-    }
-  }
-
-  // Friendly tool label
-  const label = name.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-  const toolIcon = (() => {
-    if (name.startsWith('compile')) return <Zap size={12} />;
-    if (name.startsWith('connect') || name.startsWith('disconnect')) return <Plug size={12} />;
-    if (name.includes('file') || name.includes('read') || name.includes('create'))
-      return <Terminal size={12} />;
-    if (name.includes('board') || name.includes('component')) return <Cpu size={12} />;
-    return <Settings2 size={12} />;
-  })();
-
-  return (
-    <div
-      className={`agu-tool-card ${isPending ? 'agu-tool-card--pending' : isError ? 'agu-tool-card--error' : 'agu-tool-card--done'}`}
-    >
-      <button
-        type="button"
-        className="agu-tool-card__header"
-        onClick={() => !isPending && setExpanded((v) => !v)}
-      >
-        <span className="agu-tool-card__icon">{toolIcon}</span>
-        <span className="agu-tool-card__name">{label}</span>
-        <span className="agu-tool-card__status-dot">
-          {isPending ? (
-            <Loader2 size={10} className="spin" />
-          ) : isError ? (
-            <XCircle size={10} />
-          ) : (
-            <CheckCircle2 size={10} />
-          )}
-        </span>
-        {!isPending && (
-          <ChevronRight
-            size={10}
-            className="agu-tool-card__chevron"
-            style={{ transform: expanded ? 'rotate(90deg)' : 'none' }}
-          />
-        )}
-      </button>
-
-      {expanded && !isPending && (
-        <div className="agu-tool-card__body">
-          {!!parameters && Object.keys(parameters as object).length > 0 && (
-            <div className="agu-tool-card__section">
-              <div className="agu-tool-card__section-label">Input</div>
-              <pre className="agu-tool-card__pre">{JSON.stringify(parameters, null, 2)}</pre>
-            </div>
-          )}
-          {parsedResult !== undefined && (
-            <div className="agu-tool-card__section">
-              <div className="agu-tool-card__section-label">Output</div>
-              <pre className="agu-tool-card__pre">
-                {typeof parsedResult === 'string'
-                  ? parsedResult
-                  : JSON.stringify(parsedResult, null, 2)}
-              </pre>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
-const AgUiToolRendererRegistration: React.FC = () => {
-  useDefaultRenderTool({
-    render: ({ name, parameters, status, result }) => (
-      <ToolCallCard name={name} parameters={parameters} status={status} result={result} />
-    ),
-  });
-  return null;
-};
-
-// ── Session Rail ──────────────────────────────────────────────────────────────
-
-const SessionRail: React.FC<{
+const SessionsSidebar: React.FC<{
+  open: boolean;
   sessions: AgentSession[];
   activeSessionId: string | null;
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
   loading: boolean;
-}> = ({ sessions, activeSessionId, onSelect, onNew, onDelete, loading }) => {
+}> = ({ open, sessions, activeSessionId, onSelect, onNew, onDelete, loading }) => {
+  const railWidthClass = 'w-[min(280px,42vw)]';
+
   return (
-    <div className="agu-rail">
-      <div className="agu-rail__header">
-        <span className="agu-rail__title">History</span>
-        <button className="agu-rail__new-btn" onClick={onNew} title="New session">
-          <Plus size={13} />
-        </button>
-      </div>
-
-      <div className="agu-rail__list">
-        {loading && (
-          <div className="agu-rail__empty">
-            <Loader2 size={14} className="spin" />
-          </div>
-        )}
-        {!loading && sessions.length === 0 && (
-          <div className="agu-rail__empty">No sessions yet</div>
-        )}
-        {sessions.map((s) => {
-          const meta = statusMeta(s.status);
-          const isActive = s.id === activeSessionId;
-          return (
-            <div key={s.id} className={`agu-rail__item ${isActive ? 'is-active' : ''}`}>
-              <button type="button" className="agu-rail__item-btn" onClick={() => onSelect(s.id)}>
-                <span className="agu-rail__item-dot" style={{ color: meta.color }}>
-                  {meta.icon}
-                </span>
-                <div className="agu-rail__item-info">
-                  <span className="agu-rail__item-time">{formatSessionLabel(s.updatedAt)}</span>
-                  <span className="agu-rail__item-model">
-                    {s.modelName?.split(':')[1] ?? s.status}
-                  </span>
-                </div>
-              </button>
-              <button
-                type="button"
-                className="agu-rail__item-delete"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDelete(s.id);
-                }}
-                title="Delete session"
-              >
-                <Trash2 size={11} />
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-};
-
-// ── Chat area with CoAgent state sync ─────────────────────────────────────────
-
-const AgUiChatCore: React.FC<{
-  sessionId: string;
-  projectId: string;
-  activeBoardId: string | null;
-  activeGroupId: string;
-  activeFileId: string;
-  activeFileName: string | null;
-  selectedWireId: string | null;
-  modelName: string;
-}> = ({
-  sessionId,
-  projectId,
-  activeBoardId,
-  activeGroupId,
-  activeFileId,
-  activeFileName,
-  selectedWireId,
-  modelName,
-}) => {
-  useAgentSync(sessionId);
-  const [historyMessages, setHistoryMessages] = useState<any[]>([]);
-  const [historyLoaded, setHistoryLoaded] = useState(false);
-
-  const agentState = useMemo<AgentUiState>(
-    () => ({
-      projectId,
-      sessionId,
-      modelName,
-      activeBoardId,
-      activeGroupId,
-      activeFileId,
-      activeFileName,
-      selectedWireId,
-    }),
-    [
-      projectId,
-      sessionId,
-      modelName,
-      activeBoardId,
-      activeGroupId,
-      activeFileId,
-      activeFileName,
-      selectedWireId,
-    ],
-  );
-
-  const { setState } = useCoAgent<AgentUiState>({
-    name: 'velxio',
-    initialState: agentState,
-  });
-
-  const lastStateRef = useRef('');
-  useEffect(() => {
-    const next = JSON.stringify(agentState);
-    if (next === lastStateRef.current) return;
-    lastStateRef.current = next;
-    
-    // Defer setState to avoid updating during render
-    setTimeout(() => {
-      setState(agentState);
-    }, 0);
-  }, [agentState, setState]);
-
-  // Load conversation history for manual rendering
-  // AG-UI doesn't display history automatically
-  useEffect(() => {
-    const loadHistory = async () => {
-      try {
-        const apiBase = import.meta.env.VITE_API_BASE || '/api';
-        const response = await fetch(
-          `${apiBase}/agent/sessions/${sessionId}/events?stream=false`,
-          {
-            credentials: 'include',
-          }
-        );
-        
-        if (!response.ok) {
-          console.error('Failed to load conversation history:', response.statusText);
-          setHistoryLoaded(true);
-          return;
-        }
-
-        const events = await response.json();
-        const messages: any[] = [];
-
-        for (const event of events) {
-          if (event.eventType === 'run.started' && event.payload?.message) {
-            messages.push({
-              id: `msg-${event.seq}-user`,
-              role: 'user',
-              content: event.payload.message,
-            });
-          } 
-          else if (event.eventType === 'run.completed' && event.payload?.output) {
-            const output = event.payload.output;
-            if (output && output.trim()) {
-              messages.push({
-                id: `msg-${event.seq}-assistant`,
-                role: 'assistant',
-                content: output,
-              });
-            }
-          }
-        }
-
-        console.log('Loaded conversation history:', messages.length, 'messages');
-        setHistoryMessages(messages);
-        setHistoryLoaded(true);
-      } catch (error) {
-        console.error('Error loading conversation history:', error);
-        setHistoryLoaded(true);
-      }
-    };
-
-    loadHistory();
-  }, [sessionId]);
-
-  if (!historyLoaded) {
-    return (
-      <div className="agu-panel__empty">
-        <Loader2 size={22} className="spin" />
-        <p>Loading conversation…</p>
-      </div>
-    );
-  }
-
-  // Manually render history using CopilotKit's CSS classes
-  return (
-    <div className="agu-chat-with-history-manual">
-      {historyMessages.length > 0 && (
-        <div className="agu-history-messages">
-          {historyMessages.map((msg) => (
-            <div key={msg.id} className="copilotKitMessage">
-              <div className={msg.role === 'user' ? 'copilotKitUserMessage' : 'copilotKitAssistantMessage'}>
-                {msg.role === 'assistant' ? <div>{msg.content}</div> : msg.content}
-              </div>
-            </div>
-          ))}
-        </div>
+    <aside
+      id="agent-sessions-sidebar"
+      className={cn(
+        'flex shrink-0 flex-col overflow-hidden border-border transition-[width] duration-200 ease-out',
+        open ? cn('w-[min(280px,42vw)] border-r') : 'w-0 border-transparent',
       )}
-      <CopilotChat className="agu-chat" agentId="velxio" threadId={sessionId} />
-    </div>
+      aria-hidden={!open}
+    >
+      <div className={cn('flex h-full min-h-0 flex-col', railWidthClass)}>
+        <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2.5 shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <History className="size-3.5 shrink-0 text-muted-foreground" aria-hidden />
+            <span className="text-xs font-medium tracking-tight truncate">Sessions</span>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 h-7 w-7 text-muted-foreground hover:text-foreground"
+            onClick={onNew}
+            title="New session"
+          >
+            <Plus className="size-3.5" />
+          </Button>
+        </div>
+
+        <ScrollArea className="flex-1 min-h-0">
+          <div className="p-2 space-y-0.5">
+            {loading && (
+              <div className="flex justify-center py-8 text-muted-foreground">
+                <Loader2 className="size-5 animate-spin" />
+              </div>
+            )}
+            {!loading && sessions.length === 0 && (
+              <p className="text-xs text-muted-foreground px-2 py-6 text-center">No sessions yet</p>
+            )}
+            {!loading &&
+              sessions.map((s) => {
+                const isActive = s.id === activeSessionId;
+                return (
+                  <div
+                    key={s.id}
+                    className={cn(
+                      'group flex items-stretch gap-0.5 rounded-md border transition-colors',
+                      isActive ? 'bg-muted border-border' : 'border-transparent hover:bg-muted/50',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      className="flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-left"
+                      onClick={() => onSelect(s.id)}
+                    >
+                      <span className="shrink-0 text-muted-foreground">{statusIcon(s.status)}</span>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[11px] font-medium text-foreground truncate">
+                          {formatSessionLabel(s.updatedAt)}
+                        </div>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {s.modelName?.split(':').pop() ?? s.status}
+                        </div>
+                      </div>
+                    </button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="h-auto w-8 shrink-0 rounded-md text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-destructive transition-opacity"
+                      title="Delete session"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onDelete(s.id);
+                      }}
+                    >
+                      <Trash2 className="size-3" />
+                    </Button>
+                  </div>
+                );
+              })}
+          </div>
+        </ScrollArea>
+      </div>
+    </aside>
   );
 };
 
-// Remove the CopilotChatWithHistory component - not needed
-
-// ── Main Panel ────────────────────────────────────────────────────────────────
+// ── Main panel ───────────────────────────────────────────────────────────────
 
 export const AgUiPanel: React.FC = () => {
   const currentProject = useProjectStore((s) => s.currentProject);
@@ -432,22 +229,11 @@ export const AgUiPanel: React.FC = () => {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
-  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
   const activeSession = useMemo(
     () => sessions.find((s) => s.id === sessionId) ?? null,
     [sessions, sessionId],
   );
-
-  const apiBase = import.meta.env.VITE_API_BASE || '/api';
-  const selectedModel = (defaultModelName || '').trim();
-  const agUiUrl = sessionId
-    ? `${apiBase}/agent/ag-ui?sessionId=${encodeURIComponent(sessionId)}${selectedModel ? `&modelName=${encodeURIComponent(selectedModel)}` : ''}`
-    : `${apiBase}/agent/ag-ui`;
-
-  const agents = useMemo(() => ({ velxio: new HttpAgent({ url: agUiUrl }) }), [agUiUrl]);
-
-  // ── Session management ────────────────────────────────────────────────────
 
   const refreshSessions = useCallback(async (projectId: string) => {
     setLoadingSessions(true);
@@ -463,17 +249,6 @@ export const AgUiPanel: React.FC = () => {
   const createAndActivate = useCallback(
     async (projectId: string) => {
       const snapshot = buildSnapshotFromStores();
-      
-      // Debug logging to help diagnose snapshot issues
-      console.log('[AgUiPanel] Creating session with snapshot:', {
-        projectId,
-        boards: snapshot.boards.length,
-        components: snapshot.components.length,
-        wires: snapshot.wires.length,
-        fileGroups: Object.keys(snapshot.fileGroups),
-        activeBoardId: snapshot.activeBoardId,
-      });
-      
       const session = await createAgentSession({
         projectId,
         snapshotJson: JSON.stringify(snapshot),
@@ -527,8 +302,6 @@ export const AgUiPanel: React.FC = () => {
     [currentProject?.id, sessionId, setActiveSessionId, refreshSessions],
   );
 
-  // ── Init ──────────────────────────────────────────────────────────────────
-
   useEffect(() => {
     if (!currentProject?.id) {
       setSessionId(null);
@@ -537,53 +310,38 @@ export const AgUiPanel: React.FC = () => {
     let cancelled = false;
     setSessionError(null);
 
-    // CRITICAL FIX: Wait for stores to be populated before creating session
-    // This prevents capturing stale data from previous project
     const waitForStoresReady = async () => {
-      // Poll until we have valid store data or timeout
-      const maxAttempts = 20; // 2 seconds max wait
-      const pollInterval = 100; // 100ms between checks
-      
+      const maxAttempts = 20;
+      const pollInterval = 100;
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const sim = useSimulatorStore.getState();
         const editor = useEditorStore.getState();
-        
-        // Check if stores have been initialized with project data
-        // A project is "ready" when it has at least one file group
         const hasFileGroups = Object.keys(editor.fileGroups).length > 0;
-        const hasFiles = Object.values(editor.fileGroups).some(files => files.length > 0);
-        
-        if (hasFileGroups && hasFiles) {
-          return true; // Stores are ready
-        }
-        
+        const hasFiles = Object.values(editor.fileGroups).some((files) => files.length > 0);
+        if (hasFileGroups && hasFiles) return true;
         if (cancelled) return false;
-        await new Promise(resolve => setTimeout(resolve, pollInterval));
+        await new Promise((resolve) => setTimeout(resolve, pollInterval));
       }
-      
-      // Timeout - proceed anyway but log warning
-      console.warn('[AgUiPanel] Store initialization timeout - proceeding with current state');
+      console.warn('[AgUiPanel] Store initialization timeout — proceeding with current state');
       return true;
     };
 
     const initSession = async () => {
-      // Wait for stores to be ready
       const ready = await waitForStoresReady();
       if (!ready || cancelled) return;
 
       await refreshSessions(currentProject.id);
       if (cancelled) return;
-      
+
       const state = useAgentStore.getState();
       const projectSessions = state.sessions.filter((s) => s.projectId === currentProject.id);
       const existing = projectSessions[0];
-      
+
       if (existing) {
         setSessionId(existing.id);
         setActiveSessionId(existing.id);
         return;
       }
-      
+
       await createAndActivate(currentProject.id);
     };
 
@@ -599,120 +357,113 @@ export const AgUiPanel: React.FC = () => {
     };
   }, [currentProject?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Status indicator ──────────────────────────────────────────────────────
-
-  const statusInfo = statusMeta(activeSession?.status ?? streamStatus ?? 'idle');
-
-  // ── Render ────────────────────────────────────────────────────────────────
+  const displayStatus = activeSession?.status ?? (streamStatus === 'open' ? 'running' : 'idle');
+  const statusVariant = sessionStatusTone(displayStatus);
 
   if (!currentProject?.id) {
     return (
-      <div className="agu-panel ag-ui-panel--pro">
-        <div className="agu-panel__empty">
-          <Cpu size={28} style={{ opacity: 0.25 }} />
-          <p>Open a project to start the agent</p>
-        </div>
+      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 bg-background px-4 text-center">
+        <Cpu className="size-8 text-muted-foreground/40" aria-hidden />
+        <p className="text-sm text-muted-foreground">Open a project to use the agent</p>
       </div>
     );
   }
 
   if (sessionError) {
     return (
-      <div className="agu-panel ag-ui-panel--pro">
-        <div className="agu-panel__empty agu-panel__empty--error">
-          <XCircle size={24} />
-          <p>{sessionError}</p>
-          <button
-            className="agu-btn agu-btn--sm"
-            onClick={() => currentProject?.id && createAndActivate(currentProject.id)}
-          >
-            Retry
-          </button>
-        </div>
+      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 bg-background px-4 text-center">
+        <XCircle className="size-7 text-destructive" aria-hidden />
+        <p className="text-sm text-muted-foreground max-w-xs">{sessionError}</p>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => currentProject?.id && createAndActivate(currentProject.id)}
+        >
+          Retry
+        </Button>
       </div>
     );
   }
 
   return (
-    <div className="agu-panel ag-ui-panel--pro">
-      {/* ── Header ── */}
-      <div className="agu-panel__header">
-        <div className="agu-panel__header-left">
-          <button
-            className="agu-panel__history-btn"
-            onClick={() => setRailOpen((v) => !v)}
-            title="Session history"
-          >
-            <Clock size={14} />
-          </button>
-          <span className="agu-panel__title">Agent</span>
-          <span
-            className="agu-panel__status-pill"
-            style={{ '--status-color': statusInfo.color } as React.CSSProperties}
-          >
-            {statusInfo.icon}
-            {statusInfo.label}
-          </span>
-        </div>
-        <div className="agu-panel__header-right">
-          <button className="agu-panel__new-btn" onClick={handleNewSession} title="New session">
-            <Plus size={13} />
-            New
-          </button>
-        </div>
-      </div>
+    <div className="flex h-full min-h-0 flex-row bg-background text-foreground">
+      <SessionsSidebar
+        open={railOpen}
+        sessions={sessions}
+        activeSessionId={sessionId}
+        onSelect={handleSelectSession}
+        onNew={handleNewSession}
+        onDelete={handleDeleteSession}
+        loading={loadingSessions}
+      />
 
-      {/* ── Session rail overlay ── */}
-      {railOpen && (
-        <>
-          <div className="agu-rail-overlay" onClick={() => setRailOpen(false)} />
-          <SessionRail
-            sessions={sessions}
-            activeSessionId={sessionId}
-            onSelect={handleSelectSession}
-            onNew={handleNewSession}
-            onDelete={handleDeleteSession}
-            loading={loadingSessions}
-          />
-        </>
-      )}
+      <div className="flex min-w-0 flex-1 flex-col min-h-0">
+        {/* Top bar */}
+        <header className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-3 py-2">
+          <div className="flex min-w-0 items-center gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon-sm"
+              className="h-7 w-7 text-muted-foreground hover:text-foreground"
+              onClick={() => setRailOpen((v) => !v)}
+              title={railOpen ? 'Hide session list' : 'Show session list'}
+              aria-expanded={railOpen}
+              aria-controls="agent-sessions-sidebar"
+            >
+              <History className="size-3.5" />
+            </Button>
+            <span className="text-xs font-medium truncate">
+              Agent{' '}
+              <span className="text-muted-foreground font-normal">
+                · {currentProject.ownerUsername}/{currentProject.slug}
+              </span>
+            </span>
+          </div>
 
-      {/* ── Chat ── */}
-      {!sessionId ? (
-        <div className="agu-panel__empty">
-          <Loader2 size={22} className="spin" />
-          <p>Starting session…</p>
-        </div>
-      ) : (
-        <div className="agu-panel__chat-wrap">
-          <CopilotKitProvider
-            key={`${sessionId}-${agUiUrl}`}
-            selfManagedAgents={agents}
-            credentials="include"
-          >
-            <AgUiToolRendererRegistration />
-            <AgUiChatCore
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+                statusVariant === 'destructive' &&
+                  'border-destructive/40 bg-destructive/10 text-destructive',
+                statusVariant === 'secondary' && 'border-primary/40 bg-primary/10 text-primary',
+                statusVariant === 'outline' && 'border-border text-muted-foreground',
+                statusVariant === 'default' && 'border-border bg-muted/50 text-muted-foreground',
+              )}
+            >
+              {statusIcon(displayStatus)}
+              {statusLabel(displayStatus)}
+            </span>
+            <Button
+              type="button"
+              variant="default"
+              size="sm"
+              className="h-7 gap-1 text-xs px-3"
+              onClick={handleNewSession}
+            >
+              <Plus className="size-3.5" />
+              New
+            </Button>
+          </div>
+        </header>
+
+        {/* Chat */}
+        <div className="relative min-h-0 flex-1 flex flex-col">
+          {!sessionId ? (
+            <div className="flex flex-1 flex-col items-center justify-center gap-2 text-muted-foreground">
+              <Loader2 className="size-6 animate-spin" />
+              <p className="text-sm">Starting session…</p>
+            </div>
+          ) : (
+            <ChatPanel
+              key={sessionId}
               sessionId={sessionId}
-              projectId={currentProject.id}
-              modelName={defaultModelName}
-              activeBoardId={activeBoardId}
-              activeGroupId={activeGroupId}
-              activeFileId={activeFileId}
-              activeFileName={activeFileName}
-              selectedWireId={selectedWireId}
+              defaultModelName={defaultModelName}
+              onModelChange={setDefaultModelName}
             />
-          </CopilotKitProvider>
+          )}
         </div>
-      )}
-
-      {/* ── Model selector pill (shown below chat input via CSS) ── */}
-      <div className="agu-panel__footer">
-        <CompactModelSelector
-          value={defaultModelName}
-          onChange={setDefaultModelName}
-          open={modelSelectorOpen}
-          onToggle={() => setModelSelectorOpen((v) => !v)}
-        />
       </div>
     </div>
   );

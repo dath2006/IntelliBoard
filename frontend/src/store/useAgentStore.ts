@@ -178,9 +178,6 @@ export const useAgentStore = create<AgentState>((set) => ({
       let nextBufferedText = bufferedText;
       let nextTrace: AgentTraceItem | null = null;
 
-      // DEBUG: Log all events to see what's coming through
-      console.log('[ingestEvent]', event.eventType, event.seq, event.payload);
-
       if (event.eventType === 'model.output.delta') {
         const delta = typeof event.payload?.delta === 'string' ? event.payload.delta : '';
         nextBufferedText = bufferedText + delta;
@@ -237,7 +234,7 @@ export const useAgentStore = create<AgentState>((set) => ({
         if (toolCallId) delete pendingBySession[toolCallId];
       } else if (event.eventType === 'frontend.action.request') {
         const action =
-          typeof event.payload?.action === 'string' ? event.payload.action : 'frontend.action';
+          typeof event.payload?.action === 'string' ? event.payload.action : 'frontend_action';
         nextTrace = {
           id: `trace-${sessionId}-${event.seq}`,
           sessionId,
@@ -250,7 +247,7 @@ export const useAgentStore = create<AgentState>((set) => ({
         };
       } else if (event.eventType === 'frontend.action.result') {
         const action =
-          typeof event.payload?.action === 'string' ? event.payload.action : 'frontend.action';
+          typeof event.payload?.action === 'string' ? event.payload.action : 'frontend_action';
         const ok = event.payload?.ok === true;
         nextTrace = {
           id: `trace-${sessionId}-${event.seq}`,

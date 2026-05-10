@@ -1,17 +1,19 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import tailwindcss from '@tailwindcss/vite'
 
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8001'
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
       'avr8js': path.resolve(__dirname, '../wokwi-libs/avr8js/dist/esm'),
       'rp2040js': path.resolve(__dirname, '../wokwi-libs/rp2040js/dist/esm'),
       '@wokwi/elements': path.resolve(__dirname, '../wokwi-libs/wokwi-elements/dist/esm'),
+      '@': path.resolve(__dirname, './src'),
     },
   },
   server: {
