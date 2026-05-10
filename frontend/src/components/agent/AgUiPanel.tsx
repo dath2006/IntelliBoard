@@ -200,6 +200,31 @@ export const AgUiPanel: React.FC = () => {
     upsertSession,
   } = useAgentStore();
 
+  // CRITICAL FIX: Validate and fix panel width on mount
+  useEffect(() => {
+    const storedWidth = localStorage.getItem('velxio.agent.panel.width');
+    const numericWidth = Number(storedWidth);
+    
+    if (!storedWidth || isNaN(numericWidth) || numericWidth < 360 || numericWidth > 800) {
+      console.warn('[AgUiPanel] Invalid panel width detected, resetting to 480px');
+      localStorage.setItem('velxio.agent.panel.width', '480');
+      useAgentStore.getState().setPanelWidth(480);
+    }
+  }, []);
+
+  const activeBoardId = useSimulatorStore((s) => s.activeBoardId);
+  const selectedWireId = useSimulatorStore((s) => s.selectedWireId);
+  const activeGroupId = useEditorStore((s) => s.activeGroupId);
+  const activeFileId = useEditorStore(
+    (s) => s.activeGroupFileId[s.activeGroupId] ?? s.activeFileId,
+  );
+  const fileGroups = useEditorStore((s) => s.fileGroups);
+
+  const activeFileName = useMemo(() => {
+    const files = fileGroups[activeGroupId] ?? [];
+    return files.find((f) => f.id === activeFileId)?.name ?? null;
+  }, [fileGroups, activeGroupId, activeFileId]);
+
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [loadingSessions, setLoadingSessions] = useState(false);

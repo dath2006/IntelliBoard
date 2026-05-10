@@ -67,33 +67,29 @@ const BOARD_SIZE: Record<string, { w: number; h: number }> = {
 export function getObstacleRects(
   components: Array<{ id: string; metadataId: string; x: number; y: number }>,
   boards: Array<{ id: string; boardKind: string; x: number; y: number }>,
-  excludeIds: Set<string>,
-): Rect[] {
-  const rects: Rect[] = [];
+): Map<string, Rect> {
+  const rects = new Map<string, Rect>();
 
   // Board bounding boxes
   for (const board of boards) {
-    if (excludeIds.has(board.id)) continue;
     const size = BOARD_SIZE[board.boardKind] ?? { w: 300, h: 200 };
-    rects.push({ x: board.x, y: board.y, w: size.w, h: size.h });
+    rects.set(board.id, { x: board.x, y: board.y, w: size.w, h: size.h });
   }
 
   // Component bounding boxes — we measure from the DOM if available,
   // otherwise fall back to a generous default
   for (const comp of components) {
-    if (excludeIds.has(comp.id)) continue;
     const el = typeof document !== 'undefined' ? document.getElementById(comp.id) : null;
     let w = 60;
     let h = 60;
     if (el) {
       const r = el.getBoundingClientRect();
-      // getBoundingClientRect gives screen pixels; we need canvas-space.
-      // Components are positioned with position:absolute at comp.x, comp.y,
-      // so we can use the natural element size.
       w = r.width || 60;
       h = r.height || 60;
     }
-    rects.push({ x: comp.x, y: comp.y, w, h });
+    // Note: Components have a (4, 6) visual offset wrapper, but getBoundingClientRect captures it.
+    // However, if DOM isn't ready, we fallback to 60x60.
+    rects.set(comp.id, { x: comp.x, y: comp.y, w, h });
   }
 
   return rects;
@@ -273,6 +269,21 @@ function computeDetour(start: Point, end: Point, paddedObstacles: Rect[]): Point
 
 // ── Main entry point ─────────────────────────────────────────────────────────
 
+function getBreakoutPoint(pt: Point, boardRect: Rect): Point {
+  const distLeft = Math.abs(pt.x - boardRect.x);
+  const distRight = Math.abs((boardRect.x + boardRect.w) - pt.x);
+  const distTop = Math.abs(pt.y - boardRect.y);
+  const distBottom = Math.abs((boardRect.y + boardRect.h) - pt.y);
+
+  const min = Math.min(distLeft, distRight, distTop, distBottom);
+  const pad = OBSTACLE_PADDING + 2;
+
+  if (min === distLeft) return { x: boardRect.x - pad, y: pt.y };
+  if (min === distRight) return { x: boardRect.x + boardRect.w + pad, y: pt.y };
+  if (min === distTop) return { x: pt.x, y: boardRect.y - pad };
+  return { x: pt.x, y: boardRect.y + boardRect.h + pad };
+}
+
 /**
  * Apply obstacle-aware routing to a wire.
  *
@@ -291,15 +302,6 @@ export function routeWireAroundObstacles(
     return wire;
   }
 
-  // Exclude the components this wire connects to
-  const excludeIds = new Set([wire.start.componentId, wire.end.componentId]);
-
-  const obstacles = getObstacleRects(components, boards, excludeIds);
-
-  if (obstacles.length === 0) {
-    return wire;
-  }
-
   const startPt: Point = { x: wire.start.x, y: wire.start.y };
   const endPt: Point = { x: wire.end.x, y: wire.end.y };
 
@@ -307,14 +309,47 @@ export function routeWireAroundObstacles(
   if (!startPt.x && !startPt.y) return wire;
   if (!endPt.x && !endPt.y) return wire;
 
-  const waypoints = routeAroundObstacles(startPt, endPt, obstacles);
+  // Get all obstacle rects (no exclusions anymore!)
+  const allRectsMap = getObstacleRects(components, boards);
+  const obstaclesArray = Array.from(allRectsMap.values());
 
-  if (waypoints.length === 0) {
+  if (obstaclesArray.length === 0) {
+    return wire;
+  }
+
+  // Calculate breakout for start
+  let routeStart = startPt;
+  let startBreakout: Point | null = null;
+  const startRect = allRectsMap.get(wire.start.componentId);
+  if (startRect) {
+    startBreakout = getBreakoutPoint(startPt, startRect);
+    routeStart = startBreakout;
+  }
+
+  // Calculate breakout for end
+  let routeEnd = endPt;
+  let endBreakout: Point | null = null;
+  const endRect = allRectsMap.get(wire.end.componentId);
+  if (endRect) {
+    endBreakout = getBreakoutPoint(endPt, endRect);
+    routeEnd = endBreakout;
+  }
+
+  const waypoints = routeAroundObstacles(routeStart, routeEnd, obstaclesArray);
+
+  // If a simple direct route works between breakouts, we still need to add the breakout points
+  // so the wire strictly follows the right-angle out of the board.
+  const finalWaypoints = [];
+  if (startBreakout) finalWaypoints.push(startBreakout);
+  finalWaypoints.push(...waypoints);
+  if (endBreakout) finalWaypoints.push(endBreakout);
+
+  if (finalWaypoints.length === 0) {
     return wire;
   }
 
   return {
     ...wire,
-    waypoints,
+    waypoints: finalWaypoints,
   };
 }
