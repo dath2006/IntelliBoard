@@ -54,22 +54,22 @@ export async function runFrontendAction(
 
   try {
     switch (action) {
-      case 'serial.monitor.open': {
+      case 'serial_monitor_open': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         sim.openSerialMonitor(boardId ?? undefined);
         return { ok: true, payload: { boardId, open: true } };
       }
-      case 'serial.monitor.close': {
+      case 'serial_monitor_close': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         sim.closeSerialMonitor(boardId ?? undefined);
         return { ok: true, payload: { boardId, open: false } };
       }
-      case 'serial.monitor.status': {
+      case 'serial_monitor_status': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         const status = sim.getSerialMonitorStatus(boardId ?? undefined);
         return { ok: true, payload: status };
       }
-      case 'serial.set_baud_rate': {
+      case 'serial_set_baud_rate': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         const baudRate = typeof payload?.baudRate === 'number' ? payload.baudRate : null;
         if (!baudRate || baudRate <= 0) {
@@ -85,7 +85,7 @@ export async function runFrontendAction(
           },
         };
       }
-      case 'serial.send': {
+      case 'serial_send': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         const text = typeof payload?.text === 'string' ? payload.text : '';
         const lineEnding = resolveLineEnding(payload?.lineEnding);
@@ -94,13 +94,13 @@ export async function runFrontendAction(
         else sim.serialWrite(fullText);
         return { ok: true, payload: { boardId, bytes: fullText.length } };
       }
-      case 'serial.clear': {
+      case 'serial_clear': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         if (boardId) sim.clearBoardSerialOutput(boardId);
         else sim.clearSerialOutput();
         return { ok: true, payload: { boardId } };
       }
-      case 'serial.capture': {
+      case 'serial_capture': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         let maxLines = typeof payload?.maxLines === 'number' ? payload.maxLines : 200;
         if (!Number.isFinite(maxLines) || maxLines <= 0) maxLines = 200;
@@ -128,7 +128,7 @@ export async function runFrontendAction(
           error: outcome.ok ? undefined : outcome.message?.text,
         };
       }
-      case 'sim.run': {
+      case 'sim_run': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         const outcome = await runSimulationAction({
           boardId,
@@ -143,12 +143,12 @@ export async function runFrontendAction(
           error: outcome.error,
         };
       }
-      case 'sim.pause': {
+      case 'sim_pause': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         stopSimulationAction(boardId);
         return { ok: true, payload: { boardId, running: false } };
       }
-      case 'sim.reset': {
+      case 'sim_reset': {
         const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
         resetSimulationAction(boardId);
         return { ok: true, payload: { boardId } };

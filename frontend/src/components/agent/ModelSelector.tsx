@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronDown, Check, Loader2, Cpu, KeyIcon, UserKey, Link2Off, Key } from 'lucide-react';
+import { ChevronDown, Check, Loader2, Cpu, UserKey, Link2Off, Key } from 'lucide-react';
 import type { ModelInfo, ProviderStatus } from '../../services/llmProviders';
 import {
   disconnectGitHub,
@@ -8,8 +8,27 @@ import {
   pollGitHubConnect,
   startGitHubConnect,
 } from '../../services/llmProviders';
-
-// ── Shared state ──────────────────────────────────────────────────────────────
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface Props {
   value: string;
@@ -19,7 +38,55 @@ interface Props {
 
 type ConnectStep = 'idle' | 'loading' | 'show_code' | 'polling' | 'done' | 'error';
 
-// ── Original full ModelSelector (kept for backward compat) ────────────────────
+function ProviderBadges({
+  openaiProvider,
+  githubProvider,
+  compact,
+}: {
+  openaiProvider?: ProviderStatus;
+  githubProvider?: ProviderStatus;
+  compact?: boolean;
+}) {
+  const chip = (connected: boolean, label: string, title: string, icon: React.ReactNode) => (
+    <span
+      title={title}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-medium',
+        connected
+          ? 'border-emerald-500/35 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+          : 'border-border bg-muted/50 text-muted-foreground',
+        compact && 'px-1.5',
+      )}
+    >
+      {icon}
+      <span className="max-w-[72px] truncate">{label}</span>
+      {connected ? <Check className="size-2.5 shrink-0" /> : null}
+    </span>
+  );
+
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {openaiProvider
+        ? chip(
+            openaiProvider.connected,
+            'OpenAI',
+            openaiProvider.connected ? 'OpenAI API key configured' : 'No API key',
+            <Key className="size-2.5 opacity-70" />,
+          )
+        : null}
+      {githubProvider
+        ? chip(
+            githubProvider.connected,
+            'Copilot',
+            githubProvider.connected ? 'GitHub Copilot connected' : 'Not connected',
+            <UserKey className="size-2.5 opacity-70" />,
+          )
+        : null}
+    </div>
+  );
+}
+
+// ── Full ModelSelector (agent meta / legacy layouts) ─────────────────────────
 
 export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) => {
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -43,7 +110,7 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
         onChange(m[0].id);
       }
     } catch {
-      // silently ignore
+      /* ignore */
     } finally {
       setLoadingModels(false);
     }
@@ -138,145 +205,130 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
   const openaiModels = models.filter((m) => m.provider === 'openai');
   const githubModels = models.filter((m) => m.provider === 'github');
 
-  return (
-    <div className="model-selector">
-      <div className="model-selector__row">
-        <select
-          className="model-selector__select"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled || loadingModels || models.length === 0}
-        >
-          {models.length === 0 && (
-            <option value="">{loadingModels ? 'Loading…' : 'No models available'}</option>
-          )}
-          {openaiModels.length > 0 && (
-            <optgroup label="OpenAI">
-              {openaiModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          {githubModels.length > 0 && (
-            <optgroup label="GitHub Copilot">
-              {githubModels.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </optgroup>
-          )}
-        </select>
+  const selectDisabled = disabled || loadingModels || models.length === 0;
 
-        <div className="model-selector__providers">
-          {openaiProvider && (
-            <span
-              className={`model-selector__badge ${openaiProvider.connected ? 'model-selector__badge--connected' : 'model-selector__badge--disconnected'}`}
-              title={
-                openaiProvider.connected ? 'OpenAI connected' : 'OpenAI API key not configured'
-              }
-            >
-              OpenAI
-            </span>
-          )}
-          {githubProvider && (
-            <span
-              className={`model-selector__badge ${githubProvider.connected ? 'model-selector__badge--connected' : 'model-selector__badge--disconnected'}`}
-              title={
-                githubProvider.connected
-                  ? 'GitHub Copilot connected'
-                  : 'GitHub Copilot not connected'
-              }
-            >
-              Copilot
-            </span>
-          )}
-        </div>
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-stretch gap-2">
+        <Select
+          value={models.some((m) => m.id === value) ? value : undefined}
+          onValueChange={onChange}
+          disabled={selectDisabled}
+        >
+          <SelectTrigger className="h-8 min-w-0 flex-1 text-xs" size="sm">
+            <SelectValue placeholder={loadingModels ? 'Loading models…' : 'No models available'} />
+          </SelectTrigger>
+          <SelectContent>
+            {openaiModels.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>OpenAI</SelectLabel>
+                {openaiModels.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+            {openaiModels.length > 0 && githubModels.length > 0 ? <SelectSeparator /> : null}
+            {githubModels.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>GitHub Copilot</SelectLabel>
+                {githubModels.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+          </SelectContent>
+        </Select>
+
+        <ProviderBadges openaiProvider={openaiProvider} githubProvider={githubProvider} />
       </div>
 
+      <Separator />
+
       {githubProvider && !githubProvider.connected && connectStep === 'idle' && (
-        <button
-          className="model-selector__connect-btn"
-          onClick={handleGitHubConnect}
-          disabled={disabled}
-        >
+        <Button type="button" variant="secondary" size="sm" className="w-full text-xs" disabled={disabled} onClick={handleGitHubConnect}>
           Connect GitHub Copilot
-        </button>
+        </Button>
       )}
       {githubProvider && githubProvider.connected && (
-        <button
-          className="model-selector__disconnect-btn"
-          onClick={handleDisconnectGitHub}
-          disabled={disabled}
-        >
+        <Button type="button" variant="outline" size="sm" className="w-full text-xs text-destructive hover:bg-destructive/10" disabled={disabled} onClick={handleDisconnectGitHub}>
           Disconnect GitHub Copilot
-        </button>
+        </Button>
       )}
+
       {connectStep === 'loading' && (
-        <div className="model-selector__connect-flow">Starting GitHub authorization…</div>
+        <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+          Starting GitHub authorization…
+        </div>
       )}
       {connectStep === 'show_code' && (
-        <div className="model-selector__connect-flow">
-          <div className="model-selector__connect-instructions">
-            <span>Enter this code at </span>
-            <a href={verificationUri} target="_blank" rel="noopener noreferrer">
-              {verificationUri}
+        <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3 text-xs">
+          <p className="text-muted-foreground">
+            Enter this code at{' '}
+            <a className="text-primary underline underline-offset-2" href={verificationUri} target="_blank" rel="noopener noreferrer">
+              github.com/device
             </a>
-          </div>
-          <div className="model-selector__code-row">
-            <div className="model-selector__user-code">{userCode}</div>
-            <button
-              className={`model-selector__copy-btn ${codeCopied ? 'model-selector__copy-btn--copied' : ''}`}
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            <span className="font-mono text-lg font-bold tracking-[0.2em]">{userCode}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className={cn('text-xs shrink-0', codeCopied && 'border-emerald-500/40 text-emerald-600')}
               onClick={() => void copyCode(userCode)}
             >
-              {codeCopied ? '✓ Copied' : 'Copy'}
-            </button>
+              {codeCopied ? <Check className="size-3.5" /> : 'Copy'}
+            </Button>
           </div>
-          <div className="model-selector__connect-actions">
-            <button className="model-selector__connect-btn" onClick={handleStartPolling}>
-              I've authorized — continue
-            </button>
-            <button className="model-selector__cancel-btn" onClick={handleCancelConnect}>
+          <div className="flex flex-wrap gap-2 pt-1">
+            <Button type="button" size="sm" className="text-xs flex-1" onClick={handleStartPolling}>
+              I’ve authorized — continue
+            </Button>
+            <Button type="button" variant="ghost" size="sm" className="text-xs flex-1" onClick={handleCancelConnect}>
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}
       {connectStep === 'polling' && (
-        <div className="model-selector__connect-flow">
-          Waiting for GitHub authorization
-          <span className="model-selector__spinner" />
-          <button className="model-selector__cancel-btn" onClick={handleCancelConnect}>
+        <div className="flex flex-col gap-2 rounded-lg border border-border bg-muted/20 p-3 text-xs text-muted-foreground">
+          <span className="inline-flex items-center gap-2">
+            <Loader2 className="size-3.5 animate-spin" />
+            Waiting for GitHub authorization…
+          </span>
+          <Button type="button" variant="ghost" size="sm" className="self-start text-xs" onClick={handleCancelConnect}>
             Cancel
-          </button>
+          </Button>
         </div>
       )}
       {connectStep === 'done' && (
-        <div className="model-selector__connect-flow model-selector__connect-flow--success">
+        <div className="rounded-lg border border-emerald-500/35 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-800 dark:text-emerald-400">
           GitHub Copilot connected.
         </div>
       )}
-      {connectStep === 'error' && (
-        <div className="model-selector__connect-flow model-selector__connect-flow--error">
+      {connectStep === 'error' && connectError && (
+        <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
           {connectError}
-          <button className="model-selector__cancel-btn" onClick={handleCancelConnect}>
+          <Button type="button" variant="ghost" size="sm" className="self-start text-xs" onClick={handleCancelConnect}>
             Dismiss
-          </button>
+          </Button>
         </div>
       )}
     </div>
   );
 };
 
-// ── Compact Model Selector (for AgUiPanel footer) ─────────────────────────────
+// ── Compact selector (footer) ────────────────────────────────────────────────
 
 interface CompactProps {
   value: string;
   onChange: (modelId: string) => void;
   open: boolean;
-  onToggle: () => void;
+  onOpenChange: (next: boolean) => void;
   disabled?: boolean;
 }
 
@@ -284,7 +336,7 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
   value,
   onChange,
   open,
-  onToggle,
+  onOpenChange,
   disabled,
 }) => {
   const [models, setModels] = useState<ModelInfo[]>([]);
@@ -297,7 +349,6 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
   const [connectError, setConnectError] = useState<string | null>(null);
   const [codeCopied, setCodeCopied] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => {
     setLoadingModels(true);
@@ -318,18 +369,6 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
   useEffect(() => {
     void refresh();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Close on outside click
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        onToggle();
-      }
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open, onToggle]);
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -375,7 +414,7 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
           stopPolling();
           setConnectStep('done');
           await refresh();
-          onToggle();
+          onOpenChange(false);
         } else if (
           result.status === 'expired' ||
           result.status === 'denied' ||
@@ -409,174 +448,163 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
   const githubModels = models.filter((m) => m.provider === 'github');
 
   return (
-    <div className="cmp-model" ref={dropdownRef}>
-      {/* Pill trigger */}
-      <button
-        type="button"
-        className={`cmp-model__pill ${open ? 'is-open' : ''}`}
-        onClick={onToggle}
-        disabled={disabled || loadingModels}
-        title="Select model"
-      >
-        <Cpu size={11} />
-        <span className="cmp-model__label">{modelLabel}</span>
-        <ChevronDown size={10} className={`cmp-model__caret ${open ? 'is-up' : ''}`} />
-      </button>
+    <DropdownMenu modal={false} open={open} onOpenChange={onOpenChange}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled || loadingModels}
+          className="h-8 max-w-full justify-between gap-1.5 px-2 font-normal text-xs"
+          title="Select model"
+        >
+          <span className="inline-flex items-center gap-1.5 min-w-0">
+            <Cpu className="size-3 shrink-0 text-muted-foreground" />
+            <span className="truncate">{modelLabel}</span>
+          </span>
+          <ChevronDown className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" side="top" className="w-72">
+        <DropdownMenuLabel className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          Models
+        </DropdownMenuLabel>
+        <div className="px-2 pb-2">
+          <ProviderBadges openaiProvider={openaiProvider} githubProvider={githubProvider} compact />
+        </div>
 
-      {/* Dropdown */}
-      {open && (
-        <div className="cmp-model__dropdown">
-          <div className="cmp-model__section-header">Models</div>
-
-          {/* Provider status row */}
-          <div className="cmp-model__providers">
-            {openaiProvider && (
-              <span
-                className={`cmp-model__provider-badge ${openaiProvider.connected ? 'is-connected' : ''}`}
-                title={openaiProvider.connected ? 'Connected' : 'No API key'}
-              >
-                <Key size={9} />
-                OpenAI
-                {openaiProvider.connected ? <Check size={9} /> : null}
-              </span>
-            )}
-            {githubProvider && (
-              <span
-                className={`cmp-model__provider-badge ${githubProvider.connected ? 'is-connected' : ''}`}
-                title={githubProvider.connected ? 'GitHub Copilot connected' : 'Not connected'}
-              >
-                <UserKey size={9} />
-                Copilot
-                {githubProvider.connected ? <Check size={9} /> : null}
-              </span>
-            )}
-          </div>
-
-          {/* Model list */}
-          {openaiModels.length > 0 && (
-            <>
-              <div className="cmp-model__group-label">OpenAI</div>
-              {openaiModels.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`cmp-model__option ${m.id === value ? 'is-selected' : ''}`}
-                  onClick={() => {
-                    onChange(m.id);
-                    onToggle();
-                  }}
-                >
-                  {m.id === value && <Check size={11} />}
-                  <span>{m.label}</span>
-                </button>
-              ))}
-            </>
-          )}
-          {githubModels.length > 0 && (
-            <>
-              <div className="cmp-model__group-label">GitHub Copilot</div>
-              {githubModels.map((m) => (
-                <button
-                  key={m.id}
-                  type="button"
-                  className={`cmp-model__option ${m.id === value ? 'is-selected' : ''}`}
-                  onClick={() => {
-                    onChange(m.id);
-                    onToggle();
-                  }}
-                >
-                  {m.id === value && <Check size={11} />}
-                  <span>{m.label}</span>
-                </button>
-              ))}
-            </>
-          )}
-
-          {/* GitHub connect/disconnect */}
-          <div className="cmp-model__divider" />
-          {githubProvider && !githubProvider.connected && connectStep === 'idle' && (
-            <button type="button" className="cmp-model__action-btn" onClick={handleGitHubConnect}>
-              <UserKey size={11} />
-              Connect GitHub Copilot
-            </button>
-          )}
-          {githubProvider && githubProvider.connected && (
-            <button
-              type="button"
-              className="cmp-model__action-btn cmp-model__action-btn--danger"
-              onClick={handleDisconnectGitHub}
-            >
-              <Link2Off size={11} />
-              Disconnect Copilot
-            </button>
-          )}
-
-          {/* Device flow states */}
-          {connectStep === 'loading' && (
-            <div className="cmp-model__flow-msg">
-              <Loader2 size={12} className="spin" /> Starting GitHub auth…
-            </div>
-          )}
-          {connectStep === 'show_code' && (
-            <div className="cmp-model__flow-code">
-              <p>
-                Go to{' '}
-                <a href={verificationUri} target="_blank" rel="noopener noreferrer">
-                  {verificationUri}
-                </a>{' '}
-                and enter:
-              </p>
-              <div className="cmp-model__code-block">
-                <span>{userCode}</span>
-                <button onClick={() => void copyCode(userCode)} className="cmp-model__copy-btn">
-                  {codeCopied ? <Check size={11} /> : 'Copy'}
-                </button>
-              </div>
-              <div className="cmp-model__flow-actions">
-                <button className="cmp-model__action-btn" onClick={handleStartPolling}>
-                  Authorized ✓
-                </button>
-                <button
-                  className="cmp-model__action-btn cmp-model__action-btn--ghost"
-                  onClick={() => setConnectStep('idle')}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-          {connectStep === 'polling' && (
-            <div className="cmp-model__flow-msg">
-              <Loader2 size={12} className="spin" /> Waiting for authorization…
-              <button
-                className="cmp-model__action-btn cmp-model__action-btn--ghost"
-                onClick={() => {
-                  stopPolling();
-                  setConnectStep('idle');
+        {openaiModels.length > 0 && (
+          <>
+            <DropdownMenuLabel className="pt-1 text-[10px] text-muted-foreground/90">OpenAI</DropdownMenuLabel>
+            {openaiModels.map((m) => (
+              <DropdownMenuItem
+                key={m.id}
+                className="gap-2 text-xs"
+                onSelect={() => {
+                  onChange(m.id);
+                  onOpenChange(false);
                 }}
               >
-                Cancel
-              </button>
-            </div>
-          )}
-          {connectStep === 'done' && (
-            <div className="cmp-model__flow-msg cmp-model__flow-msg--success">
-              <Check size={12} /> Connected!
-            </div>
-          )}
-          {connectStep === 'error' && (
-            <div className="cmp-model__flow-msg cmp-model__flow-msg--error">
-              {connectError}
-              <button
-                className="cmp-model__action-btn cmp-model__action-btn--ghost"
-                onClick={() => setConnectStep('idle')}
+                {m.id === value ? <Check className="size-3.5 text-primary" /> : <span className="size-3.5" />}
+                <span className="truncate">{m.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
+
+        {githubModels.length > 0 && (
+          <>
+            {openaiModels.length > 0 ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground/90">GitHub Copilot</DropdownMenuLabel>
+            {githubModels.map((m) => (
+              <DropdownMenuItem
+                key={m.id}
+                className="gap-2 text-xs"
+                onSelect={() => {
+                  onChange(m.id);
+                  onOpenChange(false);
+                }}
               >
-                Dismiss
-              </button>
+                {m.id === value ? <Check className="size-3.5 text-primary" /> : <span className="size-3.5" />}
+                <span className="truncate">{m.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
+
+        <DropdownMenuSeparator />
+
+        {githubProvider && !githubProvider.connected && connectStep === 'idle' && (
+          <DropdownMenuItem className="text-xs gap-2" onSelect={(e) => e.preventDefault()}>
+            <Button type="button" variant="secondary" size="sm" className="h-7 w-full gap-1.5 text-xs" onClick={handleGitHubConnect}>
+              <UserKey className="size-3" />
+              Connect GitHub Copilot
+            </Button>
+          </DropdownMenuItem>
+        )}
+        {githubProvider && githubProvider.connected && (
+          <DropdownMenuItem className="text-xs" variant="destructive" onSelect={(e) => e.preventDefault()}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 w-full justify-start gap-1.5 text-xs text-destructive hover:text-destructive"
+              onClick={handleDisconnectGitHub}
+            >
+              <Link2Off className="size-3" />
+              Disconnect Copilot
+            </Button>
+          </DropdownMenuItem>
+        )}
+
+        {connectStep === 'loading' && (
+          <div className="flex items-center gap-2 px-2 py-2 text-[11px] text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" />
+            Starting GitHub auth…
+          </div>
+        )}
+
+        {connectStep === 'show_code' && (
+          <div className="space-y-2 border-t border-border px-2 py-2 text-[11px]">
+            <p className="text-muted-foreground">
+              Open{' '}
+              <a className="text-primary underline underline-offset-2" href={verificationUri} target="_blank" rel="noopener noreferrer">
+                device login
+              </a>{' '}
+              and enter:
+            </p>
+            <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-2 py-1.5 font-mono text-sm font-semibold tracking-[0.12em]">
+              <span className="min-w-0 flex-1 truncate">{userCode}</span>
+              <Button type="button" variant="outline" size="sm" className="h-6 shrink-0 px-2 text-[10px]" onClick={() => void copyCode(userCode)}>
+                {codeCopied ? <Check className="size-3" /> : 'Copy'}
+              </Button>
             </div>
-          )}
-        </div>
-      )}
-    </div>
+            <div className="flex gap-1">
+              <Button type="button" size="sm" className="h-7 flex-1 text-[11px]" onClick={handleStartPolling}>
+                Authorized
+              </Button>
+              <Button type="button" variant="ghost" size="sm" className="h-7 flex-1 text-[11px]" onClick={() => setConnectStep('idle')}>
+                Cancel
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {connectStep === 'polling' && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-border px-2 py-2 text-[11px] text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" />
+            Waiting…
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[11px]"
+              onClick={() => {
+                stopPolling();
+                setConnectStep('idle');
+              }}
+            >
+              Cancel
+            </Button>
+          </div>
+        )}
+
+        {connectStep === 'done' && (
+          <div className="flex items-center gap-1.5 px-2 py-2 text-[11px] text-emerald-600 dark:text-emerald-400">
+            <Check className="size-3.5" />
+            Connected!
+          </div>
+        )}
+
+        {connectStep === 'error' && connectError && (
+          <div className="space-y-1 border-t border-border px-2 py-2 text-[11px] text-destructive">
+            {connectError}
+            <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setConnectStep('idle')}>
+              Dismiss
+            </Button>
+          </div>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import nullcontext
 from typing import Any
@@ -33,6 +34,7 @@ from app.agent.schemas import (
     PinCatalogObservationRequest,
     AgentSessionResponse,
 )
+from app.agent.vercel_adapter import VercelAIAdapter
 from app.agent.frontend_actions import resolve_frontend_action_result
 from app.agent.sessions import (
     append_event,
@@ -58,6 +60,45 @@ from app.services.llm_providers import resolve_pydantic_ai_model
 from app.services.project_files import read_files
 
 router = APIRouter()
+
+
+def _sanitize_tool_name(name: str | None) -> str:
+    """
+    Sanitize tool names to comply with OpenAI API pattern ^[a-zA-Z0-9_-]+$.
+    Replaces invalid characters (like dots) with underscores.
+    """
+    if not name:
+        return "tool"
+    import re
+    sanitized = re.sub(r"[^a-zA-Z0-9_-]", "_", name)
+    return sanitized or "tool"
+
+
+def _sanitize_tool_names_in_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """
+    Recursively sanitize tool names in the payload messages.
+    Specifically handles toolInvocations array in messages.
+    """
+    if not isinstance(payload, dict):
+        return payload
+
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return payload
+
+    for msg in messages:
+        if not isinstance(msg, dict):
+            continue
+        tool_invocations = msg.get("toolInvocations")
+        if not isinstance(tool_invocations, list):
+            continue
+        for ti in tool_invocations:
+            if not isinstance(ti, dict):
+                continue
+            if "toolName" in ti and isinstance(ti["toolName"], str):
+                ti["toolName"] = _sanitize_tool_name(ti["toolName"])
+
+    return payload
 
 
 def _looks_like_agent_ui_state(value: Any) -> bool:
@@ -128,6 +169,34 @@ def _extract_requested_model(
     return None
 
 
+def _text_from_sdk_ui_message(message: dict[str, Any]) -> str | None:
+    """Best-effort user/assistant text from Vercel AI SDK UIMessage-shaped dicts."""
+    raw = message.get("content")
+    if isinstance(raw, str) and raw.strip():
+        return raw.strip()
+    parts = message.get("parts")
+    if not isinstance(parts, list):
+        return None
+    chunks: list[str] = []
+    for p in parts:
+        if isinstance(p, dict) and p.get("type") == "text":
+            t = p.get("text")
+            if isinstance(t, str) and t:
+                chunks.append(t)
+    joined = " ".join(chunks).strip()
+    return joined or None
+
+
+def _latest_user_message_preview(messages: list[Any], *, limit: int = 2000) -> str:
+    for m in reversed(messages):
+        if not isinstance(m, dict) or m.get("role") != "user":
+            continue
+        txt = _text_from_sdk_ui_message(m)
+        if txt:
+            return txt[:limit]
+    return "Agentic request"
+
+
 async def _finalize_ag_ui_run(
     *,
     session_id: str,
@@ -151,7 +220,6 @@ async def _finalize_ag_ui_run(
                 event_type="run.completed" if status_value == "completed" else "run.failed",
                 payload={"output": output},
             )
-
 
 @router.post("/sessions", response_model=AgentSessionResponse, status_code=status.HTTP_201_CREATED)
 async def create_agent_session(
@@ -472,76 +540,10 @@ async def run_ag_ui_agent(
         else nullcontext()
     )
     
-    # Define completion handler to persist agent response
-    async def handle_agent_completion(result) -> None:
-        """
-        Callback invoked after the agent stream completes.
-        Captures the final agent response and stores it in the database.
-        """
-        try:
-            # Extract the final text output from the result
-            final_output = ""
-            if hasattr(result, 'data') and result.data:
-                final_output = str(result.data)
-            elif hasattr(result, 'output') and result.output:
-                final_output = str(result.output)
-            
-            # Get all messages from the run if available
-            if hasattr(result, 'all_messages'):
-                messages = result.all_messages()
-                # Extract assistant messages
-                for msg in reversed(messages):
-                    if hasattr(msg, 'role') and msg.role == 'assistant':
-                        if hasattr(msg, 'content'):
-                            content = msg.content
-                            if isinstance(content, str):
-                                final_output = content
-                            elif isinstance(content, list):
-                                text_parts = []
-                                for part in content:
-                                    if hasattr(part, 'text'):
-                                        text_parts.append(part.text)
-                                    elif isinstance(part, dict) and 'text' in part:
-                                        text_parts.append(part['text'])
-                                if text_parts:
-                                    final_output = ''.join(text_parts)
-                        break
-            
-            # Store the response if we captured any text
-            if final_output and final_output.strip():
-                async with AsyncSessionLocal() as db_bg:
-                    await set_session_status(
-                        db_bg,
-                        session_id=session.id,
-                        user_id=user.id,
-                        status="completed",
-                    )
-                    await append_event(
-                        db_bg,
-                        session_id=session.id,
-                        event_type="run.completed",
-                        payload={"output": final_output.strip()},
-                    )
-            else:
-                # No output captured, just mark as completed
-                async with AsyncSessionLocal() as db_bg:
-                    await set_session_status(
-                        db_bg,
-                        session_id=session.id,
-                        user_id=user.id,
-                        status="completed",
-                    )
-        except Exception as exc:
-            # Log error but don't fail the response
-            print(f"Error in handle_agent_completion: {exc}")
-            async with AsyncSessionLocal() as db_bg:
-                await set_session_status(
-                    db_bg,
-                    session_id=session.id,
-                    user_id=user.id,
-                    status="completed",
-                )
-    
+    # Move the handler definition inside the dispatch_request call or before it
+    async def on_complete_handler(result) -> None:
+        await handle_agent_completion(result, session.id, user.id)
+
     with dispatch_span:
         response = None
         if AGUIApp is not None:
@@ -566,7 +568,7 @@ async def run_ag_ui_agent(
             with model_override_ctx:
                 # Check if adapter.handle supports on_complete callback
                 try:
-                    response = await adapter.handle(request, on_complete=handle_agent_completion)
+                    response = await adapter.handle(request, on_complete=on_complete_handler)
                 except TypeError:
                     # Fallback if on_complete is not supported
                     response = await adapter.handle(request)
@@ -579,13 +581,11 @@ async def run_ag_ui_agent(
             }
             if model_override is not None:
                 dispatch_kwargs["model"] = model_override
-            
+
             # Try to use on_complete if supported
             try:
                 response = await AGUIAdapter.dispatch_request(
-                    request, 
-                    on_complete=handle_agent_completion,
-                    **dispatch_kwargs
+                    request, on_complete=on_complete_handler, **dispatch_kwargs
                 )
             except TypeError:
                 # Fallback without on_complete
@@ -593,6 +593,127 @@ async def run_ag_ui_agent(
 
     # Return the response directly - completion handler will persist the result
     return response
+
+
+@router.post("/chat-stream")
+async def v_ai_sdk_chat_stream(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(require_auth),
+):
+    """
+    Vercel AI SDK compatible streaming endpoint.
+    Expects messages and session metadata in the body.
+    """
+    raw_body = await request.body()
+    try:
+        payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=422, detail=f"Invalid payload: {exc}") from exc
+
+    # Extract session ID and state
+    session_id = payload.get("sessionId")
+    if not session_id:
+        # Check query params as fallback
+        session_id = request.query_params.get("sessionId")
+    
+    if not session_id:
+        raise HTTPException(status_code=422, detail="sessionId is required.")
+
+    session = await get_session_for_user(db, session_id=session_id, user_id=user.id)
+    if session is None:
+        raise HTTPException(status_code=404, detail="Agent session not found.")
+
+    # Extract messages
+    messages = payload.get("messages", [])
+    if not messages:
+        raise HTTPException(status_code=422, detail="messages are required.")
+
+    latest_msg = _latest_user_message_preview(messages)
+
+    # Prepare agent run
+    snapshot = await load_draft_snapshot(db, session_id=session.id, user_id=user.id)
+
+    state_blob = payload.get("state")
+    extracted = state_blob if isinstance(state_blob, dict) else {}
+    requested_model = _extract_requested_model(request, payload, extracted)
+    model_id = (
+        requested_model.strip()
+        if isinstance(requested_model, str) and requested_model.strip()
+        else session.model_name
+    )
+
+    resolved_model = await resolve_pydantic_ai_model(db, user.id, model_id)
+    agent = build_agent(resolved_model)
+    
+    state = payload.get("state", {})
+    try:
+        state_obj = AgentUiState.model_validate(state) if state else AgentUiState(sessionId=session_id)
+    except ValidationError:
+        state_obj = AgentUiState(sessionId=session_id)
+
+    deps = AgentDeps(
+        db=db,
+        session_id=session.id,
+        user_id=user.id,
+        snapshot=snapshot,
+        state=state_obj,
+    )
+
+    # Set status
+    await set_session_status(db, session_id=session.id, user_id=user.id, status="running")
+    await append_event(
+        db,
+        session_id=session.id,
+        event_type="run.started",
+        payload={"message": latest_msg, "modelName": model_id},
+    )
+
+    # Re-inject the body so VercelAIAdapter.dispatch_request can read it
+    # Starlette Request consumes the stream on await request.body()
+    # Pydantic AI SubmitMessage requires a root-level `id` (AI SDK may omit it).
+    if (
+        isinstance(payload, dict)
+        and payload.get("trigger") == "submit-message"
+        and not payload.get("id")
+    ):
+        mid = payload.get("messageId")
+        if isinstance(mid, str) and mid.strip():
+            payload["id"] = mid.strip()
+        else:
+            for m in reversed(payload.get("messages") or []):
+                if (
+                    isinstance(m, dict)
+                    and m.get("role") == "user"
+                    and isinstance(m.get("id"), str)
+                    and m["id"].strip()
+                ):
+                    payload["id"] = m["id"].strip()
+                    break
+        if not payload.get("id"):
+            payload["id"] = str(uuid.uuid4())
+
+    # Sanitize tool names in the payload to comply with OpenAI API pattern
+    if isinstance(payload, dict):
+        payload = _sanitize_tool_names_in_payload(payload)
+
+    raw_body = json.dumps(payload).encode("utf-8")
+    request._body = raw_body
+
+    # Dispatch request using the official adapter
+    # sdk_version=6 supports toolInvocations automatically
+    async def on_complete_handler(result) -> None:
+        await handle_agent_completion(result, session.id, user.id)
+
+    return await VercelAIAdapter.dispatch_request(
+        request,
+        agent=agent,
+        deps=deps,
+        on_complete=on_complete_handler,
+        sdk_version=6,
+    )
+
+
 
 
 @router.patch("/sessions/{session_id}/canvas", response_model=AgentSessionResponse)
@@ -736,3 +857,78 @@ def _event_response(event) -> AgentSessionEventResponse:
         payload=json.loads(event.payload_json or "{}"),
         createdAt=event.created_at,
     )
+
+
+async def handle_agent_completion(result, session_id: str, user_id: str):
+    """
+    Called by the VercelAIAdapter when the stream finishes (and by AG-UI when supported).
+    Persists pydantic-ai messages plus a summary run.completed row (with output text for AG-UI).
+    """
+    from pydantic_ai.messages import ModelResponse, TextPart
+
+    final_output = ""
+
+    try:
+        if getattr(result, "data", None):
+            final_output = str(result.data)
+
+        all_fn = getattr(result, "all_messages", None)
+        if callable(all_fn) and not final_output.strip():
+            for msg in reversed(list(all_fn())):
+                if isinstance(msg, ModelResponse):
+                    chunks: list[str] = []
+                    for part in msg.parts:
+                        if isinstance(part, TextPart):
+                            chunks.append(part.content)
+                        elif hasattr(part, "text"):
+                            chunks.append(str(part.text))
+                    if chunks:
+                        final_output = "".join(chunks)
+                    break
+
+        if not final_output.strip() and getattr(result, "output", None):
+            final_output = str(result.output)
+    except Exception as exc:
+        if logfire:
+            logfire.warning("Extracting final assistant text failed", error=str(exc))
+        else:
+            print(f"Extracting final assistant text failed: {exc}")
+
+    usage_payload: dict = {}
+    usage_fn = getattr(result, "usage", None)
+    if callable(usage_fn):
+        try:
+            usage_payload = usage_fn().model_dump()
+        except Exception:
+            usage_payload = {}
+
+    async with AsyncSessionLocal() as db:
+        try:
+            new_fn = getattr(result, "new_messages", None)
+            if callable(new_fn):
+                for msg in new_fn():
+                    payload = msg.model_dump() if hasattr(msg, "model_dump") else str(msg)
+                    await append_event(
+                        db,
+                        session_id=session_id,
+                        event_type="chat.message",
+                        payload=payload if isinstance(payload, dict) else {"content": payload},
+                    )
+
+            await set_session_status(
+                db,
+                session_id=session_id,
+                user_id=user_id,
+                status="completed",
+            )
+
+            run_payload = {**({"output": final_output.strip()} if final_output.strip() else {}), **{"usage": usage_payload}}
+            await append_event(db, session_id=session_id, event_type="run.completed", payload=run_payload)
+
+            await db.commit()
+        except Exception as e:
+            await db.rollback()
+            if logfire:
+                logfire.error("Failed to save agent completion: {error}", error=str(e))
+            else:
+                print(f"Error in handle_agent_completion: {e}")

@@ -990,7 +990,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "open_serial_monitor",
             lambda: _run_frontend_action(
                 ctx,
-                "serial.monitor.open",
+                "serial_monitor_open",
                 {"boardId": board_id} if board_id else {},
             ),
         )
@@ -1004,7 +1004,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "close_serial_monitor",
             lambda: _run_frontend_action(
                 ctx,
-                "serial.monitor.close",
+                "serial_monitor_close",
                 {"boardId": board_id} if board_id else {},
             ),
         )
@@ -1018,7 +1018,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "get_serial_monitor_status",
             lambda: _run_frontend_action(
                 ctx,
-                "serial.monitor.status",
+                "serial_monitor_status",
                 {"boardId": board_id} if board_id else {},
             ),
         )
@@ -1036,7 +1036,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "set_serial_baud_rate",
             lambda: _run_frontend_action(
                 ctx,
-                "serial.set_baud_rate",
+                "serial_set_baud_rate",
                 {"boardId": board_id, "baudRate": baud_rate} if board_id else {"baudRate": baud_rate},
             ),
         )
@@ -1058,7 +1058,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         return await _safe_tool_call(
             ctx,
             "send_serial_message",
-            lambda: _run_frontend_action(ctx, "serial.send", payload),
+            lambda: _run_frontend_action(ctx, "serial_send", payload),
         )
 
     @agent.tool
@@ -1070,7 +1070,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "clear_serial_monitor",
             lambda: _run_frontend_action(
                 ctx,
-                "serial.clear",
+                "serial_clear",
                 {"boardId": board_id} if board_id else {},
             ),
         )
@@ -1089,7 +1089,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         return await _safe_tool_call(
             ctx,
             "capture_serial_monitor",
-            lambda: _run_frontend_action(ctx, "serial.capture", payload),
+            lambda: _run_frontend_action(ctx, "serial_capture", payload),
         )
 
     @agent.tool
@@ -1101,7 +1101,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "run_simulation",
             lambda: _run_frontend_action(
                 ctx,
-                "sim.run",
+                "sim_run",
                 {"boardId": board_id} if board_id else {},
                 timeout_ms=180000,
             ),
@@ -1116,7 +1116,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "pause_simulation",
             lambda: _run_frontend_action(
                 ctx,
-                "sim.pause",
+                "sim_pause",
                 {"boardId": board_id} if board_id else {},
             ),
         )
@@ -1130,7 +1130,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             "reset_simulation",
             lambda: _run_frontend_action(
                 ctx,
-                "sim.reset",
+                "sim_reset",
                 {"boardId": board_id} if board_id else {},
             ),
         )

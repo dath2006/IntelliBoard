@@ -19,6 +19,7 @@ import base64
 import logging
 import os
 import re
+import sys
 import shutil
 import subprocess
 import tempfile
@@ -676,6 +677,20 @@ class ESPIDFCompiler:
                     extra_paths.append(str(tool_dir))
                 if extra_paths:
                     env['PATH'] = os.pathsep.join(extra_paths) + os.pathsep + env.get('PATH', '')
+
+            # Ensure we use the current Python interpreter and skip dependency checks
+            # that might fail due to missing git metadata or constraint files.
+            env['PYTHON'] = sys.executable
+            env['IDF_PYTHON_CHECK_CONSTRAINTS'] = 'no'
+
+            # Add ESP-IDF tools to PYTHONPATH (mimics export.sh)
+            idf_tools_py = os.path.join(self.idf_path, 'tools')
+            idf_kconfig_py = os.path.join(self.idf_path, 'tools', 'kconfig_new', 'python-scripts')
+            env['PYTHONPATH'] = os.pathsep.join([idf_tools_py, idf_kconfig_py]) + os.pathsep + env.get('PYTHONPATH', '')
+
+            # Set version explicitly to avoid 'git describe' failures in Docker
+            if self.idf_path and not os.path.exists(os.path.join(self.idf_path, '.git')):
+                env['IDF_VERSION'] = 'v4.4.7'
 
         return env
 

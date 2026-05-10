@@ -7,7 +7,7 @@
  *
  * Call `scanAndReportCanvasPins()` any time you know the canvas may have just
  * rendered new components — particularly right after applySnapshotToStores()
- * inside AgentPanel so the agent's next `get_canvas_runtime_pins` call finds
+ * from the agent sidebar so the agent's next `get_canvas_runtime_pins` call finds
  * fresh data instead of returning `available: false`.
  *
  * The function is safe to call concurrently / repeatedly; a module-level

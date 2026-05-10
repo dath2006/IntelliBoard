@@ -43,7 +43,7 @@
 .docs-nav-brand svg {
   width: 18px;
   height: 18px;
-  color: var(--accent);
+  color: var(--velxio-accent);
 }
 
 .docs-nav-divider {
@@ -73,7 +73,7 @@
   color: var(--text-muted);
   text-decoration: none;
   font-size: 13px;
-  border-radius: var(--radius);
+  border-radius: var(--velxio-radius);
   transition:
     color 0.15s,
     background 0.15s;
@@ -96,7 +96,7 @@
   color: var(--text);
   text-decoration: none;
   font-size: 13px;
-  border-radius: var(--radius);
+  border-radius: var(--velxio-radius);
   transition:
     border-color 0.15s,
     background 0.15s;
@@ -114,7 +114,7 @@
   color: var(--text-muted);
   cursor: pointer;
   padding: 5px 7px;
-  border-radius: var(--radius);
+  border-radius: var(--velxio-radius);
   margin-left: auto;
 }
 
@@ -175,7 +175,7 @@
   border: none;
   color: var(--text-muted);
   font-size: 13.5px;
-  border-radius: var(--radius);
+  border-radius: var(--velxio-radius);
   cursor: pointer;
   transition:
     color 0.15s,
@@ -189,7 +189,7 @@
 }
 
 .docs-sidebar-item--active {
-  color: var(--accent);
+  color: var(--velxio-accent);
   background: rgba(0, 122, 204, 0.12);
 }
 
@@ -248,7 +248,7 @@
 .docs-label {
   font-family: var(--mono);
   font-size: 12px;
-  color: var(--accent);
+  color: var(--velxio-accent);
   letter-spacing: 0.04em;
   display: block;
   margin-bottom: 8px;
@@ -295,7 +295,7 @@
 }
 
 .docs-section a {
-  color: var(--accent);
+  color: var(--velxio-accent);
   text-decoration: none;
 }
 
@@ -374,7 +374,7 @@
 }
 
 .docs-callout a {
-  color: var(--accent);
+  color: var(--velxio-accent);
 }
 
 /* ── Wire dot ─────────────────────────────────────────────── */
@@ -403,7 +403,7 @@
   border: 1px solid var(--border-hi);
   color: var(--text-muted);
   font-size: 13.5px;
-  border-radius: var(--radius);
+  border-radius: var(--velxio-radius);
   padding: 9px 16px;
   cursor: pointer;
   transition:

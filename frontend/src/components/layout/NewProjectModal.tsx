@@ -5,6 +5,8 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { createProject } from '../../services/projectService';
 import { trackCreateProject } from '../../utils/analytics';
+import { BOARD_KIND_LABELS } from '../../types/board';
+import { isEsp32BoardKind } from '../../utils/boardResolver';
 
 interface NewProjectModalProps {
   onClose: () => void;
@@ -33,9 +35,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose }) => 
     let defaultCode = 'void setup() {\n}\n\nvoid loop() {\n}';
     let defaultExt = '.ino';
     
-    if (boardType.startsWith('esp32')) {
+    if (isEsp32BoardKind(boardType)) {
       defaultExt = '.ino';
-    } else if (boardType === 'raspberry-pi-pico') {
+    } else if (boardType === 'raspberry-pi-pico' || boardType === 'pi-pico-w') {
       defaultCode = 'print("Hello from Pico!")';
       defaultExt = '.py';
     } else if (boardType === 'raspberry-pi-3') {
@@ -129,14 +131,11 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose }) => 
             onChange={(e) => setBoardType(e.target.value)}
             style={styles.input}
           >
-            <option value="arduino-uno">Arduino Uno</option>
-            <option value="arduino-nano">Arduino Nano</option>
-            <option value="arduino-mega">Arduino Mega</option>
-            <option value="raspberry-pi-pico">Raspberry Pi Pico</option>
-            <option value="raspberry-pi-3">Raspberry Pi 3</option>
-            <option value="esp32">ESP32</option>
-            <option value="esp32-s3">ESP32-S3</option>
-            <option value="esp32-c3">ESP32-C3</option>
+            {Object.entries(BOARD_KIND_LABELS).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
           </select>
 
           <div

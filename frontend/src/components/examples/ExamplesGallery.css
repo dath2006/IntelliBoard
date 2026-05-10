@@ -138,7 +138,7 @@
 }
 
 .filter-button.active {
-  background: var(--accent);
+  background: var(--velxio-accent);
   color: #fff;
   font-weight: 500;
 }
