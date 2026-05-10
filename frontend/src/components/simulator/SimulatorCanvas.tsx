@@ -108,8 +108,10 @@ export const SimulatorCanvas = ({
   // Compute offset wires: obstacle-avoidance → grid-snap → overlap-offset
   // Memoized with caching to prevent excessive recalculation
   const wiresCacheKey = useMemo(() => {
-    // Create a stable key based on wire positions and component positions
-    return `${wires.map(w => `${w.id}:${w.start.x},${w.start.y}-${w.end.x},${w.end.y}`).join('|')}`;
+    // Create a stable key based on wire positions, waypoints, and component positions
+    return `${wires.map(w => 
+      `${w.id}:${w.start.x},${w.start.y}-${w.end.x},${w.end.y}:${w.waypoints?.map(wp => `${wp.x},${wp.y}`).join(',') || ''}`
+    ).join('|')}`;
   }, [wires]);
 
   const offsetWires = React.useMemo(() => {
