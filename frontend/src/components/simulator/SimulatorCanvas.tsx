@@ -99,6 +99,7 @@ export const SimulatorCanvas = ({
   const cancelWireCreation = useSimulatorStore((s) => s.cancelWireCreation);
   const wireInProgress = useSimulatorStore((s) => s.wireInProgress);
   const recalculateAllWirePositions = useSimulatorStore((s) => s.recalculateAllWirePositions);
+  const clearAttachedWireWaypoints = useSimulatorStore((s) => s.clearAttachedWireWaypoints);
   const selectedWireId = useSimulatorStore((s) => s.selectedWireId);
   const setSelectedWire = useSimulatorStore((s) => s.setSelectedWire);
   const removeWire = useSimulatorStore((s) => s.removeWire);
@@ -1139,6 +1140,15 @@ export const SimulatorCanvas = ({
             }
           }
         }
+      } else {
+        // It was an actual drag (moved > 5px or held > 300ms)
+        // Clear manual waypoints on attached wires so they auto-route cleanly to the new position
+        const targetId = draggedComponentId.startsWith('__board__:')
+          ? draggedComponentId.slice('__board__:'.length)
+          : draggedComponentId === '__board__'
+            ? 'arduino-uno' // fallback
+            : draggedComponentId;
+        clearAttachedWireWaypoints(targetId);
       }
 
       recalculateAllWirePositions();

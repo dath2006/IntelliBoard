@@ -67,33 +67,29 @@ const BOARD_SIZE: Record<string, { w: number; h: number }> = {
 export function getObstacleRects(
   components: Array<{ id: string; metadataId: string; x: number; y: number }>,
   boards: Array<{ id: string; boardKind: string; x: number; y: number }>,
-  excludeIds: Set<string>,
-): Rect[] {
-  const rects: Rect[] = [];
+): Map<string, Rect> {
+  const rects = new Map<string, Rect>();
 
   // Board bounding boxes
   for (const board of boards) {
-    if (excludeIds.has(board.id)) continue;
     const size = BOARD_SIZE[board.boardKind] ?? { w: 300, h: 200 };
-    rects.push({ x: board.x, y: board.y, w: size.w, h: size.h });
+    rects.set(board.id, { x: board.x, y: board.y, w: size.w, h: size.h });
   }
 
   // Component bounding boxes — we measure from the DOM if available,
   // otherwise fall back to a generous default
   for (const comp of components) {
-    if (excludeIds.has(comp.id)) continue;
     const el = typeof document !== 'undefined' ? document.getElementById(comp.id) : null;
     let w = 60;
     let h = 60;
     if (el) {
       const r = el.getBoundingClientRect();
-      // getBoundingClientRect gives screen pixels; we need canvas-space.
-      // Components are positioned with position:absolute at comp.x, comp.y,
-      // so we can use the natural element size.
       w = r.width || 60;
       h = r.height || 60;
     }
-    rects.push({ x: comp.x, y: comp.y, w, h });
+    // Note: Components have a (4, 6) visual offset wrapper, but getBoundingClientRect captures it.
+    // However, if DOM isn't ready, we fallback to 60x60.
+    rects.set(comp.id, { x: comp.x, y: comp.y, w, h });
   }
 
   return rects;
@@ -313,49 +309,33 @@ export function routeWireAroundObstacles(
   if (!startPt.x && !startPt.y) return wire;
   if (!endPt.x && !endPt.y) return wire;
 
-  const startIsBoard = boards.some((b) => b.id === wire.start.componentId);
-  const endIsBoard = boards.some((b) => b.id === wire.end.componentId);
+  // Get all obstacle rects (no exclusions anymore!)
+  const allRectsMap = getObstacleRects(components, boards);
+  const obstaclesArray = Array.from(allRectsMap.values());
 
-  // We exclude components from obstacles so wires can reach them naturally,
-  // but we DO NOT exclude boards. Boards must be strictly routed around.
-  const excludeIds = new Set<string>();
-  if (!startIsBoard) excludeIds.add(wire.start.componentId);
-  if (!endIsBoard) excludeIds.add(wire.end.componentId);
-
-  const obstacles = getObstacleRects(components, boards, excludeIds);
-
-  if (obstacles.length === 0 && !startIsBoard && !endIsBoard) {
+  if (obstaclesArray.length === 0) {
     return wire;
   }
 
-  // Pre-calculate all rects for breakout generation
-  const allRects = new Map<string, Rect>();
-  for (const board of boards) {
-    const size = BOARD_SIZE[board.boardKind] ?? { w: 300, h: 200 };
-    allRects.set(board.id, { x: board.x, y: board.y, w: size.w, h: size.h });
-  }
-
+  // Calculate breakout for start
   let routeStart = startPt;
   let startBreakout: Point | null = null;
-  if (startIsBoard) {
-    const startRect = allRects.get(wire.start.componentId);
-    if (startRect) {
-      startBreakout = getBreakoutPoint(startPt, startRect);
-      routeStart = startBreakout;
-    }
+  const startRect = allRectsMap.get(wire.start.componentId);
+  if (startRect) {
+    startBreakout = getBreakoutPoint(startPt, startRect);
+    routeStart = startBreakout;
   }
 
+  // Calculate breakout for end
   let routeEnd = endPt;
   let endBreakout: Point | null = null;
-  if (endIsBoard) {
-    const endRect = allRects.get(wire.end.componentId);
-    if (endRect) {
-      endBreakout = getBreakoutPoint(endPt, endRect);
-      routeEnd = endBreakout;
-    }
+  const endRect = allRectsMap.get(wire.end.componentId);
+  if (endRect) {
+    endBreakout = getBreakoutPoint(endPt, endRect);
+    routeEnd = endBreakout;
   }
 
-  const waypoints = routeAroundObstacles(routeStart, routeEnd, obstacles);
+  const waypoints = routeAroundObstacles(routeStart, routeEnd, obstaclesArray);
 
   // If a simple direct route works between breakouts, we still need to add the breakout points
   // so the wire strictly follows the right-angle out of the board.

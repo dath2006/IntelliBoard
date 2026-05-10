@@ -9,7 +9,7 @@ import { CodeEditor } from '../components/editor/CodeEditor';
 import { EditorToolbar } from '../components/editor/EditorToolbar';
 import { FileTabs } from '../components/editor/FileTabs';
 import { FileExplorer } from '../components/editor/FileExplorer';
-import { AgUiPanel } from '../components/agent/AgUiPanel';
+import { AgentPanelV2 } from '../components/agent/AgentPanelV2';
 
 // Lazy-load Pi workspace so xterm.js isn't in the main bundle
 const RaspberryPiWorkspace = lazy(() =>
@@ -608,7 +608,7 @@ export const EditorPage: React.FC = () => {
               <div className="resize-handle-grip" />
             </div>
             <div className="agent-panel-shell" style={{ width: agentPanelWidth }}>
-              <AgUiPanel />
+              <AgentPanelV2 />
             </div>
           </>
         )}
