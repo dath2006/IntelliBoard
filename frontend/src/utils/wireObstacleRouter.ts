@@ -273,6 +273,21 @@ function computeDetour(start: Point, end: Point, paddedObstacles: Rect[]): Point
 
 // ── Main entry point ─────────────────────────────────────────────────────────
 
+function getBreakoutPoint(pt: Point, boardRect: Rect): Point {
+  const distLeft = Math.abs(pt.x - boardRect.x);
+  const distRight = Math.abs((boardRect.x + boardRect.w) - pt.x);
+  const distTop = Math.abs(pt.y - boardRect.y);
+  const distBottom = Math.abs((boardRect.y + boardRect.h) - pt.y);
+
+  const min = Math.min(distLeft, distRight, distTop, distBottom);
+  const pad = OBSTACLE_PADDING + 2;
+
+  if (min === distLeft) return { x: boardRect.x - pad, y: pt.y };
+  if (min === distRight) return { x: boardRect.x + boardRect.w + pad, y: pt.y };
+  if (min === distTop) return { x: pt.x, y: boardRect.y - pad };
+  return { x: pt.x, y: boardRect.y + boardRect.h + pad };
+}
+
 /**
  * Apply obstacle-aware routing to a wire.
  *
@@ -291,15 +306,6 @@ export function routeWireAroundObstacles(
     return wire;
   }
 
-  // Exclude the components this wire connects to
-  const excludeIds = new Set([wire.start.componentId, wire.end.componentId]);
-
-  const obstacles = getObstacleRects(components, boards, excludeIds);
-
-  if (obstacles.length === 0) {
-    return wire;
-  }
-
   const startPt: Point = { x: wire.start.x, y: wire.start.y };
   const endPt: Point = { x: wire.end.x, y: wire.end.y };
 
@@ -307,14 +313,63 @@ export function routeWireAroundObstacles(
   if (!startPt.x && !startPt.y) return wire;
   if (!endPt.x && !endPt.y) return wire;
 
-  const waypoints = routeAroundObstacles(startPt, endPt, obstacles);
+  const startIsBoard = boards.some((b) => b.id === wire.start.componentId);
+  const endIsBoard = boards.some((b) => b.id === wire.end.componentId);
 
-  if (waypoints.length === 0) {
+  // We exclude components from obstacles so wires can reach them naturally,
+  // but we DO NOT exclude boards. Boards must be strictly routed around.
+  const excludeIds = new Set<string>();
+  if (!startIsBoard) excludeIds.add(wire.start.componentId);
+  if (!endIsBoard) excludeIds.add(wire.end.componentId);
+
+  const obstacles = getObstacleRects(components, boards, excludeIds);
+
+  if (obstacles.length === 0 && !startIsBoard && !endIsBoard) {
+    return wire;
+  }
+
+  // Pre-calculate all rects for breakout generation
+  const allRects = new Map<string, Rect>();
+  for (const board of boards) {
+    const size = BOARD_SIZE[board.boardKind] ?? { w: 300, h: 200 };
+    allRects.set(board.id, { x: board.x, y: board.y, w: size.w, h: size.h });
+  }
+
+  let routeStart = startPt;
+  let startBreakout: Point | null = null;
+  if (startIsBoard) {
+    const startRect = allRects.get(wire.start.componentId);
+    if (startRect) {
+      startBreakout = getBreakoutPoint(startPt, startRect);
+      routeStart = startBreakout;
+    }
+  }
+
+  let routeEnd = endPt;
+  let endBreakout: Point | null = null;
+  if (endIsBoard) {
+    const endRect = allRects.get(wire.end.componentId);
+    if (endRect) {
+      endBreakout = getBreakoutPoint(endPt, endRect);
+      routeEnd = endBreakout;
+    }
+  }
+
+  const waypoints = routeAroundObstacles(routeStart, routeEnd, obstacles);
+
+  // If a simple direct route works between breakouts, we still need to add the breakout points
+  // so the wire strictly follows the right-angle out of the board.
+  const finalWaypoints = [];
+  if (startBreakout) finalWaypoints.push(startBreakout);
+  finalWaypoints.push(...waypoints);
+  if (endBreakout) finalWaypoints.push(endBreakout);
+
+  if (finalWaypoints.length === 0) {
     return wire;
   }
 
   return {
     ...wire,
-    waypoints,
+    waypoints: finalWaypoints,
   };
 }

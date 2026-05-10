@@ -216,9 +216,12 @@ export const EditorPage: React.FC = () => {
   const [mobileView, setMobileView] = useState<'code' | 'circuit'>('code');
   const user = useAuthStore((s) => s.user);
   const agentPanelOpen = useAgentStore((s) => s.panelOpen);
-  const agentPanelWidth = useAgentStore((s) => s.panelWidth);
+  const rawAgentPanelWidth = useAgentStore((s) => s.panelWidth);
   const setAgentPanelWidth = useAgentStore((s) => s.setPanelWidth);
   const toggleAgentPanel = useAgentStore((s) => s.togglePanel);
+
+  // Safeguard: Ensure agent panel width is always valid (min 360px)
+  const agentPanelWidth = Math.max(360, Math.min(800, rawAgentPanelWidth || 480));
 
   const handleSaveClick = useCallback(() => {
     if (!user) {

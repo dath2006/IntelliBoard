@@ -403,6 +403,18 @@ export const AgUiPanel: React.FC = () => {
     upsertSession,
   } = useAgentStore();
 
+  // CRITICAL FIX: Validate and fix panel width on mount
+  useEffect(() => {
+    const storedWidth = localStorage.getItem('velxio.agent.panel.width');
+    const numericWidth = Number(storedWidth);
+    
+    if (!storedWidth || isNaN(numericWidth) || numericWidth < 360 || numericWidth > 800) {
+      console.warn('[AgUiPanel] Invalid panel width detected, resetting to 480px');
+      localStorage.setItem('velxio.agent.panel.width', '480');
+      useAgentStore.getState().setPanelWidth(480);
+    }
+  }, []);
+
   const activeBoardId = useSimulatorStore((s) => s.activeBoardId);
   const selectedWireId = useSimulatorStore((s) => s.selectedWireId);
   const activeGroupId = useEditorStore((s) => s.activeGroupId);
