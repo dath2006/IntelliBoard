@@ -206,40 +206,19 @@ export function renderedToWaypoints(
 ): { x: number; y: number }[] {
   if (renderedPts.length <= 2) return [];
 
-  // 1. Remove zero-length segments (duplicate points)
-  const cleanPts: { x: number; y: number }[] = [renderedPts[0]];
-  for (let i = 1; i < renderedPts.length; i++) {
-    const last = cleanPts[cleanPts.length - 1];
-    const curr = renderedPts[i];
-    if (Math.abs(curr.x - last.x) > 0.1 || Math.abs(curr.y - last.y) > 0.1) {
-      cleanPts.push(curr);
-    }
-  }
-
-  if (cleanPts.length <= 2) return [];
-
   const waypoints: { x: number; y: number }[] = [];
-  for (let i = 1; i < cleanPts.length - 1; i++) {
-    const prev = cleanPts[i - 1];
-    const curr = cleanPts[i];
-    const next = cleanPts[i + 1];
-
-    const dx1 = curr.x - prev.x;
-    const dy1 = curr.y - prev.y;
-    const dx2 = next.x - curr.x;
-    const dy2 = next.y - curr.y;
-
-    const isHorizontal1 = Math.abs(dy1) < 0.1;
-    const isHorizontal2 = Math.abs(dy2) < 0.1;
-    const isVertical1 = Math.abs(dx1) < 0.1;
-    const isVertical2 = Math.abs(dx2) < 0.1;
-
-    // If direction remains same axis, skip point (it's collinear)
-    if ((isHorizontal1 && isHorizontal2) || (isVertical1 && isVertical2)) {
-      continue;
+  for (let i = 1; i < renderedPts.length - 1; i++) {
+    const prev = renderedPts[i - 1];
+    const curr = renderedPts[i];
+    const next = renderedPts[i + 1];
+    const d1x = Math.sign(curr.x - prev.x);
+    const d1y = Math.sign(curr.y - prev.y);
+    const d2x = Math.sign(next.x - curr.x);
+    const d2y = Math.sign(next.y - curr.y);
+    // Keep only direction-change points (actual corners)
+    if (d1x !== d2x || d1y !== d2y) {
+      waypoints.push({ x: curr.x, y: curr.y });
     }
-
-    waypoints.push({ x: curr.x, y: curr.y });
   }
   return waypoints;
 }
