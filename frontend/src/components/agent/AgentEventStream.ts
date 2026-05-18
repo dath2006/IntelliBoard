@@ -27,6 +27,12 @@ const AGENT_SSE_EVENT_TYPES = [
   'session.applied',
   'session.discarded',
   'session.stopped',
+  'plan.announced',
+  'plan.approved',
+  'plan.rejected',
+  'thinking.step',
+  'todo.created',
+  'todo.updated',
 ] as const;
 
 export class AgentEventStream {

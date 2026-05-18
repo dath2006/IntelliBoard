@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { AgentSession, AgentSessionEvent } from '../services/agentSessions';
+import { useTodoStore } from './useTodoStore';
+import type { AgentTodoItem, TodoStatus } from './useTodoStore';
 
 const AGENT_PANEL_OPEN_KEY = 'velxio.agent.panel.open';
 const AGENT_PANEL_WIDTH_KEY = 'velxio.agent.panel.width';
@@ -259,7 +261,48 @@ export const useAgentStore = create<AgentState>((set) => ({
           payload: event.payload ?? {},
           expanded: false,
         };
+      } else if (event.eventType === 'todo.created') {
+        const runId = typeof event.payload?.runId === 'string' ? event.payload.runId : sessionId;
+        const rawItems = Array.isArray(event.payload?.items) ? event.payload.items : [];
+        const items: AgentTodoItem[] = rawItems.map((it: unknown) => {
+          const i = it as Record<string, unknown>;
+          return {
+            id: typeof i.id === 'string' ? i.id : String(Math.random()),
+            label: typeof i.label === 'string' ? i.label : '',
+            description: typeof i.description === 'string' ? i.description : undefined,
+            status: (typeof i.status === 'string' ? i.status : 'pending') as TodoStatus,
+          };
+        });
+        useTodoStore.getState().setTodos(sessionId, runId, items);
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: `${items.length} todos created`,
+          payload: event.payload ?? {},
+          expanded: false,
+        };
+      } else if (event.eventType === 'todo.updated') {
+        const id = typeof event.payload?.id === 'string' ? event.payload.id : null;
+        const status =
+          typeof event.payload?.status === 'string'
+            ? (event.payload.status as TodoStatus)
+            : 'pending';
+        if (id) useTodoStore.getState().updateTodo(sessionId, id, status);
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: `todo ${id ?? '?'} → ${status}`,
+          payload: event.payload ?? {},
+          expanded: false,
+        };
       } else if (event.eventType === 'run.started') {
+        useTodoStore.getState().clearTodos(sessionId);
         const msg = typeof event.payload?.message === 'string' ? event.payload.message : '';
         nextTrace = {
           id: `trace-${sessionId}-${event.seq}`,
@@ -272,6 +315,7 @@ export const useAgentStore = create<AgentState>((set) => ({
           expanded: false,
         };
       } else if (event.eventType === 'run.completed') {
+        useTodoStore.getState().freezeTodos(sessionId);
         const outputFromPayload =
           typeof event.payload?.output === 'string' ? event.payload.output.trim() : '';
         const finalText = (nextBufferedText || outputFromPayload).trim();
@@ -310,6 +354,46 @@ export const useAgentStore = create<AgentState>((set) => ({
           eventType: event.eventType,
           createdAt: event.createdAt,
           compactText: `Snapshot updated${parts.length ? ` (${parts.join(', ')})` : ''}`,
+          payload: event.payload ?? {},
+          expanded: false,
+        };
+      } else if (event.eventType === 'plan.announced') {
+        const title = typeof event.payload?.title === 'string' ? event.payload.title : 'Plan';
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: title,
+          payload: event.payload ?? {},
+          expanded: false,
+        };
+      } else if (event.eventType === 'thinking.step') {
+        const label = typeof event.payload?.label === 'string' ? event.payload.label : 'Step';
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: label,
+          payload: event.payload ?? {},
+          expanded: false,
+        };
+      } else if (
+        event.eventType === 'run.failed' ||
+        event.eventType === 'run.cancelled' ||
+        event.eventType === 'session.stopped'
+      ) {
+        useTodoStore.getState().freezeTodos(sessionId);
+        nextTrace = {
+          id: `trace-${sessionId}-${event.seq}`,
+          sessionId,
+          seq: event.seq,
+          eventType: event.eventType,
+          createdAt: event.createdAt,
+          compactText: event.eventType,
           payload: event.payload ?? {},
           expanded: false,
         };

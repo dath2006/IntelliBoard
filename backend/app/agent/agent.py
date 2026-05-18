@@ -113,127 +113,85 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "- Return concise, structured status updates after completing each logical step.\n\n"
 
         "════════════════════════════════════════════\n"
-        "SECTION 2 — MANDATORY WIRING PROTOCOL\n"
+        "SECTION 2 — MANDATORY CIRCUIT BUILDING PROTOCOL\n"
         "════════════════════════════════════════════\n\n"
-        "Follow this exact sequence for every wire you place. Violating this order will "
-        "produce incorrect or broken circuits.\n\n"
-        "STEP 1 — ADD THE COMPONENT OR BOARD\n"
-        "  Call add_component() or add_board() and note the exact id returned.\n"
-        "  When adding 2+ components, use add_component_batch() to place them all\n"
-        "  in a single atomic tool call.\n\n"
-        "STEP 2 — FETCH RUNTIME PINS (MANDATORY, NO EXCEPTIONS)\n"
-        "  Call get_canvas_runtime_pins(instance_id) for a single component, OR\n"
-        "  call get_canvas_runtime_pins_batch(instance_ids) when you added multiple\n"
-        "  components. The batch variant deduplicates by metadata_id internally —\n"
-        "  so adding 10 LEDs only performs ONE catalog lookup, not 10.\n"
-        "  - PREFER get_canvas_runtime_pins_batch whenever you added 2+ components.\n"
+        "Follow this exact sequence. The agent's job is electrical topology (what connects "
+        "to what). The frontend handles all spatial geometry automatically.\n\n"
+        "STEP 1 — GET SPATIAL CONTEXT (MANDATORY FIRST)\n"
+        "  Call get_canvas_spatial_context() to see the live canvas: real board pixel "
+        "dimensions, which sides have free space, and where existing components are.\n"
+        "  Also call get_project_outline() to get IDs of existing entities.\n\n"
+        "STEP 2 — SUGGEST COMPONENT POSITIONS (NEVER GUESS x/y)\n"
+        "  Before adding any component, call suggest_placement(requests=[...]) with:\n"
+        "    - id: the component_id you plan to use\n"
+        "    - metadataId: from search_component_catalog\n"
+        "    - connectsToBoardPin: the board pin it will connect to (used for side selection)\n"
+        "  The frontend measures the live DOM and returns {id, x, y, side} for each.\n"
+        "  Use those x, y values DIRECTLY in add_component_batch — never invent coordinates.\n\n"
+        "STEP 3 — ADD COMPONENTS\n"
+        "  Call add_component_batch(components=[...]) using the x, y from Step 2.\n"
+        "  When adding a single component, add_component() is fine.\n\n"
+        "STEP 4 — FETCH RUNTIME PINS (MANDATORY, NO EXCEPTIONS)\n"
+        "  Call get_canvas_runtime_pins_batch(instance_ids) for all added components.\n"
         "  - The pinNames list is the ONLY authoritative source for valid pin names.\n"
-        "  - Never invent, guess, or normalize pin names from your training data.\n"
-        "  - If available=False after retries, stop wiring and tell the user to open the "
-        "canvas so the component renders, then retry.\n"
-        "  - Wait for available=True before proceeding.\n\n"
-        "STEP 3 — PLAN ALL WIRES BEFORE PLACING ANY\n"
-        "  Before calling connect_pins even once, mentally (in your reasoning):\n"
-        "  a) List every connection needed: (from_component, from_pin) → (to_component, to_pin).\n"
-        "  b) Assign semantic signal types and colors (see Section 4).\n"
-        "  c) Group wires by corridor: which wires will share the same X or Y axis segment?\n"
-        "  d) Assign lane offsets to each group (see Section 3 — Wire Routing Rules).\n"
-        "  e) Compute waypoints for every wire.\n\n"
-        "STEP 4 — CONNECT ALL WIRES (USE BATCH)\n"
-        "  When you have 2+ wires to place, use connect_pins_batch(wires=[...]) to\n"
-        "  place them ALL in a single tool call. Order: VCC/GND first, then shared\n"
-        "  bus signals (I2C, SPI), then unique point-to-point signals.\n"
-        "  - connect_pins_batch saves massive latency vs calling connect_pins() in a loop.\n"
+        "  - Never invent, guess, or normalize pin names from training data.\n"
+        "  - If available=False after retries, tell the user to open the canvas then retry.\n\n"
+        "STEP 5 — CONNECT ALL WIRES (TOPOLOGY ONLY)\n"
+        "  Call connect_pins_batch(wires=[...]) to declare all connections at once.\n"
+        "  Order: VCC/GND first, then I2C/SPI buses, then point-to-point signals.\n"
         "  - Use connect_pins() only when placing exactly 1 wire.\n"
-        "  - All wires in a batch are applied atomically: if one fails, none are applied.\n\n"
-        "STEP 5 — ROUTE ALL WIRES (USE BATCH)\n"
-        "  After placing wires, call route_wire_batch(routes=[...]) to set waypoints\n"
-        "  for ALL wires in a single tool call. Use route_wire() only for 1 wire.\n"
-        "  Use get_component_bounds(component_id) to get accurate bounding boxes\n"
-        "  for R3 pin exit clearance and R7 component body avoidance.\n\n"
-        "STEP 6 — VALIDATE\n"
-        "  After all wires are placed and routed, call validate_pin_mapping_state() and \n"
-        "  validate_snapshot_state() to confirm structural integrity.\n\n"
+        "  - Note every wire_id returned — you need them in Step 6.\n\n"
+        "STEP 6 — AUTO-ROUTE ALL WIRES (NEVER COMPUTE WAYPOINTS MANUALLY)\n"
+        "  Call auto_route_wires(wire_ids=[...]) passing the wire IDs from Step 5.\n"
+        "  The frontend reads real pin positions from the DOM and runs the obstacle\n"
+        "  router to produce clean, non-overlapping orthogonal waypoints.\n"
+        "  Then call route_wire_batch(routes=[...]) using the returned routes:\n"
+        "    result = auto_route_wires(wire_ids=[\"wire-1\", \"wire-2\"])\n"
+        "    routes = [{\"wire_id\": r[\"wireId\"], \"waypoints\": r[\"waypoints\"]}\n"
+        "              for r in result[\"payload\"][\"routes\"] if r[\"routed\"]]\n"
+        "    route_wire_batch(routes=routes)\n"
+        "  If routed=False for a wire, call wait_seconds(1) and retry auto_route_wires.\n\n"
+        "STEP 7 — VALIDATE\n"
+        "  Call validate_pin_mapping_state() and validate_snapshot_state().\n\n"
 
         "════════════════════════════════════════════\n"
-        "SECTION 3 — WIRE ROUTING RULES (CRITICAL)\n"
+        "SECTION 3 — SPATIAL TOOL USAGE RULES\n"
         "════════════════════════════════════════════\n\n"
-        "These rules govern how you compute waypoints for route_wire(). "
-        "Following these rules is what makes the canvas look clean and professional. "
-        "Failure to follow these rules produces tangled, overlapping, unreadable wiring.\n\n"
-        "── RULE R1: NO DIAGONAL WIRES ──────────────────────────────────────────────────\n"
-        "Every wire must travel only horizontally and vertically. "
-        "Never create a direct diagonal connection between two points. "
-        "All waypoints must share either the same X or the same Y as the adjacent waypoint.\n\n"
-        "── RULE R2: ORTHOGONAL L-SHAPED ROUTING (DEFAULT) ──────────────────────────────\n"
-        "For most connections, use exactly two segments forming an L-shape:\n"
-        "  Segment 1: Travel horizontally from start to the midpoint X column.\n"
-        "  Segment 2: Travel vertically from the midpoint X column to the end Y.\n\n"
-        "Midpoint X = (start_component_x + end_component_x) / 2\n\n"
-        "Waypoints:\n"
-        "  [ { 'x': midX, 'y': start_pin_y }, { 'x': midX, 'y': end_pin_y } ]\n\n"
-        "If the components are vertically aligned (similar X), use a horizontal midpoint Y instead:\n"
-        "  Midpoint Y = (start_component_y + end_component_y) / 2\n"
-        "  Waypoints: [ { 'x': start_pin_x, 'y': midY }, { 'x': end_pin_x, 'y': midY } ]\n\n"
-        "── RULE R3: PIN EXIT CLEARANCE ──────────────────────────────────────────────────\n"
-        "The first waypoint must place the wire OUTSIDE the component bounding box "
-        "before turning. Use a 20px clearance in the exit direction.\n\n"
-        "  - Pin on left side of component: first waypoint x = component_x - 20\n"
-        "  - Pin on right side:             first waypoint x = component_x + component_width + 20\n"
-        "  - Pin on top:                    first waypoint y = component_y - 20\n"
-        "  - Pin on bottom:                 first waypoint y = component_y + component_height + 20\n\n"
-        "If you cannot determine the pin's side from the runtime pin data, "
-        "default to exiting horizontally (left/right based on relative position to target).\n\n"
-        "── RULE R4: LANE STAGGERING (ANTI-OVERLAP) ─────────────────────────────────────\n"
-        "When multiple wires share the same corridor column (same midpoint X) or "
-        "row (same midpoint Y), they MUST be assigned unique lane offsets.\n\n"
-        "Before computing each wire's midpoint, check if that X (or Y) is already used "
-        "by a wire routed in this session. If it is, shift by 10px:\n"
-        "  Wire 1 corridor: midX\n"
-        "  Wire 2 corridor: midX + 10\n"
-        "  Wire 3 corridor: midX + 20\n"
-        "  Wire 4 corridor: midX - 10\n"
-        "  (alternate +/- to balance distribution)\n\n"
-        "Do this for every group of wires sharing a corridor. The result is parallel "
-        "wire bundles instead of overlapping single lines.\n\n"
-        "── RULE R5: POWER BUS CONSOLIDATION ────────────────────────────────────────────\n"
-        "For projects with 3 or more components needing VCC/GND:\n"
-        "  1. Choose a dedicated power bus X column: powerBusX = board_x - 60\n"
-        "  2. Route all VCC wires to this column first (vertical segments on the bus).\n"
-        "  3. Route all GND wires to a second column: gndBusX = board_x - 40\n"
-        "  4. Connect each component horizontally to the nearest bus column.\n\n"
-        "This eliminates the most common source of wire tangling (GND/VCC fan-out).\n\n"
-        "── RULE R6: U-SHAPE FOR SAME-SIDE PINS ─────────────────────────────────────────\n"
-        "If both the source and destination pins face the same direction (both on the "
-        "right side, both on the bottom, etc.), use a 3-segment U-shape:\n"
-        "  1. Exit the source pin in its natural direction by 30px.\n"
-        "  2. Travel parallel to the component face to clear both components.\n"
-        "  3. Enter the destination pin from the same direction.\n\n"
-        "Waypoints for two right-side pins:\n"
-        "  [\n"
-        "    { 'x': start_x + 30, 'y': start_y },\n"
-        "    { 'x': start_x + 30, 'y': end_y },\n"
-        "    { 'x': end_x,        'y': end_y }\n"
-        "  ]\n\n"
-        "── RULE R7: AVOID COMPONENT BODIES ─────────────────────────────────────────────\n"
-        "When computing waypoints, check if the corridor passes through a component's "
-        "bounding box (from get_project_outline components list: x, y positions).\n\n"
-        "Approximate bounding box: 60x60px around each component center.\n\n"
-        "If the midpoint X column passes through a component's x ± 30 range, "
-        "shift the corridor by 35px to clear it.\n\n"
-        "── RULE R8: CONNECTOR-STYLE PIN CLUSTER FANNING ────────────────────────────────\n"
-        "When multiple wires leave the same pin cluster (e.g., a 6-pin SPI connector on "
-        "a display module), fan them out like a ribbon cable:\n"
-        "  - Assign each wire a fan offset: fan_offset = wire_index * 8px\n"
-        "  - Apply fan_offset to the exit direction before the first turn.\n"
-        "  - All wires in the fan must maintain their offset through the first segment, "
-        "then converge at their respective destinations.\n\n"
-        "Example for 4 wires exiting the bottom of a display at y=200:\n"
-        "  Wire 0: exits at y=200, first waypoint y=230+0  = 230\n"
-        "  Wire 1: exits at y=200, first waypoint y=230+8  = 238\n"
-        "  Wire 2: exits at y=200, first waypoint y=230+16 = 246\n"
-        "  Wire 3: exits at y=200, first waypoint y=230+24 = 254\n"
-        "  Then each wire turns independently to reach its destination.\n\n"
+        "── RULE S1: NEVER INVENT COORDINATES ───────────────────────────────────────────\n"
+        "Never pass hardcoded or guessed x/y values to add_component or add_board.\n"
+        "ALWAYS call suggest_placement() first to get frontend-computed positions.\n"
+        "This is the single most important rule for clean canvas layouts.\n\n"
+        "── RULE S2: NEVER COMPUTE WAYPOINTS MANUALLY ───────────────────────────────────\n"
+        "Never call route_wire or route_wire_batch with manually computed waypoints.\n"
+        "ALWAYS call auto_route_wires() first, then pass the returned waypoints to\n"
+        "route_wire_batch. The frontend obstacle router knows real pin positions and\n"
+        "component bounding boxes — you do not.\n\n"
+        "── RULE S3: USE get_canvas_spatial_context FOR REASONING ───────────────────────\n"
+        "When you need to understand where things are on the canvas (e.g., why wires\n"
+        "cross, whether there is free space, which side of a board a pin exits from),\n"
+        "call get_canvas_spatial_context(). It reads the live DOM and returns real\n"
+        "pixel coordinates, widths, heights, and per-pin canvas positions.\n\n"
+        "── RULE S4: BATCH EVERYTHING ────────────────────────────────────────────────────\n"
+        "- add_component_batch   > add_component (for 2+ components)\n"
+        "- connect_pins_batch    > connect_pins (for 2+ wires)\n"
+        "- route_wire_batch      > route_wire (for 2+ wires)\n"
+        "- get_canvas_runtime_pins_batch > get_canvas_runtime_pins (for 2+ instances)\n\n"
+        "── RULE S5: WIRE COLOR & SIGNAL TYPE ───────────────────────────────────────────\n"
+        "Always assign the correct color and signal_type in connect_pins_batch.\n"
+        "  VCC/3.3V/5V  → color='#ef4444', signal_type='power'\n"
+        "  GND          → color='#374151', signal_type='ground'\n"
+        "  SDA (I2C)    → color='#3b82f6', signal_type='i2c-data'\n"
+        "  SCL (I2C)    → color='#f59e0b', signal_type='i2c-clock'\n"
+        "  MOSI (SPI)   → color='#8b5cf6', signal_type='spi-mosi'\n"
+        "  MISO (SPI)   → color='#ec4899', signal_type='spi-miso'\n"
+        "  SCK (SPI)    → color='#f97316', signal_type='spi-clock'\n"
+        "  CS/SS (SPI)  → color='#06b6d4', signal_type='spi-cs'\n"
+        "  TX (UART)    → color='#84cc16', signal_type='uart-tx'\n"
+        "  RX (UART)    → color='#14b8a6', signal_type='uart-rx'\n"
+        "  Digital I/O  → color='#22c55e', signal_type='digital'\n"
+        "  Analog       → color='#a78bfa', signal_type='analog'\n"
+        "  PWM          → color='#fbbf24', signal_type='pwm'\n"
+        "  Reset/EN     → color='#f87171', signal_type='control'\n\n"
 
         "════════════════════════════════════════════\n"
         "SECTION 4 — WIRE COLOR & SIGNAL TYPE SEMANTICS\n"
@@ -366,7 +324,41 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "- Always cite your sources briefly (e.g., 'According to the SSD1306 datasheet...') when "
         "making design decisions based on search results.\n"
         "- Do not use web search for information that is already available in the "
-        "get_project_outline() or get_canvas_runtime_pins() responses."
+        "get_project_outline() or get_canvas_runtime_pins() responses.\n\n"
+
+        "════════════════════════════════════════════\n"
+        "SECTION 10 — PLAN ANNOUNCEMENT\n"
+        "════════════════════════════════════════════\n\n"
+        "Before starting any multi-step task, call announce_plan() ONCE with a concise "
+        "execution plan. This renders a structured plan card in the UI so the user "
+        "knows what you are about to do.\n\n"
+        "Call announce_plan() ONLY when the request requires 2 or more distinct actions "
+        "(e.g., adding components AND wiring AND writing firmware). "
+        "Do NOT call it for:\n"
+        "  - Simple questions or explanations (no canvas mutations needed)\n"
+        "  - Single-action requests (e.g., 'rename this file', 'what is this component?')\n"
+        "  - Follow-up clarifications where no new work is being started\n\n"
+        "The steps you provide must reflect your actual intended execution sequence — "
+        "not generic boilerplate. Be specific (e.g., 'Add ESP32 + SSD1306 display' "
+        "not 'Add components').\n"
+        "Call announce_plan() as the very first tool call of the run, before any canvas reads.\n\n"
+
+        "════════════════════════════════════════════\n"
+        "SECTION 11 — TASK PROGRESS (TODOS)\n"
+        "════════════════════════════════════════════\n\n"
+        "After announce_plan() is approved, call create_todo() ONCE with the same steps to "
+        "show a live progress tracker in the UI. Use the same ids and labels from the plan.\n\n"
+        "During execution, wrap EVERY step with:\n"
+        "  1. update_todo(id, 'in_progress')  — before starting that step's tool calls\n"
+        "  2. update_todo(id, 'done')          — after the step is complete\n"
+        "  3. update_todo(id, 'skipped')       — if a step is intentionally not needed\n\n"
+        "Rules:\n"
+        "  - Do NOT call create_todo() for single-action requests or questions.\n"
+        "  - Do NOT call create_todo() if announce_plan() returned approved=False.\n"
+        "  - If the user changes the plan via regenerate, call create_todo() again with "
+        "the new steps after the new plan is approved.\n"
+        "  - Always mark every todo as 'done' or 'skipped' before finishing — never leave "
+        "items stuck in 'in_progress' or 'pending'."
     )
 
     model = model_name if model_name is not None else settings.AGENT_MODEL
@@ -891,28 +883,6 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
             ctx,
             "disconnect_wire",
             lambda: _apply_mutation(ctx, *snapshot_ops.disconnect_wire(ctx.deps.snapshot, wire_id=wire_id), tool_name="disconnect_wire"),
-        )
-
-    @agent.tool
-    async def route_wire(
-        ctx: RunContext[AgentDeps],
-        wire_id: str,
-        waypoints: list[dict[str, float]],
-    ) -> dict[str, Any]:
-        """Set visual waypoints for a wire's path. waypoints: list of {x, y} dicts."""
-        ctx.deps.guard_tool_call()
-        return await _safe_tool_call(
-            ctx,
-            "route_wire",
-            lambda: _apply_mutation(
-                ctx,
-                *snapshot_ops.route_wire(
-                    ctx.deps.snapshot,
-                    wire_id=wire_id,
-                    waypoints=waypoints,
-                ),
-                tool_name="route_wire",
-            ),
         )
 
     @agent.tool
@@ -1504,22 +1474,115 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         )
 
     @agent.tool
-    async def get_component_bounds(ctx: RunContext[AgentDeps], component_id: str) -> dict[str, Any]:
-        """Get the bounding box (x, y, width, height) of a component on the canvas.
+    async def suggest_placement(
+        ctx: RunContext[AgentDeps],
+        requests: list[dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Ask the frontend to compute smart canvas positions for new components.
 
-        Returns: {x, y, width, height, pinPositions: [{name, x, y, side}...]}
-        Use this for accurate wire routing — avoids guessing component dimensions.
-        Essential for R3 (pin exit clearance) and R7 (avoid component bodies).
+        Call this BEFORE add_component / add_component_batch so you never have
+        to guess x/y coordinates.  The frontend reads the live DOM to measure
+        board and existing component sizes, then packs new components into free
+        slots adjacent to the correct board edge.
+
+        requests: list of dicts, each with:
+          - id (required)         — the component_id you plan to use
+          - metadataId (required) — the catalog id (e.g. 'wokwi-led')
+          - connectsToBoardPin (optional) — the board pin this component connects
+            to (e.g. '21').  Used to choose the correct board edge so wires are
+            short and clean.
+          - preferSide (optional) — 'right' | 'left' | 'top' | 'bottom' to
+            override automatic side selection.
+
+        Returns:
+          { placements: [{id, x, y, side}, ...] }
+
+        Use the returned x, y values directly in add_component_batch.
+
+        Example:
+          suggest_placement(requests=[
+            {"id": "oled1", "metadataId": "wokwi-ssd1306", "connectsToBoardPin": "21"},
+            {"id": "res1",  "metadataId": "wokwi-resistor", "connectsToBoardPin": "13"},
+          ])
         """
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(
             ctx,
-            "get_component_bounds",
+            "suggest_placement",
             lambda: _run_frontend_action(
                 ctx,
-                "get_component_bounds",
-                {"componentId": component_id},
+                "suggest_placement",
+                {"requests": requests},
             ),
+        )
+
+    @agent.tool
+    async def auto_route_wires(
+        ctx: RunContext[AgentDeps],
+        wire_ids: list[str] | None = None,
+    ) -> dict[str, Any]:
+        """Ask the frontend to compute obstacle-avoiding waypoints for wires.
+
+        Call this AFTER connect_pins_batch, passing the wire IDs just created.
+        The frontend uses the live DOM pin positions (via pinInfo) and the
+        existing obstacle router to generate clean, non-overlapping orthogonal
+        paths.  You MUST then call route_wire_batch() with the returned routes.
+
+        wire_ids: list of wire IDs to route.  Pass None or omit to route ALL
+                  wires in the project (useful for a full re-route pass).
+
+        Returns:
+          { routes: [{wireId, waypoints: [{x, y}...], routed, reason?}, ...] }
+
+        The `waypoints` list is in the exact format expected by route_wire_batch.
+        An empty waypoints list means the wire already has a clean L-shape —
+        you may still pass it to route_wire_batch with an empty list to clear
+        any previously stored waypoints.
+
+        Wires where routed=False have a `reason` explaining why (e.g. the
+        component has not rendered yet).  Retry after a short wait_seconds(1).
+
+        Example usage:
+          # After connect_pins_batch returned wire ids ["wire-1", "wire-2"]:
+          result = auto_route_wires(wire_ids=["wire-1", "wire-2"])
+          routes = [{"wire_id": r["wireId"], "waypoints": r["waypoints"]}
+                    for r in result["payload"]["routes"] if r["routed"]]
+          route_wire_batch(routes=routes)
+        """
+        ctx.deps.guard_tool_call()
+        payload: dict[str, Any] = {}
+        if wire_ids is not None:
+            payload["wireIds"] = wire_ids
+        return await _safe_tool_call(
+            ctx,
+            "auto_route_wires",
+            lambda: _run_frontend_action(ctx, "auto_route_wires", payload),
+        )
+
+    @agent.tool
+    async def get_canvas_spatial_context(ctx: RunContext[AgentDeps]) -> dict[str, Any]:
+        """Return a full spatial snapshot of the live canvas with real pixel data.
+
+        Unlike get_project_outline (which returns abstract IDs and snapshot
+        coordinates), this tool reads the actual rendered DOM to return:
+          - boards: id, boardKind, x, y, width, height,
+                    pins: [{name, canvasX, canvasY, side}]
+          - components: id, metadataId, x, y, width, height,
+                        pins: [{name, canvasX, canvasY, side}]
+          - canvasBounds: minX, minY, maxX, maxY,
+                          suggestedNextX, suggestedNextY
+
+        Use this when you need to reason about where things actually are on the
+        canvas — for example, to decide which side of the board has free space,
+        or to understand why wires are crossing.
+
+        Call get_project_outline() first for IDs; then call this for geometry.
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "get_canvas_spatial_context",
+            lambda: _run_frontend_action(ctx, "get_canvas_spatial_context", {}),
         )
 
     @agent.tool
@@ -1575,6 +1638,136 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         duration = max(0.1, min(seconds, 10.0))
         await asyncio.sleep(duration)
         return {"ok": True, "seconds": duration}
+
+    @agent.tool
+    async def announce_plan(
+        ctx: RunContext[AgentDeps],
+        title: str,
+        description: str,
+        steps: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        """Announce a structured execution plan in the UI before starting a multi-step task.
+        Blocks until the user approves, modifies, or cancels the plan.
+
+        Call this ONCE as the very first tool call when the user's request requires 2 or more
+        distinct actions (e.g., add components + wire + write firmware). Do NOT call it for
+        simple questions, single-action requests, or clarifications.
+
+        Args:
+            title: Short plan title (e.g., "Build LED blink circuit").
+            description: One-sentence summary of what will be done.
+            steps: Ordered list of steps, each with "label" (short name) and
+                   "description" (one sentence detail). Be specific — not generic boilerplate.
+
+        Returns:
+            {"approved": True} if user approved (possibly with modifications),
+            {"approved": False, "reason": "cancelled"} if user cancelled.
+            If the user provided a revised plan, the returned dict also contains
+            "revised_steps" — use those instead of your original steps.
+        """
+        action_request = create_frontend_action_request(
+            session_id=ctx.deps.session_id,
+            action="plan.approval",
+            payload={
+                "title": title,
+                "description": description,
+                "steps": steps,
+            },
+        )
+        await ctx.deps.emit_event(
+            "plan.announced",
+            {
+                "title": title,
+                "description": description,
+                "steps": steps,
+                "actionId": action_request.action_id,
+            },
+        )
+        await ctx.deps.emit_event(
+            "frontend.action.request",
+            {
+                "actionId": action_request.action_id,
+                "action": "plan.approval",
+                "payload": {"title": title, "description": description, "steps": steps},
+            },
+        )
+        result = await wait_for_frontend_action_result(
+            action_id=action_request.action_id,
+            timeout_ms=300_000,  # 5 min — plenty of time for the user to review
+        )
+        if not result.ok:
+            reason = result.error or "cancelled"
+            await ctx.deps.emit_event("plan.rejected", {"reason": reason})
+            return {"approved": False, "reason": reason}
+
+        revised = result.payload.get("revised_steps")
+        await ctx.deps.emit_event(
+            "plan.approved",
+            {"revised_steps": revised} if revised else {},
+        )
+        if revised:
+            return {"approved": True, "revised_steps": revised}
+        return {"approved": True}
+
+    @agent.tool
+    async def create_todo(
+        ctx: RunContext[AgentDeps],
+        items: list[dict[str, str]],
+    ) -> dict[str, Any]:
+        """Create a live todo list shown in the UI to track execution progress.
+
+        Call this ONCE immediately after announce_plan() is approved, using the
+        same steps from the plan. Do NOT call it for simple single-step tasks.
+
+        Each item must have:
+          - "id": unique short string (e.g. "step-1", "step-2")
+          - "label": short task name shown in the UI
+          - "description": optional one-sentence detail
+
+        Args:
+            items: Ordered list of todo items to track.
+        """
+        import uuid as _uuid
+        run_id = _uuid.uuid4().hex
+        todos = [
+            {
+                "id": it.get("id", f"todo-{i}"),
+                "label": it.get("label", ""),
+                "description": it.get("description", ""),
+                "status": "pending",
+            }
+            for i, it in enumerate(items)
+        ]
+        await ctx.deps.emit_event(
+            "todo.created",
+            {"runId": run_id, "items": todos},
+        )
+        return {"ok": True, "runId": run_id, "count": len(todos)}
+
+    @agent.tool
+    async def update_todo(
+        ctx: RunContext[AgentDeps],
+        id: str,
+        status: str,
+    ) -> dict[str, Any]:
+        """Update a todo item's status to reflect current execution progress.
+
+        Call update_todo(id, "in_progress") before starting each step.
+        Call update_todo(id, "done") after completing each step.
+        Call update_todo(id, "skipped") if a step is intentionally skipped.
+
+        Args:
+            id: The todo item id from create_todo.
+            status: One of "pending", "in_progress", "done", "skipped".
+        """
+        valid = {"pending", "in_progress", "done", "skipped"}
+        if status not in valid:
+            return {"ok": False, "error": f"Invalid status '{status}'. Must be one of {valid}"}
+        await ctx.deps.emit_event(
+            "todo.updated",
+            {"id": id, "status": status},
+        )
+        return {"ok": True, "id": id, "status": status}
 
     return agent
 

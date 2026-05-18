@@ -1,5 +1,7 @@
 import { useCompilationStore } from '../store/useCompilationStore';
 import { useSimulatorStore } from '../store/useSimulatorStore';
+import { usePlanApprovalStore } from '../store/usePlanApprovalStore';
+import type { PlanStep } from '../store/usePlanApprovalStore';
 import { runCompileAction } from '../utils/compileActions';
 import {
   runSimulationAction,
@@ -7,6 +9,17 @@ import {
   resetSimulationAction,
 } from '../utils/simulatorActions';
 import type { CompilationLog } from '../utils/compilationLogger';
+import {
+  suggestPlacements,
+  autoRouteWires,
+  getCanvasSpatialContext,
+} from '../utils/canvasLayoutEngine';
+import type {
+  PlacementRequest,
+  WireInfo,
+  BoardInfo,
+  ComponentInfo,
+} from '../utils/canvasLayoutEngine';
 
 export interface FrontendActionRequest {
   actionId: string;
@@ -245,6 +258,117 @@ export async function runFrontendAction(
             pinPositions,
           },
         };
+      }
+      case 'plan.approval': {
+        const title = typeof payload?.title === 'string' ? payload.title : 'Execution plan';
+        const description = typeof payload?.description === 'string' ? payload.description : '';
+        const rawSteps = Array.isArray(payload?.steps) ? payload.steps : [];
+        const steps: PlanStep[] = rawSteps.map((s: unknown) => ({
+          label:
+            typeof (s as Record<string, unknown>)?.label === 'string'
+              ? ((s as Record<string, unknown>).label as string)
+              : '',
+          description:
+            typeof (s as Record<string, unknown>)?.description === 'string'
+              ? ((s as Record<string, unknown>).description as string)
+              : '',
+        }));
+        return new Promise<FrontendActionResult>((resolve) => {
+          usePlanApprovalStore.getState().setPending({
+            actionId: request.actionId,
+            sessionId: '',
+            title,
+            description,
+            steps,
+            resolve,
+          });
+        });
+      }
+      case 'suggest_placement': {
+        const rawRequests = Array.isArray(payload?.requests) ? payload.requests : [];
+        if (rawRequests.length === 0) {
+          return { ok: false, error: 'requests array is required and must not be empty' };
+        }
+        const requests: PlacementRequest[] = rawRequests.map((r: unknown) => {
+          const req = r as Record<string, unknown>;
+          return {
+            id: typeof req.id === 'string' ? req.id : '',
+            metadataId: typeof req.metadataId === 'string' ? req.metadataId : '',
+            connectsToBoardPin:
+              typeof req.connectsToBoardPin === 'string' ? req.connectsToBoardPin : undefined,
+            preferSide:
+              typeof req.preferSide === 'string'
+                ? (req.preferSide as PlacementRequest['preferSide'])
+                : undefined,
+          };
+        });
+        const boards: BoardInfo[] = sim.boards.map((b) => ({
+          id: b.id,
+          boardKind: b.boardKind,
+          x: b.x,
+          y: b.y,
+        }));
+        const components: ComponentInfo[] = sim.components.map((c) => ({
+          id: c.id,
+          metadataId: c.metadataId,
+          x: c.x,
+          y: c.y,
+        }));
+        const placements = suggestPlacements(requests, boards, components);
+        return { ok: true, payload: { placements } };
+      }
+      case 'auto_route_wires': {
+        const rawWireIds = Array.isArray(payload?.wireIds) ? (payload.wireIds as string[]) : null;
+        const allWires: WireInfo[] = sim.wires.map((w) => ({
+          id: w.id,
+          start: {
+            componentId: w.start.componentId,
+            pinName: w.start.pinName,
+            x: w.start.x,
+            y: w.start.y,
+          },
+          end: { componentId: w.end.componentId, pinName: w.end.pinName, x: w.end.x, y: w.end.y },
+          waypoints: (w.waypoints ?? []).map((wp: { x: number; y: number }) => ({
+            x: wp.x,
+            y: wp.y,
+          })),
+        }));
+        const wiresToRoute = rawWireIds
+          ? allWires.filter((w) => rawWireIds.includes(w.id))
+          : allWires;
+        if (wiresToRoute.length === 0) {
+          return { ok: true, payload: { routes: [], message: 'No wires to route' } };
+        }
+        const boards: BoardInfo[] = sim.boards.map((b) => ({
+          id: b.id,
+          boardKind: b.boardKind,
+          x: b.x,
+          y: b.y,
+        }));
+        const components: ComponentInfo[] = sim.components.map((c) => ({
+          id: c.id,
+          metadataId: c.metadataId,
+          x: c.x,
+          y: c.y,
+        }));
+        const routes = autoRouteWires(wiresToRoute, components, boards);
+        return { ok: true, payload: { routes } };
+      }
+      case 'get_canvas_spatial_context': {
+        const boards: BoardInfo[] = sim.boards.map((b) => ({
+          id: b.id,
+          boardKind: b.boardKind,
+          x: b.x,
+          y: b.y,
+        }));
+        const components: ComponentInfo[] = sim.components.map((c) => ({
+          id: c.id,
+          metadataId: c.metadataId,
+          x: c.x,
+          y: c.y,
+        }));
+        const context = getCanvasSpatialContext(components, boards);
+        return { ok: true, payload: context };
       }
       default:
         return { ok: false, error: `Unknown action: ${action}` };

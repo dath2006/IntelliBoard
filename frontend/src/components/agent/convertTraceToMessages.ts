@@ -249,6 +249,28 @@ export function convertTraceToMessages(traces: AgentTraceItem[]): UIMessage[] {
           bad ? String((merged as { error?: string }).error ?? '') : undefined,
         ),
       );
+      continue;
+    }
+
+    if (trace.eventType === 'plan.announced') {
+      const steps = Array.isArray(trace.payload?.steps) ? trace.payload.steps : [];
+      const approved = trace.payload?.approved as boolean | undefined;
+      messages.push({
+        id: trace.id,
+        role: 'assistant',
+        parts: [
+          {
+            type: 'text',
+            text: `__plan__:${JSON.stringify({
+              title: trace.payload?.title ?? 'Execution plan',
+              description: trace.payload?.description ?? '',
+              steps,
+              approved: approved ?? null,
+            })}`,
+          },
+        ],
+      });
+      continue;
     }
 
     // run.completed with output-only rows are represented via model.output.final already in traces.

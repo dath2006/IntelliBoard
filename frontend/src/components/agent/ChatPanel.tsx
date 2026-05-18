@@ -27,12 +27,179 @@ import {
 } from '../ai-elements/prompt-input';
 import { CompactModelSelector } from './ModelSelector';
 import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '../ai-elements/tool';
+import {
+  Plan,
+  PlanHeader,
+  PlanTitle,
+  PlanDescription,
+  PlanTrigger,
+  PlanContent,
+} from '../ai-elements/plan';
+import {
+  ChainOfThought,
+  ChainOfThoughtHeader,
+  ChainOfThoughtContent,
+  ChainOfThoughtStep,
+} from '../ai-elements/chain-of-thought';
+import { CheckCircle2Icon, LucideTerminal, CheckIcon, XIcon, RefreshCwIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAgentSync, buildSnapshotFromStores } from './useAgentSync';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { LucideTerminal } from 'lucide-react';
 import { nanoid } from 'nanoid';
+import { usePlanApprovalStore } from '../../store/usePlanApprovalStore';
+import { AgentTodoPanel } from './AgentTodoPanel';
+import { Button } from '@/components/ui/button';
 import { Shimmer } from '../ai-elements/shimmer';
+
+/** Floating approval card — shown while agent is waiting for plan approval */
+function PlanApprovalCard({
+  sessionId,
+  onRegenerate,
+}: {
+  sessionId: string;
+  onRegenerate: (feedback: string) => void;
+}) {
+  const pending = usePlanApprovalStore((s) => s.pending);
+  const approve = usePlanApprovalStore((s) => s.approve);
+  const cancel = usePlanApprovalStore((s) => s.cancel);
+  const [showFeedback, setShowFeedback] = React.useState(false);
+  const [feedback, setFeedback] = React.useState('');
+  const feedbackRef = React.useRef<HTMLTextAreaElement>(null);
+
+  if (
+    !pending ||
+    pending.actionId === '' ||
+    (pending.sessionId !== '' && pending.sessionId !== sessionId)
+  )
+    return null;
+
+  const handleShowFeedback = () => {
+    setShowFeedback(true);
+    setTimeout(() => feedbackRef.current?.focus(), 50);
+  };
+
+  const handleRegenerate = () => {
+    const text = feedback.trim();
+    if (!text) return;
+    cancel();
+    onRegenerate(text);
+    setFeedback('');
+    setShowFeedback(false);
+  };
+
+  const handleCancel = () => {
+    cancel();
+    setShowFeedback(false);
+    setFeedback('');
+  };
+
+  return (
+    <div className="mx-4 mb-3 rounded-xl border border-border bg-card shadow-sm text-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 px-4 pt-4 pb-2">
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-foreground leading-tight">{pending.title}</p>
+          {pending.description && (
+            <p className="mt-0.5 text-[11px] text-muted-foreground leading-snug">
+              {pending.description}
+            </p>
+          )}
+        </div>
+        <span className="shrink-0 mt-0.5 rounded-full border border-amber-400/40 bg-amber-400/10 px-2 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
+          Awaiting approval
+        </span>
+      </div>
+
+      {/* Steps */}
+      <div className="px-4 pb-3 space-y-0 border-t border-border/50 pt-3">
+        {pending.steps.map((step, si) => (
+          <div key={si} className="flex items-start gap-2.5 py-1.5">
+            <div className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full bg-muted text-[10px] font-semibold text-muted-foreground">
+              {si + 1}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-foreground leading-snug">{step.label}</p>
+              {step.description && (
+                <p className="text-[11px] text-muted-foreground leading-snug mt-0.5">
+                  {step.description}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Feedback input — shown when user clicks "Change plan" */}
+      {showFeedback && (
+        <div className="px-4 pb-3 border-t border-border/50 pt-3 space-y-2">
+          <p className="text-[11px] text-muted-foreground">
+            Describe what you'd like to change and the agent will generate a new plan.
+          </p>
+          <textarea
+            ref={feedbackRef}
+            className="w-full rounded-lg border border-border bg-background px-3 py-2 text-xs placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring resize-none"
+            rows={3}
+            placeholder="e.g. Use SSD1306 OLED instead of LCD, and add a temperature sensor…"
+            value={feedback}
+            onChange={(e) => setFeedback(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleRegenerate();
+            }}
+          />
+        </div>
+      )}
+
+      {/* Actions */}
+      <div className="flex items-center justify-between gap-2 border-t border-border/50 px-4 py-2.5 bg-muted/30">
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="ghost"
+            className="h-7 gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            onClick={
+              showFeedback
+                ? () => {
+                    setShowFeedback(false);
+                    setFeedback('');
+                  }
+                : handleShowFeedback
+            }
+          >
+            <RefreshCwIcon className="size-3" />
+            {showFeedback ? 'Cancel change' : 'Change plan'}
+          </Button>
+          {showFeedback && (
+            <Button
+              size="sm"
+              variant="secondary"
+              className="h-7 gap-1.5 text-xs"
+              disabled={!feedback.trim()}
+              onClick={handleRegenerate}
+            >
+              <RefreshCwIcon className="size-3" />
+              Regenerate
+            </Button>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 gap-1.5 text-xs text-destructive border-destructive/30 hover:bg-destructive/10"
+            onClick={handleCancel}
+          >
+            <XIcon className="size-3" />
+            Cancel
+          </Button>
+          <Button size="sm" className="h-7 gap-1.5 text-xs" onClick={() => approve()}>
+            <CheckIcon className="size-3" />
+            Approve & run
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 interface ChatPanelProps {
   sessionId: string;
@@ -71,6 +238,66 @@ const ChatMessage = React.memo(function ChatMessage({ message, isBusy }: ChatMes
             );
           }
           if (isTextUIPart(part)) {
+            if (part.text.startsWith('__plan__:')) {
+              let planData: {
+                title: string;
+                description: string;
+                steps: { label: string; description: string }[];
+                approved: boolean | null;
+              } | null = null;
+              try {
+                planData = JSON.parse(part.text.slice('__plan__:'.length));
+              } catch {
+                /* ignore */
+              }
+              if (planData) {
+                const isApproved = planData.approved === true;
+                const isCancelled = planData.approved === false;
+                return (
+                  <div key={`${message.id}-plan-${pi}`} className={cn('w-full', pi > 0 && 'mt-3')}>
+                    <Plan className="border-border/50 bg-muted/20 text-xs">
+                      <PlanHeader>
+                        <div className="flex flex-col gap-0.5 flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <PlanTitle>{planData.title}</PlanTitle>
+                            {isApproved && (
+                              <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-1.5 py-0.5 text-[10px] font-medium text-emerald-600 dark:text-emerald-400">
+                                Approved
+                              </span>
+                            )}
+                            {isCancelled && (
+                              <span className="rounded-full border border-destructive/30 bg-destructive/10 px-1.5 py-0.5 text-[10px] font-medium text-destructive">
+                                Cancelled
+                              </span>
+                            )}
+                          </div>
+                          {planData.description && (
+                            <PlanDescription>{planData.description}</PlanDescription>
+                          )}
+                        </div>
+                        <PlanTrigger />
+                      </PlanHeader>
+                      <PlanContent className="pt-0 pb-3 px-4">
+                        <ChainOfThought defaultOpen>
+                          <ChainOfThoughtHeader>Steps</ChainOfThoughtHeader>
+                          <ChainOfThoughtContent>
+                            {planData.steps.map((step, si) => (
+                              <ChainOfThoughtStep
+                                key={si}
+                                icon={CheckCircle2Icon}
+                                label={step.label}
+                                description={step.description}
+                                status="complete"
+                              />
+                            ))}
+                          </ChainOfThoughtContent>
+                        </ChainOfThought>
+                      </PlanContent>
+                    </Plan>
+                  </div>
+                );
+              }
+            }
             return (
               <div key={`${message.id}-t-${pi}`} className={cn('max-w-none', pi > 0 && 'mt-3')}>
                 <MessageResponse>{part.text}</MessageResponse>
@@ -283,6 +510,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </div>
         )}
 
+        {/* Live todo progress — pinned at top, always visible while active */}
+        <AgentTodoPanel sessionId={sessionId} />
+
         <Conversation
           className={cn('flex-1 min-h-0 chat-panel-scroll', !isBusy && 'chat-panel-scroll--smooth')}
           initial="instant"
@@ -311,6 +541,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           </ConversationContent>
           <ConversationScrollButton className="mb-4" />
         </Conversation>
+
+        {/* Plan approval card — shown while agent awaits plan approval */}
+        <PlanApprovalCard
+          sessionId={sessionId}
+          onRegenerate={(feedback) => {
+            sendMessage({ text: feedback });
+            setInputUi('');
+          }}
+        />
 
         {/* Composer */}
         <div className="shrink-0 p-4 border-t border-border bg-background">

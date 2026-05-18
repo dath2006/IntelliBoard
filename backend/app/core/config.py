@@ -23,7 +23,7 @@ class Settings(BaseSettings):
     AGENT_MAX_TOOL_CALLS: int = 200
     AGENT_MAX_PROMPT_CHARS: int = 12000
     AGENT_SNAPSHOT_MAX_BYTES: int = 1_000_000
-    AGENT_MAX_RUN_SECONDS: int = 180
+    AGENT_MAX_RUN_SECONDS: int = 600
     AGENT_ENABLE_LOGFIRE: bool = False
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
