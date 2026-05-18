@@ -5,7 +5,7 @@ import { useEditorStore } from '../../store/useEditorStore';
 import { useSimulatorStore } from '../../store/useSimulatorStore';
 import { createProject } from '../../services/projectService';
 import { trackCreateProject } from '../../utils/analytics';
-import { BOARD_KIND_LABELS } from '../../types/board';
+import { BOARD_KIND_LABELS, type BoardKind } from '../../types/board';
 import { isEsp32BoardKind } from '../../utils/boardResolver';
 
 interface NewProjectModalProps {
@@ -34,7 +34,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose }) => 
 
     let defaultCode = 'void setup() {\n}\n\nvoid loop() {\n}';
     let defaultExt = '.ino';
-    
+
     if (isEsp32BoardKind(boardType)) {
       defaultExt = '.ino';
     } else if (boardType === 'raspberry-pi-pico' || boardType === 'pi-pico-w') {
@@ -64,14 +64,14 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose }) => 
       // This ensures the new project starts with a clean slate
       const editorState = useEditorStore.getState();
       const simulatorState = useSimulatorStore.getState();
-      
-      // Clear editor state
-      editorState.loadFiles([{ name: `main${defaultExt}`, content: defaultCode }]);
-      
-      // Clear simulator state
+
+      // Reset simulator board so IDs match the selected board kind
+      simulatorState.resetBoardsToSingle(boardType as BoardKind);
       simulatorState.setComponents([]);
       simulatorState.setWires([]);
-      simulatorState.setBoardType(boardType as any);
+
+      // Clear editor state for the new board group
+      editorState.loadFiles([{ name: `main${defaultExt}`, content: defaultCode }]);
 
       setCurrentProject({
         id: saved.id,
@@ -79,10 +79,10 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({ onClose }) => 
         ownerUsername: saved.owner_username,
         isPublic: saved.is_public,
       });
-      
+
       navigate(`/project/${saved.id}`, { replace: true });
       onClose();
-      
+
       // Note: Removed window.location.reload() - stores are now properly cleared
     } catch (err: any) {
       if (!err?.response) {
@@ -274,4 +274,3 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
   },
 };
-

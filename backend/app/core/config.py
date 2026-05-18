@@ -12,11 +12,12 @@ class Settings(BaseSettings):
     FRONTEND_URL: str = "http://localhost:5173"
     # Set to true in production (HTTPS). Controls the Secure flag on the JWT cookie.
     OPENAI_API_KEY: str = ""
+    OPENROUTER_API_KEY: str = ""
     ARDUINO_ESP32_PATH: str = ""
     IDF_PATH: str = ""
     COOKIE_SECURE: bool = False
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 10080  # 7 days
-    AGENT_MODEL: str = "openai:gpt-5.4-mini"
+    AGENT_MODEL: str = "openrouter:z-ai/glm-5"
     AGENT_FALLBACK_MODEL: str = ""
     AGENT_ENABLED: bool = True
     AGENT_MAX_TOOL_CALLS: int = 200
@@ -36,6 +37,9 @@ class Settings(BaseSettings):
         # OpenAI API key is only required for openai: or openai-responses: models
         if (self.AGENT_MODEL.startswith("openai:") or self.AGENT_MODEL.startswith("openai-responses:")) and not self.OPENAI_API_KEY:
             raise RuntimeError("OPENAI_API_KEY is required when using OpenAI models.")
+        # OpenRouter API key is required for openrouter: models
+        if self.AGENT_MODEL.startswith("openrouter:") and not self.OPENROUTER_API_KEY:
+            raise RuntimeError("OPENROUTER_API_KEY is required when using OpenRouter models.")
 
 
 settings = Settings()

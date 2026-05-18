@@ -50,6 +50,13 @@ PROVIDERS: list[dict[str, str]] = [
         "description": "OpenAI GPT models via API key configured in server settings.",
     },
     {
+        "id": "openrouter",
+        "label": "OpenRouter",
+        "auth_type": "api_key",
+        "model_prefix": "openrouter:",
+        "description": "OpenRouter models via API key configured in server settings.",
+    },
+    {
         "id": "github",
         "label": "GitHub Copilot",
         "auth_type": "device_code",
@@ -70,6 +77,10 @@ GITHUB_COPILOT_MODELS = [
 
 OPENAI_MODELS = [
     "gpt-5.4-mini",
+]
+
+OPENROUTER_MODELS = [
+    "z-ai/glm-5",
 ]
 
 
@@ -124,6 +135,16 @@ async def list_models_for_user(db: AsyncSession, user_id: str) -> list[dict[str,
                 "label": m,
                 "provider": "openai",
                 "provider_label": "OpenAI",
+            })
+
+    # OpenRouter models — only when API key is configured server-side
+    if settings.OPENROUTER_API_KEY:
+        for m in OPENROUTER_MODELS:
+            models.append({
+                "id": f"openrouter:{m}",
+                "label": m,
+                "provider": "openrouter",
+                "provider_label": "OpenRouter",
             })
 
     # GitHub Copilot models — only when user has connected their account
@@ -207,9 +228,11 @@ async def resolve_pydantic_ai_model(
         return await _build_copilot_model(db, user_id, normalized_model_id)
     if normalized_model_id.startswith("openai:"):
         return normalized_model_id
+    if normalized_model_id.startswith("openrouter:"):
+        return normalized_model_id
 
     raise ValueError(
-        f"Unsupported model id '{model_id}'. Expected 'openai:<model>' or 'github-copilot:<model>'."
+        f"Unsupported model id '{model_id}'. Expected 'openai:<model>', 'openrouter:<model>', or 'github-copilot:<model>'."
     )
 
 

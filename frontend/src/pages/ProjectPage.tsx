@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getProject } from '../services/projectService';
 import { useEditorStore } from '../store/useEditorStore';
 import { useSimulatorStore } from '../store/useSimulatorStore';
+import type { BoardKind } from '../types/board';
 import { useProjectStore } from '../store/useProjectStore';
 import { EditorPage } from './EditorPage';
 
@@ -15,35 +16,35 @@ export const ProjectPage: React.FC = () => {
   const { username, projectName } = useParams<{ username: string; projectName: string }>();
   const navigate = useNavigate();
   const loadFiles = useEditorStore((s) => s.loadFiles);
-  const { setComponents, setWires, setBoardType } = useSimulatorStore();
+  const { setComponents, setWires, resetBoardsToSingle } = useSimulatorStore();
   const setCurrentProject = useProjectStore((s) => s.setCurrentProject);
   const [ready, setReady] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
     if (!username || !projectName) return;
-    
+
     // CRITICAL FIX: Clear stores before loading new project to prevent
     // cross-contamination between projects
     const editorState = useEditorStore.getState();
     const simulatorState = useSimulatorStore.getState();
-    
+
     // Clear editor state
     editorState.loadFiles([{ name: 'sketch.ino', content: '' }]);
-    
+
     // Clear simulator state
     simulatorState.setComponents([]);
     simulatorState.setWires([]);
-    simulatorState.setBoardType('arduino-uno');
-    
+    simulatorState.resetBoardsToSingle('arduino-uno');
+
     getProject(username, projectName)
       .then((project) => {
         const files =
           project.files.length > 0
             ? project.files
             : [{ name: 'sketch.ino', content: project.code }];
+        resetBoardsToSingle(project.board_type as BoardKind);
         loadFiles(files);
-        setBoardType(project.board_type as any);
         try {
           setComponents(JSON.parse(project.components_json));
           setWires(JSON.parse(project.wires_json));

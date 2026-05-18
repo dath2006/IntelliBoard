@@ -21,12 +21,15 @@ export interface FrontendActionResult {
   error?: string;
 }
 
-const MAX_SERIAL_SNAPSHOT_LINES = 1000;
+const MAX_SERIAL_SNAPSHOT_LINES = 500;
+const MAX_COMPILE_LOG_LINES = 200;
 
 function serializeLogs(
   logs: CompilationLog[],
+  maxLines: number | null = null,
 ): Array<{ timestamp: string; type: string; message: string }> {
-  return logs.map((log) => ({
+  const slice = maxLines ? logs.slice(-maxLines) : logs;
+  return slice.map((log) => ({
     timestamp: log.timestamp.toISOString(),
     type: log.type,
     message: log.message,
@@ -115,6 +118,8 @@ export async function runFrontendAction(
           boardId,
           onLog: (log) => compilation.appendLog(log),
         });
+        const totalLogs = outcome.logs.length;
+        const logs = serializeLogs(outcome.logs, MAX_COMPILE_LOG_LINES);
         return {
           ok: outcome.ok,
           payload: {
@@ -122,8 +127,10 @@ export async function runFrontendAction(
             boardKind: outcome.boardKind,
             message: outcome.message,
             missingLibHint: outcome.missingLibHint,
-            logs: serializeLogs(outcome.logs),
-            result: outcome.result,
+            logs,
+            totalLogs,
+            logsTruncated: logs.length < totalLogs,
+            maxLogs: MAX_COMPILE_LOG_LINES,
           },
           error: outcome.ok ? undefined : outcome.message?.text,
         };

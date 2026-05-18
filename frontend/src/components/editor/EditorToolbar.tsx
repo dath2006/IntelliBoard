@@ -329,11 +329,11 @@ export const EditorToolbar = ({
     try {
       const result = await importFromWokwiZip(file);
       const { loadFiles } = useEditorStore.getState();
-      const { setComponents, setWires, setBoardType, setBoardPosition, stopSimulation } =
+      const { setComponents, setWires, resetBoardsToSingle, stopSimulation } =
         useSimulatorStore.getState();
       stopSimulation();
-      if (result.boardType) setBoardType(result.boardType);
-      setBoardPosition(result.boardPosition);
+      if (result.boardType)
+        resetBoardsToSingle(result.boardType as BoardKind, result.boardPosition);
       setComponents(result.components);
       setWires(result.wires);
       if (result.files.length > 0) loadFiles(result.files);
@@ -395,11 +395,15 @@ export const EditorToolbar = ({
                   }}
                   title={`Editing: ${BOARD_KIND_LABELS[activeBoard.boardKind]}`}
                 >
-                  <span className="tb-board-pill-icon">{BOARD_PILL_ICON[activeBoard.boardKind]}</span>
+                  <span className="tb-board-pill-icon">
+                    {BOARD_PILL_ICON[activeBoard.boardKind]}
+                  </span>
                   <span className="tb-board-pill-label">
                     {BOARD_KIND_LABELS[activeBoard.boardKind]}
                   </span>
-                  {activeBoard.running && <span className="tb-board-pill-running" title="Running" />}
+                  {activeBoard.running && (
+                    <span className="tb-board-pill-running" title="Running" />
+                  )}
                 </div>
                 {BOARD_SUPPORTS_MICROPYTHON.has(activeBoard.boardKind) && (
                   <select
@@ -429,116 +433,36 @@ export const EditorToolbar = ({
             )}
 
             <div className="toolbar-group">
-            {/* Compile */}
-            <button
-              onClick={handleCompile}
-              disabled={compiling || !activeBoard}
-              className="tb-btn tb-btn-compile"
-              title={
-                !activeBoard
-                  ? 'Add a board to compile'
-                  : compiling
-                    ? 'Loading…'
-                    : activeBoard?.languageMode === 'micropython'
-                      ? 'Load MicroPython'
-                      : 'Compile (Ctrl+B)'
-              }
-            >
-              {compiling ? (
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="spin"
-                >
-                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-                </svg>
-              ) : (
-                <svg
-                  width="22"
-                  height="22"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                >
-                  <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                </svg>
-              )}
-            </button>
-
-            <div className="tb-divider" />
-
-            {/* Run */}
-            <button
-              onClick={handleRun}
-              disabled={isRunning || compiling || !activeBoard}
-              className="tb-btn tb-btn-run"
-              title={
-                !activeBoard
-                  ? 'Add a board to run'
-                  : activeBoard?.languageMode === 'micropython'
-                    ? 'Run MicroPython'
-                    : 'Run (auto-compiles if needed)'
-              }
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <polygon points="5,3 19,12 5,21" />
-              </svg>
-            </button>
-
-            {/* Stop */}
-            <button
-              onClick={handleStop}
-              disabled={!isRunning}
-              className="tb-btn tb-btn-stop"
-              title="Stop"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-              </svg>
-            </button>
-
-            {/* Reset */}
-            <button
-              onClick={handleReset}
-              disabled={!activeBoard?.compiledProgram}
-              className="tb-btn tb-btn-reset"
-              title="Reset"
-            >
-              <svg
-                width="22"
-                height="22"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
+              {/* Compile */}
+              <button
+                onClick={handleCompile}
+                disabled={compiling || !activeBoard}
+                className="tb-btn tb-btn-compile"
+                title={
+                  !activeBoard
+                    ? 'Add a board to compile'
+                    : compiling
+                      ? 'Loading…'
+                      : activeBoard?.languageMode === 'micropython'
+                        ? 'Load MicroPython'
+                        : 'Compile (Ctrl+B)'
+                }
               >
-                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                <path d="M3 3v5h5" />
-              </svg>
-            </button>
-
-            {boards.length > 1 && (
-              <>
-                <div className="tb-divider" />
-
-                {/* Compile All */}
-                <button
-                  onClick={handleCompileAll}
-                  disabled={compileAllRunning}
-                  className="tb-btn tb-btn-compile-all"
-                  title="Compile all boards"
-                >
+                {compiling ? (
+                  <svg
+                    width="22"
+                    height="22"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="spin"
+                  >
+                    <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                  </svg>
+                ) : (
                   <svg
                     width="22"
                     height="22"
@@ -550,27 +474,113 @@ export const EditorToolbar = ({
                     strokeLinejoin="round"
                   >
                     <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
-                    <path d="M6 20h4M14 4l4 4" strokeDasharray="2 2" />
                   </svg>
-                </button>
+                )}
+              </button>
 
-                {/* Run All */}
-                <button
-                  onClick={handleRunAll}
-                  disabled={isRunning}
-                  className="tb-btn tb-btn-run-all"
-                  title="Run all boards"
+              <div className="tb-divider" />
+
+              {/* Run */}
+              <button
+                onClick={handleRun}
+                disabled={isRunning || compiling || !activeBoard}
+                className="tb-btn tb-btn-run"
+                title={
+                  !activeBoard
+                    ? 'Add a board to run'
+                    : activeBoard?.languageMode === 'micropython'
+                      ? 'Run MicroPython'
+                      : 'Run (auto-compiles if needed)'
+                }
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <polygon points="5,3 19,12 5,21" />
+                </svg>
+              </button>
+
+              {/* Stop */}
+              <button
+                onClick={handleStop}
+                disabled={!isRunning}
+                className="tb-btn tb-btn-stop"
+                title="Stop"
+              >
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+                  <rect x="3" y="3" width="18" height="18" rx="2" />
+                </svg>
+              </button>
+
+              {/* Reset */}
+              <button
+                onClick={handleReset}
+                disabled={!activeBoard?.compiledProgram}
+                className="tb-btn tb-btn-reset"
+                title="Reset"
+              >
+                <svg
+                  width="22"
+                  height="22"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 >
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" stroke="none">
-                    <polygon points="3,3 11,12 3,21" />
-                    <polygon points="13,3 21,12 13,21" />
-                  </svg>
-                </button>
-              </>
-            )}
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                  <path d="M3 3v5h5" />
+                </svg>
+              </button>
+
+              {boards.length > 1 && (
+                <>
+                  <div className="tb-divider" />
+
+                  {/* Compile All */}
+                  <button
+                    onClick={handleCompileAll}
+                    disabled={compileAllRunning}
+                    className="tb-btn tb-btn-compile-all"
+                    title="Compile all boards"
+                  >
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+                      <path d="M6 20h4M14 4l4 4" strokeDasharray="2 2" />
+                    </svg>
+                  </button>
+
+                  {/* Run All */}
+                  <button
+                    onClick={handleRunAll}
+                    disabled={isRunning}
+                    className="tb-btn tb-btn-run-all"
+                    title="Run all boards"
+                  >
+                    <svg
+                      width="22"
+                      height="22"
+                      viewBox="0 0 24 24"
+                      fill="currentColor"
+                      stroke="none"
+                    >
+                      <polygon points="3,3 11,12 3,21" />
+                      <polygon points="13,3 21,12 13,21" />
+                    </svg>
+                  </button>
+                </>
+              )}
             </div>
           </div>
-          
+
           {/* Spacer to push groups apart */}
           <div style={{ flex: 1 }} />
 

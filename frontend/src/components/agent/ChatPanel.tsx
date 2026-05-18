@@ -292,7 +292,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             {messages.length === 0 && (
               <ConversationEmptyState
                 className="min-h-[200px]"
-                title="Velxio agent"
+                title="IntelliBoard agent"
                 description="Describe schematic or sketch changes — canvas and files sync automatically when you edit."
               />
             )}

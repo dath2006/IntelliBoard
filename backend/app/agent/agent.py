@@ -9,6 +9,10 @@ from typing import Any
 # pyrefly: ignore [missing-import]
 from pydantic_ai import Agent, RunContext, WebSearchTool
 # pyrefly: ignore [missing-import]
+from pydantic_ai.models.openrouter import OpenRouterModel
+# pyrefly: ignore [missing-import]
+from pydantic_ai.providers.openrouter import OpenRouterProvider
+# pyrefly: ignore [missing-import]
 from pydantic_ai.messages import (
     AgentStreamEvent,
     FinalResultEvent,
@@ -374,6 +378,15 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         if model.startswith("openai:"):
             model = model.replace("openai:", "openai-responses:", 1)
         builtin_tools.append(WebSearchTool())
+
+    # Build an explicit OpenRouterModel when using the openrouter: prefix so that
+    # the OPENROUTER_API_KEY env-var is picked up by OpenRouterProvider.
+    if isinstance(model, str) and model.startswith("openrouter:"):
+        openrouter_model_name = model[len("openrouter:"):]
+        model = OpenRouterModel(
+            openrouter_model_name,
+            provider=OpenRouterProvider(api_key=settings.OPENROUTER_API_KEY),
+        )
 
     agent = Agent(
         model,

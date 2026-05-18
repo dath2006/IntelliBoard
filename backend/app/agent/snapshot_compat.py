@@ -48,7 +48,9 @@ def legacy_to_snapshot_v2(
         active_board_id = None
         group_id = "group-standalone"
     else:
+        # Canonicalize the board kind and use it as the ID for the first board of its kind
         board_kind = canonical_board_kind(board_type or DEFAULT_BOARD_KIND)
+        # Use the board kind as the ID - this matches the addBoard logic for the first board
         board_id = board_kind
         group_id = f"group-{board_id}"
         boards = [

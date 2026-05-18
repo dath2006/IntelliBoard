@@ -40,10 +40,12 @@ type ConnectStep = 'idle' | 'loading' | 'show_code' | 'polling' | 'done' | 'erro
 
 function ProviderBadges({
   openaiProvider,
+  openrouterProvider,
   githubProvider,
   compact,
 }: {
   openaiProvider?: ProviderStatus;
+  openrouterProvider?: ProviderStatus;
   githubProvider?: ProviderStatus;
   compact?: boolean;
 }) {
@@ -66,6 +68,14 @@ function ProviderBadges({
 
   return (
     <div className="flex flex-wrap gap-1.5">
+      {openrouterProvider
+        ? chip(
+            openrouterProvider.connected,
+            'OpenRouter',
+            openrouterProvider.connected ? 'OpenRouter API key configured' : 'No API key',
+            <Key className="size-2.5 opacity-70" />,
+          )
+        : null}
       {openaiProvider
         ? chip(
             openaiProvider.connected,
@@ -202,7 +212,9 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
 
   const githubProvider = providers.find((p) => p.id === 'github');
   const openaiProvider = providers.find((p) => p.id === 'openai');
+  const openrouterProvider = providers.find((p) => p.id === 'openrouter');
   const openaiModels = models.filter((m) => m.provider === 'openai');
+  const openrouterModels = models.filter((m) => m.provider === 'openrouter');
   const githubModels = models.filter((m) => m.provider === 'github');
 
   const selectDisabled = disabled || loadingModels || models.length === 0;
@@ -219,6 +231,17 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
             <SelectValue placeholder={loadingModels ? 'Loading models…' : 'No models available'} />
           </SelectTrigger>
           <SelectContent>
+            {openrouterModels.length > 0 && (
+              <SelectGroup>
+                <SelectLabel>OpenRouter</SelectLabel>
+                {openrouterModels.map((m) => (
+                  <SelectItem key={m.id} value={m.id} className="text-xs">
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            )}
+            {openrouterModels.length > 0 && openaiModels.length > 0 ? <SelectSeparator /> : null}
             {openaiModels.length > 0 && (
               <SelectGroup>
                 <SelectLabel>OpenAI</SelectLabel>
@@ -229,7 +252,9 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
                 ))}
               </SelectGroup>
             )}
-            {openaiModels.length > 0 && githubModels.length > 0 ? <SelectSeparator /> : null}
+            {(openrouterModels.length > 0 || openaiModels.length > 0) && githubModels.length > 0 ? (
+              <SelectSeparator />
+            ) : null}
             {githubModels.length > 0 && (
               <SelectGroup>
                 <SelectLabel>GitHub Copilot</SelectLabel>
@@ -243,18 +268,36 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
           </SelectContent>
         </Select>
 
-        <ProviderBadges openaiProvider={openaiProvider} githubProvider={githubProvider} />
+        <ProviderBadges
+          openaiProvider={openaiProvider}
+          githubProvider={githubProvider}
+          openrouterProvider={openrouterProvider}
+        />
       </div>
 
       <Separator />
 
       {githubProvider && !githubProvider.connected && connectStep === 'idle' && (
-        <Button type="button" variant="secondary" size="sm" className="w-full text-xs" disabled={disabled} onClick={handleGitHubConnect}>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          className="w-full text-xs"
+          disabled={disabled}
+          onClick={handleGitHubConnect}
+        >
           Connect GitHub Copilot
         </Button>
       )}
       {githubProvider && githubProvider.connected && (
-        <Button type="button" variant="outline" size="sm" className="w-full text-xs text-destructive hover:bg-destructive/10" disabled={disabled} onClick={handleDisconnectGitHub}>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="w-full text-xs text-destructive hover:bg-destructive/10"
+          disabled={disabled}
+          onClick={handleDisconnectGitHub}
+        >
           Disconnect GitHub Copilot
         </Button>
       )}
@@ -268,7 +311,12 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
         <div className="space-y-2 rounded-lg border border-border bg-muted/20 p-3 text-xs">
           <p className="text-muted-foreground">
             Enter this code at{' '}
-            <a className="text-primary underline underline-offset-2" href={verificationUri} target="_blank" rel="noopener noreferrer">
+            <a
+              className="text-primary underline underline-offset-2"
+              href={verificationUri}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               github.com/device
             </a>
           </p>
@@ -278,7 +326,10 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
               type="button"
               variant="outline"
               size="sm"
-              className={cn('text-xs shrink-0', codeCopied && 'border-emerald-500/40 text-emerald-600')}
+              className={cn(
+                'text-xs shrink-0',
+                codeCopied && 'border-emerald-500/40 text-emerald-600',
+              )}
               onClick={() => void copyCode(userCode)}
             >
               {codeCopied ? <Check className="size-3.5" /> : 'Copy'}
@@ -288,7 +339,13 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
             <Button type="button" size="sm" className="text-xs flex-1" onClick={handleStartPolling}>
               I’ve authorized — continue
             </Button>
-            <Button type="button" variant="ghost" size="sm" className="text-xs flex-1" onClick={handleCancelConnect}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="text-xs flex-1"
+              onClick={handleCancelConnect}
+            >
               Cancel
             </Button>
           </div>
@@ -300,7 +357,13 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
             <Loader2 className="size-3.5 animate-spin" />
             Waiting for GitHub authorization…
           </span>
-          <Button type="button" variant="ghost" size="sm" className="self-start text-xs" onClick={handleCancelConnect}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="self-start text-xs"
+            onClick={handleCancelConnect}
+          >
             Cancel
           </Button>
         </div>
@@ -313,7 +376,13 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
       {connectStep === 'error' && connectError && (
         <div className="flex flex-col gap-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
           {connectError}
-          <Button type="button" variant="ghost" size="sm" className="self-start text-xs" onClick={handleCancelConnect}>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="self-start text-xs"
+            onClick={handleCancelConnect}
+          >
             Dismiss
           </Button>
         </div>
@@ -444,7 +513,9 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
 
   const githubProvider = providers.find((p) => p.id === 'github');
   const openaiProvider = providers.find((p) => p.id === 'openai');
+  const openrouterProvider = providers.find((p) => p.id === 'openrouter');
   const openaiModels = models.filter((m) => m.provider === 'openai');
+  const openrouterModels = models.filter((m) => m.provider === 'openrouter');
   const githubModels = models.filter((m) => m.provider === 'github');
 
   return (
@@ -462,7 +533,12 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
             <Cpu className="size-3 shrink-0 text-muted-foreground" />
             <span className="truncate">{modelLabel}</span>
           </span>
-          <ChevronDown className={cn('size-3.5 shrink-0 text-muted-foreground transition-transform', open && 'rotate-180')} />
+          <ChevronDown
+            className={cn(
+              'size-3.5 shrink-0 text-muted-foreground transition-transform',
+              open && 'rotate-180',
+            )}
+          />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" side="top" className="w-72">
@@ -470,12 +546,45 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
           Models
         </DropdownMenuLabel>
         <div className="px-2 pb-2">
-          <ProviderBadges openaiProvider={openaiProvider} githubProvider={githubProvider} compact />
+          <ProviderBadges
+            openaiProvider={openaiProvider}
+            githubProvider={githubProvider}
+            openrouterProvider={openrouterProvider}
+            compact
+          />
         </div>
+
+        {openrouterModels.length > 0 && (
+          <>
+            <DropdownMenuLabel className="pt-1 text-[10px] text-muted-foreground/90">
+              OpenRouter
+            </DropdownMenuLabel>
+            {openrouterModels.map((m) => (
+              <DropdownMenuItem
+                key={m.id}
+                className="gap-2 text-xs"
+                onSelect={() => {
+                  onChange(m.id);
+                  onOpenChange(false);
+                }}
+              >
+                {m.id === value ? (
+                  <Check className="size-3.5 text-primary" />
+                ) : (
+                  <span className="size-3.5" />
+                )}
+                <span className="truncate">{m.label}</span>
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
 
         {openaiModels.length > 0 && (
           <>
-            <DropdownMenuLabel className="pt-1 text-[10px] text-muted-foreground/90">OpenAI</DropdownMenuLabel>
+            {openrouterModels.length > 0 ? <DropdownMenuSeparator /> : null}
+            <DropdownMenuLabel className="pt-1 text-[10px] text-muted-foreground/90">
+              OpenAI
+            </DropdownMenuLabel>
             {openaiModels.map((m) => (
               <DropdownMenuItem
                 key={m.id}
@@ -485,7 +594,11 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
                   onOpenChange(false);
                 }}
               >
-                {m.id === value ? <Check className="size-3.5 text-primary" /> : <span className="size-3.5" />}
+                {m.id === value ? (
+                  <Check className="size-3.5 text-primary" />
+                ) : (
+                  <span className="size-3.5" />
+                )}
                 <span className="truncate">{m.label}</span>
               </DropdownMenuItem>
             ))}
@@ -494,8 +607,12 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
 
         {githubModels.length > 0 && (
           <>
-            {openaiModels.length > 0 ? <DropdownMenuSeparator /> : null}
-            <DropdownMenuLabel className="text-[10px] text-muted-foreground/90">GitHub Copilot</DropdownMenuLabel>
+            {openrouterModels.length > 0 || openaiModels.length > 0 ? (
+              <DropdownMenuSeparator />
+            ) : null}
+            <DropdownMenuLabel className="text-[10px] text-muted-foreground/90">
+              GitHub Copilot
+            </DropdownMenuLabel>
             {githubModels.map((m) => (
               <DropdownMenuItem
                 key={m.id}
@@ -505,7 +622,11 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
                   onOpenChange(false);
                 }}
               >
-                {m.id === value ? <Check className="size-3.5 text-primary" /> : <span className="size-3.5" />}
+                {m.id === value ? (
+                  <Check className="size-3.5 text-primary" />
+                ) : (
+                  <span className="size-3.5" />
+                )}
                 <span className="truncate">{m.label}</span>
               </DropdownMenuItem>
             ))}
@@ -516,14 +637,24 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
 
         {githubProvider && !githubProvider.connected && connectStep === 'idle' && (
           <DropdownMenuItem className="text-xs gap-2" onSelect={(e) => e.preventDefault()}>
-            <Button type="button" variant="secondary" size="sm" className="h-7 w-full gap-1.5 text-xs" onClick={handleGitHubConnect}>
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              className="h-7 w-full gap-1.5 text-xs"
+              onClick={handleGitHubConnect}
+            >
               <UserKey className="size-3" />
               Connect GitHub Copilot
             </Button>
           </DropdownMenuItem>
         )}
         {githubProvider && githubProvider.connected && (
-          <DropdownMenuItem className="text-xs" variant="destructive" onSelect={(e) => e.preventDefault()}>
+          <DropdownMenuItem
+            className="text-xs"
+            variant="destructive"
+            onSelect={(e) => e.preventDefault()}
+          >
             <Button
               type="button"
               variant="ghost"
@@ -548,22 +679,44 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
           <div className="space-y-2 border-t border-border px-2 py-2 text-[11px]">
             <p className="text-muted-foreground">
               Open{' '}
-              <a className="text-primary underline underline-offset-2" href={verificationUri} target="_blank" rel="noopener noreferrer">
+              <a
+                className="text-primary underline underline-offset-2"
+                href={verificationUri}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
                 device login
               </a>{' '}
               and enter:
             </p>
             <div className="flex items-center gap-2 rounded-md border border-border bg-muted/50 px-2 py-1.5 font-mono text-sm font-semibold tracking-[0.12em]">
               <span className="min-w-0 flex-1 truncate">{userCode}</span>
-              <Button type="button" variant="outline" size="sm" className="h-6 shrink-0 px-2 text-[10px]" onClick={() => void copyCode(userCode)}>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-6 shrink-0 px-2 text-[10px]"
+                onClick={() => void copyCode(userCode)}
+              >
                 {codeCopied ? <Check className="size-3" /> : 'Copy'}
               </Button>
             </div>
             <div className="flex gap-1">
-              <Button type="button" size="sm" className="h-7 flex-1 text-[11px]" onClick={handleStartPolling}>
+              <Button
+                type="button"
+                size="sm"
+                className="h-7 flex-1 text-[11px]"
+                onClick={handleStartPolling}
+              >
                 Authorized
               </Button>
-              <Button type="button" variant="ghost" size="sm" className="h-7 flex-1 text-[11px]" onClick={() => setConnectStep('idle')}>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-7 flex-1 text-[11px]"
+                onClick={() => setConnectStep('idle')}
+              >
                 Cancel
               </Button>
             </div>
@@ -599,7 +752,13 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
         {connectStep === 'error' && connectError && (
           <div className="space-y-1 border-t border-border px-2 py-2 text-[11px] text-destructive">
             {connectError}
-            <Button type="button" variant="ghost" size="sm" className="h-7 text-[11px]" onClick={() => setConnectStep('idle')}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[11px]"
+              onClick={() => setConnectStep('idle')}
+            >
               Dismiss
             </Button>
           </div>

@@ -291,6 +291,7 @@ interface SimulatorState {
     }>,
     activeBoardId?: string | null,
   ) => void;
+  resetBoardsToSingle: (boardKind: BoardKind, position?: { x: number; y: number }) => void;
   updateBoard: (boardId: string, updates: Partial<BoardInstance>) => void;
   setBoardPosition: (pos: { x: number; y: number }, boardId?: string) => void;
   setActiveBoardId: (boardId: string) => void;
@@ -674,6 +675,16 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       if (nextActive) {
         get().setActiveBoardId(nextActive);
       }
+    },
+
+    resetBoardsToSingle: (boardKind: BoardKind, position = DEFAULT_BOARD_POSITION) => {
+      const targetKind = resolveBoardKind(boardKind);
+      const existingBoards = [...get().boards];
+      for (const board of existingBoards) {
+        get().removeBoard(board.id);
+      }
+      const id = get().addBoard(targetKind, position.x, position.y, targetKind);
+      get().setActiveBoardId(id);
     },
 
     removeBoard: (boardId: string) => {

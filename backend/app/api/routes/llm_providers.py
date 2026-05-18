@@ -83,6 +83,8 @@ async def list_providers(
     for p in PROVIDERS:
         if p["id"] == "openai":
             connected = bool(settings.OPENAI_API_KEY)
+        elif p["id"] == "openrouter":
+            connected = bool(settings.OPENROUTER_API_KEY)
         elif p["id"] == "github":
             connected = bool(gh_token)
         else:

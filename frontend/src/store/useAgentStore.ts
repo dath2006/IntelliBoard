@@ -92,7 +92,7 @@ export const useAgentStore = create<AgentState>((set) => ({
   compactView: readLocalBoolean(AGENT_PANEL_COMPACT_KEY, true),
   sessions: [],
   activeSessionId: null,
-  defaultModelName: 'openai:gpt-5.4-mini',
+  defaultModelName: 'openrouter:z-ai/glm-5',
   isLoadingSessions: false,
   isSendingMessage: false,
   streamStatus: 'idle',
