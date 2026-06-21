@@ -359,6 +359,7 @@ interface SimulatorState {
 
   // ── Wires ───────────────────────────────────────────────────────────────
   wires: Wire[];
+  wiresVisible: boolean;
   selectedWireId: string | null;
   wireInProgress: WireInProgress | null;
   addWire: (wire: Wire) => void;
@@ -366,6 +367,7 @@ interface SimulatorState {
   updateWire: (wireId: string, updates: Partial<Wire>) => void;
   setSelectedWire: (wireId: string | null) => void;
   setWires: (wires: Wire[]) => void;
+  setWiresVisible: (visible: boolean) => void;
   startWireCreation: (endpoint: WireEndpoint, color: string) => void;
   updateWireInProgress: (x: number, y: number) => void;
   addWireWaypoint: (x: number, y: number) => void;
@@ -1444,6 +1446,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     ],
     selectedWireId: null,
     wireInProgress: null,
+    wiresVisible: true,
 
     addComponent: (component) => set((state) => ({ components: [...state.components, component] })),
 
@@ -1494,6 +1497,8 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         // Ensure every wire has waypoints (backwards-compatible with saved projects)
         wires: wires.map((w) => ({ waypoints: [], ...w })),
       }),
+
+    setWiresVisible: (visible) => set({ wiresVisible: visible }),
 
     startWireCreation: (endpoint, color) =>
       set({

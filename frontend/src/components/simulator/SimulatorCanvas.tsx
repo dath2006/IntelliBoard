@@ -29,6 +29,7 @@ import {
 import { calculateWireOffsets, applyOffsetToWire } from '../../utils/wireOffsetCalculator';
 import { routeWireAroundObstacles } from '../../utils/wireObstacleRouter';
 import { debounce } from '../../utils/performanceUtils';
+import { suggestPlacements } from '../../utils/canvasLayoutEngine';
 import { MemoizedComponentRenderer } from './MemoizedComponentRenderer';
 import type { ComponentMetadata } from '../../types/component-metadata';
 import type { BoardKind } from '../../types/board';
@@ -62,6 +63,7 @@ export const SimulatorCanvas = ({
     handleZoomIn: () => void;
     handleZoomOut: () => void;
     handleResetView: () => void;
+    handleAutoArrange?: () => void;
   }) => void;
   showComponentPicker?: boolean;
   onShowComponentPickerChange?: (show: boolean) => void;
@@ -82,6 +84,8 @@ export const SimulatorCanvas = ({
     updateComponent,
     serialMonitorOpen,
     toggleSerialMonitor,
+    wiresVisible,
+    setWiresVisible,
   } = useSimulatorStore();
 
   // Active board (for WiFi/BLE status display)
@@ -1073,11 +1077,13 @@ export const SimulatorCanvas = ({
     }
 
     // Wire hover detection (when not dragging anything)
-    if (!draggedComponentId) {
+    if (!draggedComponentId && wiresVisible) {
       const world = toWorld(e.clientX, e.clientY);
       const threshold = 8 / zoomRef.current;
       const wire = findWireNearPoint(wiresRef.current, world.x, world.y, threshold);
       setHoveredWireId(wire ? wire.id : null);
+    } else if (!wiresVisible) {
+      setHoveredWireId(null);
     }
   };
 
@@ -1235,6 +1241,50 @@ export const SimulatorCanvas = ({
     setPan({ x: 0, y: 0 });
   };
 
+  const handleAutoArrange = useCallback(() => {
+    if (boards.length === 0) return;
+
+    // Prepare placement requests for all components based on pin connections
+    const requests = components.map((comp) => {
+      const connectedWire = wires.find(
+        (w) =>
+          (w.start.componentId === comp.id && isBoardComponent(w.end.componentId)) ||
+          (w.end.componentId === comp.id && isBoardComponent(w.start.componentId))
+      );
+
+      let connectsToBoardPin: string | undefined;
+      if (connectedWire) {
+        connectsToBoardPin = connectedWire.start.componentId === comp.id
+          ? connectedWire.end.pinName
+          : connectedWire.start.pinName;
+      }
+
+      return {
+        id: comp.id,
+        metadataId: comp.metadataId,
+        connectsToBoardPin,
+      };
+    });
+
+    const boardInfos = boards.map((b) => ({
+      id: b.id,
+      boardKind: b.boardKind,
+      x: b.x,
+      y: b.y,
+    }));
+
+    // Fresh layout calculation skipping existing component offsets
+    const placements = suggestPlacements(requests, boardInfos, []);
+
+    placements.forEach((p) => {
+      updateComponent(p.id, { x: p.x, y: p.y } as any);
+    });
+
+    setTimeout(() => {
+      recalculateAllWirePositions();
+    }, 50);
+  }, [boards, components, wires, updateComponent, recalculateAllWirePositions]);
+
   // Helper functions for zoom controls
   const handleZoomIn = useCallback(() => {
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -1275,9 +1325,10 @@ export const SimulatorCanvas = ({
         handleZoomIn,
         handleZoomOut,
         handleResetView,
+        handleAutoArrange,
       });
     }
-  }, [onControlsReady, handleZoomIn, handleZoomOut]);
+  }, [onControlsReady, handleZoomIn, handleZoomOut, handleAutoArrange]);
 
   // Notify zoom changes
   useEffect(() => {
@@ -1611,6 +1662,52 @@ export const SimulatorCanvas = ({
               </svg>
               Scope
             </button>
+
+            {/* Wires visibility toggle */}
+            <button
+              onClick={() => setWiresVisible(!wiresVisible)}
+              className={`canvas-serial-btn${wiresVisible ? ' canvas-serial-btn-active' : ''}`}
+              title="Toggle Wires Visibility"
+            >
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 12c4-4 8 4 12 0s4-4 8 0" />
+                <path d="M4 18c4-4 8 4 12 0s4-4 8 0" opacity="0.6" />
+              </svg>
+              Wires: {wiresVisible ? 'On' : 'Off'}
+            </button>
+
+            {/* Tidy Layout button */}
+            <button
+              onClick={handleAutoArrange}
+              className="canvas-serial-btn"
+              title="Auto-arrange components to prevent overlap"
+            >
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              Tidy
+            </button>
           </div>
 
           <div className="canvas-header-right">
@@ -1747,18 +1844,20 @@ export const SimulatorCanvas = ({
               return;
             }
             // Wire selection via canvas-level hit detection
-            const world = toWorld(e.clientX, e.clientY);
-            const threshold = 8 / zoomRef.current;
-            const wire = findWireNearPoint(wiresRef.current, world.x, world.y, threshold);
-            if (wire) {
-              setSelectedWire(selectedWireId === wire.id ? null : wire.id);
-            } else {
-              setSelectedWire(null);
-              setSelectedComponentId(null);
+            if (wiresVisible) {
+              const world = toWorld(e.clientX, e.clientY);
+              const threshold = 8 / zoomRef.current;
+              const wire = findWireNearPoint(wiresRef.current, world.x, world.y, threshold);
+              if (wire) {
+                setSelectedWire(selectedWireId === wire.id ? null : wire.id);
+                return;
+              }
             }
+            setSelectedWire(null);
+            setSelectedComponentId(null);
           }}
           onDoubleClick={(e) => {
-            if (wireInProgress) return;
+            if (wireInProgress || !wiresVisible) return;
             const world = toWorld(e.clientX, e.clientY);
             const threshold = 8 / zoomRef.current;
             const wire = findWireNearPoint(wiresRef.current, world.x, world.y, threshold);
