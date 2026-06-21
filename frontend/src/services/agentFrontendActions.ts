@@ -133,20 +133,30 @@ export async function runFrontendAction(
           onLog: (log) => compilation.appendLog(log),
         });
         const totalLogs = outcome.logs.length;
-        const logs = serializeLogs(outcome.logs, MAX_COMPILE_LOG_LINES);
+        
+        // If compilation is successful, we don't need compilation logs in the prompt context.
+        // If it failed, limit the logs to the last 40 lines to prevent token bloat.
+        const maxLines = outcome.ok ? 0 : 40;
+        const logs = serializeLogs(outcome.logs, maxLines);
+        
+        let messageText = outcome.message?.text ?? '';
+        if (messageText.length > 1500) {
+          messageText = messageText.slice(0, 1500) + '\n... [truncated for token safety]';
+        }
+        
         return {
           ok: outcome.ok,
           payload: {
             boardId: outcome.boardId,
             boardKind: outcome.boardKind,
-            message: outcome.message,
+            message: outcome.message ? { ...outcome.message, text: messageText } : null,
             missingLibHint: outcome.missingLibHint,
             logs,
             totalLogs,
-            logsTruncated: logs.length < totalLogs,
-            maxLogs: MAX_COMPILE_LOG_LINES,
+            logsTruncated: totalLogs > maxLines,
+            maxLogs: maxLines,
           },
-          error: outcome.ok ? undefined : outcome.message?.text,
+          error: outcome.ok ? undefined : messageText,
         };
       }
       case 'sim_run': {
@@ -190,12 +200,19 @@ export async function runFrontendAction(
       case 'compile_last_result': {
         const logs = compilation.logs;
         const lastOutcome = logs.length > 0 ? logs[logs.length - 1] : null;
+        let lastMessage = lastOutcome?.message ?? null;
+        if (lastMessage && lastMessage.text.length > 1500) {
+          lastMessage = {
+            ...lastMessage,
+            text: lastMessage.text.slice(0, 1500) + '\n... [truncated for token safety]',
+          };
+        }
         return {
           ok: true,
           payload: {
             hasResult: logs.length > 0,
             logs: serializeLogs(logs.slice(-50)),
-            lastMessage: lastOutcome?.message ?? null,
+            lastMessage,
             lastType: lastOutcome?.type ?? null,
           },
         };

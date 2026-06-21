@@ -1236,7 +1236,17 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
     async def compile_board(ctx: RunContext[AgentDeps], board_id: str) -> dict[str, Any]:
         """Compile via the backend arduino-cli. Prefer compile_in_frontend for richer errors."""
         ctx.deps.guard_tool_call()
-        return await _safe_tool_call(ctx, "compile_board", lambda: agent_tools.compile_board(ctx.deps.snapshot, board_id=board_id))
+        async def _compile_board_action() -> dict[str, Any]:
+            result = await agent_tools.compile_board(ctx.deps.snapshot, board_id=board_id)
+            sanitized = _sanitize_hex_content(result)
+            if isinstance(sanitized, dict):
+                # Truncate stdout and stderr if they are too long to prevent token bloat
+                for field in ("stdout", "stderr"):
+                    val = sanitized.get(field)
+                    if isinstance(val, str) and len(val) > 1500:
+                        sanitized[field] = val[:1500] + "\n... [truncated for token safety]"
+            return sanitized
+        return await _safe_tool_call(ctx, "compile_board", _compile_board_action)
 
     @agent.tool
     async def compile_in_frontend(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
