@@ -117,7 +117,8 @@ export const ModelSelector: React.FC<Props> = ({ value, onChange, disabled }) =>
       setModels(m);
       setProviders(p);
       if (m.length > 0 && (!value || !m.find((x) => x.id === value))) {
-        onChange(m[0].id);
+        const claude = m.find((x) => x.id.toLowerCase().includes('claude'));
+        onChange(claude ? claude.id : m[0].id);
       }
     } catch {
       /* ignore */
@@ -426,7 +427,8 @@ export const CompactModelSelector: React.FC<CompactProps> = ({
       setModels(m);
       setProviders(p);
       if (m.length > 0 && (!value || !m.find((x) => x.id === value))) {
-        onChange(m[0].id);
+        const claude = m.find((x) => x.id.toLowerCase().includes('claude'));
+        onChange(claude ? claude.id : m[0].id);
       }
     } catch {
       /* ignore */

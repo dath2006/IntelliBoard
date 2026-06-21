@@ -315,10 +315,13 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "  for every wire before placing any of them.\n"
         "- When you encounter an error from any tool, do not silently retry. "
         "Report the error, explain your diagnosis, and state your fix strategy.\n"
-        "- Do not ask the user clarifying questions unless a decision genuinely cannot be "
-        "made from the available project context. Make reasonable embedded engineering "
-        "assumptions and state them explicitly (e.g., 'Assuming common-cathode LED. "
-        "Connecting cathode to GND and anode through 220Ω resistor to digital pin.').\n"
+        "- Do not ask the user plain text clarifying questions unless a decision genuinely cannot be "
+        "made from the available project context. If you MUST ask a clarifying question "
+        "(e.g., to select a board, clarify a component choice, or pick a programming language), "
+        "you MUST call the `ask_clarifying_mcq` tool to generate an interactive multiple-choice question "
+        "and append its exact return value to your final output text message. This renders a visual choice card "
+        "in the user interface. Otherwise, make reasonable embedded engineering assumptions and state them explicitly "
+        "(e.g., 'Assuming common-cathode LED. Connecting cathode to GND and anode through 220Ω resistor to digital pin.').\n"
         "- End every completed task with a summary block:\n"
         "    ✅ Circuit: [what was wired]\n"
         "    ✅ Firmware: [what the code does]\n"
@@ -1776,6 +1779,36 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         duration = max(0.1, min(seconds, 10.0))
         await asyncio.sleep(duration)
         return {"ok": True, "seconds": duration}
+
+    @agent.tool
+    async def ask_clarifying_mcq(
+        ctx: RunContext[AgentDeps],
+        question: str,
+        options: list[str],
+        multiselect: bool = False,
+    ) -> str:
+        """Present a multiple-choice question (MCQ) to the user to clarify requirements or choices.
+
+        Use this tool when you need the user's input/decision to proceed (e.g. choosing a board,
+        deciding which sensors to connect, selecting pins, or specifying a programming language).
+        The return value is a formatted MCQ payload string that you MUST output in your final response.
+
+        Args:
+            question: The clarification question to display (e.g., "Which MCU board would you like to use?").
+            options: A list of string options for the user to choose from (at least 2 options).
+            multiselect: Whether the user can select multiple options.
+
+        Returns:
+            The raw MCQ layout payload. Append this string exactly to your final chat output response text.
+        """
+        ctx.deps.guard_tool_call()
+        import json
+        mcq_payload = {
+            "question": question,
+            "multiselect": multiselect,
+            "options": [{"id": f"opt_{i}", "label": opt} for i, opt in enumerate(options)]
+        }
+        return f"\n__mcq__:{json.dumps(mcq_payload)}"
 
     @agent.tool
     async def announce_plan(

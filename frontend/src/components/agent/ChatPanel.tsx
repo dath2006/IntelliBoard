@@ -41,8 +41,9 @@ import {
   ChainOfThoughtContent,
   ChainOfThoughtStep,
 } from '../ai-elements/chain-of-thought';
-import { CheckCircle2Icon, LucideTerminal, CheckIcon, XIcon, RefreshCwIcon } from 'lucide-react';
+import { CheckCircle2Icon, LucideTerminal, CheckIcon, XIcon, RefreshCwIcon, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { McqCard } from './McqCard';
 import { useAgentSync, buildSnapshotFromStores } from './useAgentSync';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { nanoid } from 'nanoid';
@@ -207,13 +208,77 @@ interface ChatPanelProps {
   onModelChange: (model: string) => void;
 }
 
+interface ParsedMcq {
+  textBefore: string;
+  mcqData: any | null;
+  textAfter: string;
+  hasMcq: boolean;
+}
+
+function parseMcqText(text: string): ParsedMcq {
+  const match = text.match(/(?:__mcq__|mcq):\s*(\{.*)/si);
+  if (!match) {
+    return { textBefore: text, mcqData: null, textAfter: '', hasMcq: false };
+  }
+
+  const index = match.index ?? 0;
+  const textBefore = text.slice(0, index).trim();
+  const jsonCandidate = match[1];
+
+  let braceCount = 0;
+  let endOfJsonIndex = -1;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < jsonCandidate.length; i++) {
+    const char = jsonCandidate[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          endOfJsonIndex = i + 1;
+          break;
+        }
+      }
+    }
+  }
+
+  if (endOfJsonIndex !== -1) {
+    const jsonStr = jsonCandidate.slice(0, endOfJsonIndex);
+    const textAfter = jsonCandidate.slice(endOfJsonIndex).trim();
+    try {
+      const mcqData = JSON.parse(jsonStr);
+      return { textBefore, mcqData, textAfter, hasMcq: true };
+    } catch {
+      return { textBefore, mcqData: null, textAfter: '', hasMcq: true };
+    }
+  } else {
+    return { textBefore, mcqData: null, textAfter: '', hasMcq: true };
+  }
+}
+
 interface ChatMessageProps {
   message: UIMessage;
   isBusy: boolean;
+  onMcqSubmit: (text: string) => void;
 }
 
 /** Memoized message component to prevent re-renders of stable messages during streaming */
-const ChatMessage = React.memo(function ChatMessage({ message, isBusy }: ChatMessageProps) {
+const ChatMessage = React.memo(function ChatMessage({ message, isBusy, onMcqSubmit }: ChatMessageProps) {
   const isUser = message.role === 'user';
 
   return (
@@ -294,6 +359,39 @@ const ChatMessage = React.memo(function ChatMessage({ message, isBusy }: ChatMes
                         </ChainOfThought>
                       </PlanContent>
                     </Plan>
+                  </div>
+                );
+              }
+            }
+            if (part.text.includes('__mcq__:') || part.text.match(/(?:__mcq__|mcq):\s*\{/i)) {
+              const parsed = parseMcqText(part.text);
+              if (parsed.hasMcq) {
+                return (
+                  <div key={`${message.id}-mcq-container-${pi}`} className="space-y-3.5 w-full">
+                    {parsed.textBefore && (
+                      <div className="max-w-none">
+                        <MessageResponse>{parsed.textBefore}</MessageResponse>
+                      </div>
+                    )}
+
+                    {parsed.mcqData ? (
+                      <McqCard
+                        messageId={message.id}
+                        mcqData={parsed.mcqData}
+                        onSubmit={onMcqSubmit}
+                      />
+                    ) : (
+                      <div className="w-full p-4 border border-dashed rounded-xl bg-muted/20 animate-pulse text-xs text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Generating question clarification...
+                      </div>
+                    )}
+
+                    {parsed.textAfter && (
+                      <div className="max-w-none">
+                        <MessageResponse>{parsed.textAfter}</MessageResponse>
+                      </div>
+                    )}
                   </div>
                 );
               }
@@ -528,7 +626,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
 
             {memoizedMessages.map((message) => (
-              <ChatMessage key={message.id} message={message} isBusy={isBusy} />
+              <ChatMessage
+                key={message.id}
+                message={message}
+                isBusy={isBusy}
+                onMcqSubmit={(text) => sendMessage({ text })}
+              />
             ))}
 
             {isBusy && messages[messages.length - 1]?.role === 'user' && (
