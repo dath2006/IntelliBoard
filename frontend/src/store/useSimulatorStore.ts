@@ -536,6 +536,30 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         bridge.onPinChange = (_gpioPin, _state) => {
           // Cross-board routing now handled by Interconnect (see bind below).
         };
+        // When the QEMU Pi finishes booting, mark the board as running.
+        bridge.onSystemEvent = (event: string, _data) => {
+          if (event === 'booted') {
+            set((s) => {
+              const boards = s.boards.map((b) => (b.id === id ? { ...b, running: true } : b));
+              const isActive = s.activeBoardId === id;
+              return { boards, ...(isActive ? { running: true } : {}) };
+            });
+          } else if (event === 'exited') {
+            set((s) => {
+              const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+              const isActive = s.activeBoardId === id;
+              return { boards, ...(isActive ? { running: false } : {}) };
+            });
+          }
+        };
+        // When the WebSocket to the backend closes, mark the board as stopped.
+        bridge.onDisconnected = () => {
+          set((s) => {
+            const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+            const isActive = s.activeBoardId === id;
+            return { boards, ...(isActive ? { running: false } : {}) };
+          });
+        };
         bridgeMap.set(id, bridge);
       } else if (isEsp32Kind(boardKind)) {
         const bridge = new Esp32Bridge(id, boardKind);
@@ -888,7 +912,17 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       if (!board) return;
 
       if (board.boardKind === 'raspberry-pi-3') {
+        // Connect the WebSocket bridge — the Pi takes ~30-60s to boot in QEMU.
+        // We set running: true immediately so the UI reflects the active simulation,
+        // and get_simulation_status returns true while QEMU boots.
         getBoardBridge(boardId)?.connect();
+        set((s) => ({
+          boards: s.boards.map((b) =>
+            b.id === boardId ? { ...b, running: true, serialMonitorOpen: true } : b,
+          ),
+          ...(s.activeBoardId === boardId ? { running: true, serialMonitorOpen: true } : {}),
+        }));
+        return;
       } else if (isEsp32Kind(board.boardKind)) {
         // Pre-register sensors connected to this board so the QEMU worker
         // has them ready before the firmware starts executing.

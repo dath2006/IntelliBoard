@@ -77,6 +77,16 @@ export async function runSimulationAction(
   const isQemuBoard =
     board.boardKind === 'raspberry-pi-3' ||
     (board.boardKind ? isEsp32BoardKind(board.boardKind) : false);
+
+  // Raspberry Pi 3B runs a full Linux OS via QEMU — no compilation needed.
+  // Just connect the QEMU bridge and the Pi will boot from its SD image.
+  if (board.boardKind === 'raspberry-pi-3') {
+    trackRunSimulation(board.boardKind);
+    await reportRun(board.boardKind);
+    sim.startBoard(boardId);
+    return { ok: true, boardId, compiled: false, ran: true };
+  }
+
   const needsCompile = !board.compiledProgram || editor.codeChangedSinceLastCompile;
   let compiled = false;
 
