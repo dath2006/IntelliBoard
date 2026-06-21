@@ -34,7 +34,7 @@ from app.agent.schemas import (
     PinCatalogObservationRequest,
     AgentSessionResponse,
 )
-from app.agent.vercel_adapter import VercelAIAdapter
+from app.agent.vercel_adapter import VercelAIAdapter, process_incoming_payload_attachments
 from app.agent.frontend_actions import resolve_frontend_action_result
 from app.agent.sessions import (
     append_event,
@@ -692,6 +692,10 @@ async def v_ai_sdk_chat_stream(
                     break
         if not payload.get("id"):
             payload["id"] = str(uuid.uuid4())
+
+    # Extract text from non-image file uploads (PDF, text, docx) and convert to text parts
+    if isinstance(payload, dict):
+        payload = process_incoming_payload_attachments(payload)
 
     # Sanitize tool names in the payload to comply with OpenAI API pattern
     if isinstance(payload, dict):
