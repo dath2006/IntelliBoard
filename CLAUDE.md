@@ -31,7 +31,7 @@ pip install -r requirements.txt
 ```bash
 cd backend
 venv\Scripts\activate
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --reload-dir app --port 8001
 ```
 
 **Access:**

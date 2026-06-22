@@ -141,7 +141,7 @@ arduino-cli core install arduino:avr
 ```bash
 cd backend
 venv\Scripts\activate
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --reload-dir app --port 8001
 ```
 
 ### 3. Start the Frontend

@@ -28,8 +28,36 @@ logger = logging.getLogger(__name__)
 # ── Paths ────────────────────────────────────────────────────────────────────
 IMG_DIR     = os.path.join(os.path.dirname(__file__), '..', '..', '..', 'img')
 KERNEL_PATH = os.path.join(IMG_DIR, 'kernel8.img')
-DTB_PATH    = os.path.join(IMG_DIR, 'bcm271~1.dtb')
-SD_BASE     = os.path.join(IMG_DIR, '2025-12-04-raspios-trixie-armhf.img')
+# Prefer the full-name DTB extracted from the SD image; fall back to the
+# Windows-short-name file created by the download script.
+_DTB_FULL   = os.path.join(IMG_DIR, 'bcm2710-rpi-3-b.dtb')
+_DTB_SHORT  = os.path.join(IMG_DIR, 'bcm271~1.dtb')
+DTB_PATH    = _DTB_FULL if os.path.exists(_DTB_FULL) else _DTB_SHORT
+
+def _resolve_sd_image() -> str:
+    """Return the SD image path: RPI_SD_IMAGE env var → hardcoded name → any *.img in img/."""
+    env_override = os.environ.get('RPI_SD_IMAGE', '')
+    if env_override:
+        return env_override
+    default = os.path.join(IMG_DIR, '2025-12-04-raspios-trixie-armhf.img')
+    if os.path.exists(default):
+        return default
+    # Auto-detect: pick the largest .img file that isn't the kernel
+    try:
+        candidates = [
+            os.path.join(IMG_DIR, f)
+            for f in os.listdir(IMG_DIR)
+            if f.endswith('.img') and f != 'kernel8.img'
+        ]
+        if candidates:
+            chosen = max(candidates, key=os.path.getsize)
+            logger.info('Auto-detected SD image: %s', chosen)
+            return chosen
+    except OSError:
+        pass
+    return default  # will fail _check_images() with a clear error
+
+SD_BASE = _resolve_sd_image()
 
 
 def _find_free_port() -> int:
@@ -143,13 +171,17 @@ class QemuManager:
             '-m',      '1G',
             '-smp',    '4',
             '-nographic',
-            # ttyAMA0 → user serial (TCP server, frontend connects)
+            # UART0 (PL011 @ 0x3f201000) → user serial / console.
+            # NOTE: the rpi-3-b DTB enumerates this PL011 as ttyAMA1 (not ttyAMA0),
+            # so the kernel console MUST be console=ttyAMA1 or init gets no tty and
+            # panics with "Attempted to kill init!". This is the first -serial.
             '-serial', f'tcp:127.0.0.1:{inst.serial_port},server,nowait',
-            # ttyAMA1 → GPIO shim protocol
+            # UART1 (mini-UART) → GPIO shim protocol (second -serial).
             '-serial', f'tcp:127.0.0.1:{inst.gpio_port},server,nowait',
             '-append',
-            'console=ttyAMA0 root=/dev/mmcblk0p2 rootwait rw '
-            'dwc_otg.lpm_enable=0 quiet init=/bin/sh',
+            'earlycon=pl011,mmio32,0x3f201000 console=ttyAMA1,115200 '
+            'root=/dev/mmcblk0p2 rootfstype=ext4 rootwait rw '
+            'dwc_otg.lpm_enable=0 init=/bin/sh',
         ]
 
         logger.info('Launching QEMU for %s: %s', inst.client_id, ' '.join(cmd))
@@ -339,10 +371,10 @@ class QemuManager:
     # ── Helpers ───────────────────────────────────────────────────────────────
 
     def _check_images(self) -> bool:
-        ok = os.path.exists(KERNEL_PATH) and os.path.exists(SD_BASE)
-        if not ok:
-            logger.error('Missing QEMU images in %s', IMG_DIR)
-        return ok
+        missing = [p for p in (KERNEL_PATH, DTB_PATH, SD_BASE) if not os.path.exists(p)]
+        if missing:
+            logger.error('Missing QEMU images in %s: %s', IMG_DIR, missing)
+        return not missing
 
 
 qemu_manager = QemuManager()

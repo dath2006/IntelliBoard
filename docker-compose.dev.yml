@@ -18,14 +18,16 @@ services:
       - QEMU_ESP32_LIB=/app/lib/libqemu-xtensa.so
       - QEMU_RISCV32_LIB=/app/lib/libqemu-riscv32.so
     command: >
-      bash -lc "arduino-cli core update-index || true &&
+      bash -lc "apt-get update -qq && apt-get install -y -qq --no-install-recommends qemu-system-arm qemu-utils > /dev/null 2>&1 || true &&
+      arduino-cli core update-index || true &&
       arduino-cli core install arduino:avr || true &&
       arduino-cli core install rp2040:rp2040 || true &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload"
+      uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload --reload-dir app"
     working_dir: /app
     volumes:
       - ./backend/app:/app/app
       - ./data:/app/data
+      - ./img:/img
       - arduino-libs:/root/.arduino15
     ports:
       - "8001:8001"

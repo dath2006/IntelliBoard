@@ -398,6 +398,12 @@ const ChatMessage = React.memo(function ChatMessage({ message, isBusy, onMcqSubm
                 );
               }
             }
+
+            return (
+              <MessageResponse key={`${message.id}-t-${pi}`}>
+                {part.text}
+              </MessageResponse>
+            );
           }
           if (part.type === 'file') {
             const isImage = part.mediaType.startsWith('image/');

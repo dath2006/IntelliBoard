@@ -198,7 +198,7 @@ python -m pytest test/esp32/test_arduino_esp32_integration.py -v
 ```bash
 cd backend
 venv\Scripts\activate
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --reload-dir app --port 8001
 ```
 
 The system automatically detects the DLL. Verify in the logs:
@@ -313,7 +313,7 @@ cp pc-bios/esp32-v3-rom-app.bin /path/to/project/backend/app/services/
 
 # 4. Start backend (auto-detects the .so)
 cd /path/to/project/backend
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --reload-dir app --port 8001
 ```
 
 ---
@@ -1112,7 +1112,7 @@ docker run -d -p 3080:80 -e SECRET_KEY=secret ghcr.io/davidmonterocrespo24/velxi
 
 # Windows with lib (full emulation: GPIO + WiFi + ADC + I2C + SPI + RMT + LEDC):
 cd backend && venv\Scripts\activate
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --reload --reload-dir app --port 8001
 
 # Linux with lib at custom path:
 QEMU_ESP32_LIB=/opt/velxio/libqemu-xtensa.so uvicorn app.main:app --port 8001

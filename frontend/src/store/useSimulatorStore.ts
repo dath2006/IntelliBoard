@@ -562,6 +562,17 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
             return { boards, ...(isActive ? { running: false } : {}) };
           });
         };
+        bridge.onError = (msg: string) => {
+          const errText = `\r\n[ERROR] ${msg}\r\n`;
+          for (const ch of errText) {
+            serialCallback(ch);
+          }
+          set((s) => {
+            const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+            const isActive = s.activeBoardId === id;
+            return { boards, ...(isActive ? { running: false } : {}) };
+          });
+        };
         bridgeMap.set(id, bridge);
       } else if (isEsp32Kind(boardKind)) {
         const bridge = new Esp32Bridge(id, boardKind);
@@ -574,6 +585,17 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           set({ esp32CrashBoardId: id });
         };
         bridge.onDisconnected = () => {
+          set((s) => {
+            const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+            const isActive = s.activeBoardId === id;
+            return { boards, ...(isActive ? { running: false } : {}) };
+          });
+        };
+        bridge.onError = (msg: string) => {
+          const errText = `\r\n[ERROR] ${msg}\r\n`;
+          for (const ch of errText) {
+            serialCallback(ch);
+          }
           set((s) => {
             const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
             const isActive = s.activeBoardId === id;
@@ -1216,7 +1238,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               );
               return { boards, serialBaudRate: baud };
             }),
-          getOscilloscopeCallback(),
+          getOscilloscopeCallback(boardId),
         );
         simulatorMap.set(boardId, sim);
 
@@ -1296,7 +1318,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               );
               return { boards, serialBaudRate: baud };
             }),
-          getOscilloscopeCallback(),
+          getOscilloscopeCallback(boardId),
         );
         simulatorMap.set(boardId, sim);
         set({ simulator: sim, serialOutput: '', serialBaudRate: 0 });
@@ -1495,7 +1517,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     setWires: (wires) =>
       set({
         // Ensure every wire has waypoints (backwards-compatible with saved projects)
-        wires: wires.map((w) => ({ waypoints: [], ...w })),
+        wires: wires.map((w) => ({ ...w, waypoints: w.waypoints ?? [] })),
       }),
 
     setWiresVisible: (visible) => set({ wiresVisible: visible }),
