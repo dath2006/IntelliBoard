@@ -359,6 +359,7 @@ interface SimulatorState {
 
   // ── Wires ───────────────────────────────────────────────────────────────
   wires: Wire[];
+  wiresVisible: boolean;
   selectedWireId: string | null;
   wireInProgress: WireInProgress | null;
   addWire: (wire: Wire) => void;
@@ -366,6 +367,7 @@ interface SimulatorState {
   updateWire: (wireId: string, updates: Partial<Wire>) => void;
   setSelectedWire: (wireId: string | null) => void;
   setWires: (wires: Wire[]) => void;
+  setWiresVisible: (visible: boolean) => void;
   startWireCreation: (endpoint: WireEndpoint, color: string) => void;
   updateWireInProgress: (x: number, y: number) => void;
   addWireWaypoint: (x: number, y: number) => void;
@@ -536,6 +538,41 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
         bridge.onPinChange = (_gpioPin, _state) => {
           // Cross-board routing now handled by Interconnect (see bind below).
         };
+        // When the QEMU Pi finishes booting, mark the board as running.
+        bridge.onSystemEvent = (event: string, _data) => {
+          if (event === 'booted') {
+            set((s) => {
+              const boards = s.boards.map((b) => (b.id === id ? { ...b, running: true } : b));
+              const isActive = s.activeBoardId === id;
+              return { boards, ...(isActive ? { running: true } : {}) };
+            });
+          } else if (event === 'exited') {
+            set((s) => {
+              const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+              const isActive = s.activeBoardId === id;
+              return { boards, ...(isActive ? { running: false } : {}) };
+            });
+          }
+        };
+        // When the WebSocket to the backend closes, mark the board as stopped.
+        bridge.onDisconnected = () => {
+          set((s) => {
+            const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+            const isActive = s.activeBoardId === id;
+            return { boards, ...(isActive ? { running: false } : {}) };
+          });
+        };
+        bridge.onError = (msg: string) => {
+          const errText = `\r\n[ERROR] ${msg}\r\n`;
+          for (const ch of errText) {
+            serialCallback(ch);
+          }
+          set((s) => {
+            const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+            const isActive = s.activeBoardId === id;
+            return { boards, ...(isActive ? { running: false } : {}) };
+          });
+        };
         bridgeMap.set(id, bridge);
       } else if (isEsp32Kind(boardKind)) {
         const bridge = new Esp32Bridge(id, boardKind);
@@ -548,6 +585,17 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
           set({ esp32CrashBoardId: id });
         };
         bridge.onDisconnected = () => {
+          set((s) => {
+            const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
+            const isActive = s.activeBoardId === id;
+            return { boards, ...(isActive ? { running: false } : {}) };
+          });
+        };
+        bridge.onError = (msg: string) => {
+          const errText = `\r\n[ERROR] ${msg}\r\n`;
+          for (const ch of errText) {
+            serialCallback(ch);
+          }
           set((s) => {
             const boards = s.boards.map((b) => (b.id === id ? { ...b, running: false } : b));
             const isActive = s.activeBoardId === id;
@@ -888,7 +936,17 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
       if (!board) return;
 
       if (board.boardKind === 'raspberry-pi-3') {
+        // Connect the WebSocket bridge — the Pi takes ~30-60s to boot in QEMU.
+        // We set running: true immediately so the UI reflects the active simulation,
+        // and get_simulation_status returns true while QEMU boots.
         getBoardBridge(boardId)?.connect();
+        set((s) => ({
+          boards: s.boards.map((b) =>
+            b.id === boardId ? { ...b, running: true, serialMonitorOpen: true } : b,
+          ),
+          ...(s.activeBoardId === boardId ? { running: true, serialMonitorOpen: true } : {}),
+        }));
+        return;
       } else if (isEsp32Kind(board.boardKind)) {
         // Pre-register sensors connected to this board so the QEMU worker
         // has them ready before the firmware starts executing.
@@ -1180,7 +1238,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               );
               return { boards, serialBaudRate: baud };
             }),
-          getOscilloscopeCallback(),
+          getOscilloscopeCallback(boardId),
         );
         simulatorMap.set(boardId, sim);
 
@@ -1260,7 +1318,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
               );
               return { boards, serialBaudRate: baud };
             }),
-          getOscilloscopeCallback(),
+          getOscilloscopeCallback(boardId),
         );
         simulatorMap.set(boardId, sim);
         set({ simulator: sim, serialOutput: '', serialBaudRate: 0 });
@@ -1410,6 +1468,7 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     ],
     selectedWireId: null,
     wireInProgress: null,
+    wiresVisible: true,
 
     addComponent: (component) => set((state) => ({ components: [...state.components, component] })),
 
@@ -1458,8 +1517,10 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => {
     setWires: (wires) =>
       set({
         // Ensure every wire has waypoints (backwards-compatible with saved projects)
-        wires: wires.map((w) => ({ waypoints: [], ...w })),
+        wires: wires.map((w) => ({ ...w, waypoints: w.waypoints ?? [] })),
       }),
+
+    setWiresVisible: (visible) => set({ wiresVisible: visible }),
 
     startWireCreation: (endpoint, color) =>
       set({

@@ -107,6 +107,7 @@ export const EditorPage: React.FC = () => {
     handleZoomIn: () => void;
     handleZoomOut: () => void;
     handleResetView: () => void;
+    handleAutoArrange?: () => void;
   } | null>(null);
 
   // ── Electrical simulation subscriber (one-time, idempotent) ───────────────
@@ -431,6 +432,7 @@ export const EditorPage: React.FC = () => {
           onZoomIn={() => canvasControlsRef.current?.handleZoomIn()}
           onZoomOut={() => canvasControlsRef.current?.handleZoomOut()}
           onResetView={() => canvasControlsRef.current?.handleResetView()}
+          onAutoArrange={() => canvasControlsRef.current?.handleAutoArrange?.()}
           componentCount={components.length}
           explorerOpen={explorerOpen}
           setExplorerOpen={setExplorerOpen}

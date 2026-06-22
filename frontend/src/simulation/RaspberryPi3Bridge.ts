@@ -34,6 +34,11 @@ export class RaspberryPi3Bridge {
 
   private socket: WebSocket | null = null;
   private _connected = false;
+  private _shellReady = false;
+  // Rolling buffer to detect shell prompt spanning chunk boundaries
+  private _serialTail = '';
+
+  onShellReady: (() => void) | null = null;
 
   constructor(boardId: string) {
     this.boardId = boardId;
@@ -41,6 +46,30 @@ export class RaspberryPi3Bridge {
 
   get connected(): boolean {
     return this._connected;
+  }
+
+  get shellReady(): boolean {
+    return this._shellReady;
+  }
+
+  private _checkShellPrompt(text: string): void {
+    if (this._shellReady) return;
+    // Keep a rolling tail so prompts/markers aren't missed across chunk boundaries.
+    // Wide enough to hold the full "job control turned off" marker line.
+    this._serialTail = (this._serialTail + text).slice(-160);
+    // Primary signal: /bin/sh launched as init prints this exact message right
+    // before showing its prompt. 100% reliable for our init=/bin/sh boot.
+    const shInitMarker = /can't access tty|job control turned off|Run \/bin\/sh as init/.test(
+      this._serialTail,
+    );
+    // Fallback: a shell prompt ("/ # " or a bare "# ") after a line ending.
+    const promptMarker =
+      /[\r\n]\/\s*#\s/.test(this._serialTail) || /[\r\n]#\s/.test(this._serialTail);
+    if (shInitMarker || promptMarker) {
+      this._shellReady = true;
+      this._serialTail = '';
+      this.onShellReady?.();
+    }
   }
 
   connect(): void {
@@ -72,6 +101,7 @@ export class RaspberryPi3Bridge {
       switch (msg.type) {
         case 'serial_output': {
           const text = (msg.data.data as string) ?? '';
+          this._checkShellPrompt(text);
           if (this.onSerialData) {
             for (const ch of text) this.onSerialData(ch);
           }
@@ -94,6 +124,8 @@ export class RaspberryPi3Bridge {
 
     socket.onclose = () => {
       this._connected = false;
+      this._shellReady = false;
+      this._serialTail = '';
       this.socket = null;
       this.onDisconnected?.();
     };

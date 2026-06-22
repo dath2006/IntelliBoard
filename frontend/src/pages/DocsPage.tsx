@@ -267,7 +267,7 @@ cd velxio`}</CodeBlock>
     <CodeBlock language="bash">{`cd backend
 python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8001`}</CodeBlock>
+uvicorn app.main:app --reload --reload-dir app --port 8001`}</CodeBlock>
 
     <h3>3. Start the frontend</h3>
     <CodeBlock language="bash">{`cd frontend

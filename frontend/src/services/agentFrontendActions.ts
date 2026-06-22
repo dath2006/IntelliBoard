@@ -1,5 +1,6 @@
 import { useCompilationStore } from '../store/useCompilationStore';
-import { useSimulatorStore } from '../store/useSimulatorStore';
+import { useSimulatorStore, getBoardBridge } from '../store/useSimulatorStore';
+import { useVfsStore } from '../store/useVfsStore';
 import { usePlanApprovalStore } from '../store/usePlanApprovalStore';
 import type { PlanStep } from '../store/usePlanApprovalStore';
 import { runCompileAction } from '../utils/compileActions';
@@ -132,20 +133,30 @@ export async function runFrontendAction(
           onLog: (log) => compilation.appendLog(log),
         });
         const totalLogs = outcome.logs.length;
-        const logs = serializeLogs(outcome.logs, MAX_COMPILE_LOG_LINES);
+        
+        // If compilation is successful, we don't need compilation logs in the prompt context.
+        // If it failed, limit the logs to the last 40 lines to prevent token bloat.
+        const maxLines = outcome.ok ? 0 : 40;
+        const logs = serializeLogs(outcome.logs, maxLines);
+        
+        let messageText = outcome.message?.text ?? '';
+        if (messageText.length > 1500) {
+          messageText = messageText.slice(0, 1500) + '\n... [truncated for token safety]';
+        }
+        
         return {
           ok: outcome.ok,
           payload: {
             boardId: outcome.boardId,
             boardKind: outcome.boardKind,
-            message: outcome.message,
+            message: outcome.message ? { ...outcome.message, text: messageText } : null,
             missingLibHint: outcome.missingLibHint,
             logs,
             totalLogs,
-            logsTruncated: logs.length < totalLogs,
-            maxLogs: MAX_COMPILE_LOG_LINES,
+            logsTruncated: totalLogs > maxLines,
+            maxLogs: maxLines,
           },
-          error: outcome.ok ? undefined : outcome.message?.text,
+          error: outcome.ok ? undefined : messageText,
         };
       }
       case 'sim_run': {
@@ -189,12 +200,19 @@ export async function runFrontendAction(
       case 'compile_last_result': {
         const logs = compilation.logs;
         const lastOutcome = logs.length > 0 ? logs[logs.length - 1] : null;
+        let lastMessage = lastOutcome?.message ?? null;
+        if (lastMessage && lastMessage.text.length > 1500) {
+          lastMessage = {
+            ...lastMessage,
+            text: lastMessage.text.slice(0, 1500) + '\n... [truncated for token safety]',
+          };
+        }
         return {
           ok: true,
           payload: {
             hasResult: logs.length > 0,
             logs: serializeLogs(logs.slice(-50)),
-            lastMessage: lastOutcome?.message ?? null,
+            lastMessage,
             lastType: lastOutcome?.type ?? null,
           },
         };
@@ -370,6 +388,127 @@ export async function runFrontendAction(
         const context = getCanvasSpatialContext(components, boards);
         return { ok: true, payload: context };
       }
+      // ── Raspberry Pi VFS / serial actions ─────────────────────────────────
+      case 'pi_write_file': {
+        // Write (or create) a file in the Pi VFS.
+        // payload: { boardId, filePath, content }
+        // filePath is an absolute Unix path, e.g. '/home/pi/main.py'
+        const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
+        const filePath = typeof payload?.filePath === 'string' ? payload.filePath : null;
+        const content = typeof payload?.content === 'string' ? payload.content : '';
+        if (!boardId) return { ok: false, error: 'boardId is required' };
+        if (!filePath) return { ok: false, error: 'filePath is required' };
+
+        const vfs = useVfsStore.getState();
+        vfs.initBoardVfs(boardId);
+
+        // Resolve file path: split into directory segments + filename
+        const parts = filePath.replace(/^\/+/, '').split('/');
+        const fileName = parts.pop() ?? '';
+        if (!fileName) return { ok: false, error: 'filePath must end with a filename' };
+
+        // Walk (or create) directory nodes
+        let currentId = vfs.getRootId(boardId);
+        if (!currentId) return { ok: false, error: 'VFS not initialized for board' };
+
+        for (const seg of parts) {
+          if (!seg) continue;
+          const tree = vfs.getTree(boardId);
+          const parentNode = tree[currentId];
+          const existingChild = (parentNode?.children ?? []).find(
+            (cid) => tree[cid]?.name === seg && tree[cid]?.type === 'directory',
+          );
+          if (existingChild) {
+            currentId = existingChild;
+          } else {
+            const newDirId = vfs.createNode(boardId, currentId, seg, 'directory');
+            if (!newDirId) return { ok: false, error: `Could not create directory: ${seg}` };
+            currentId = newDirId;
+          }
+        }
+
+        // Create or update the file
+        const tree = vfs.getTree(boardId);
+        const parentNode = tree[currentId];
+        const existingFile = (parentNode?.children ?? []).find(
+          (cid) => tree[cid]?.name === fileName && tree[cid]?.type === 'file',
+        );
+        if (existingFile) {
+          vfs.setContent(boardId, existingFile, content);
+          return { ok: true, payload: { boardId, filePath, nodeId: existingFile, created: false } };
+        } else {
+          const newFileId = vfs.createNode(boardId, currentId, fileName, 'file');
+          if (!newFileId) return { ok: false, error: `Could not create file: ${fileName}` };
+          vfs.setContent(boardId, newFileId, content);
+          return { ok: true, payload: { boardId, filePath, nodeId: newFileId, created: true } };
+        }
+      }
+
+      case 'pi_upload_files': {
+        // Upload all VFS files to the running Pi via serial heredoc protocol.
+        // payload: { boardId }
+        const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
+        if (!boardId) return { ok: false, error: 'boardId is required' };
+
+        const bridge = getBoardBridge(boardId);
+        if (!bridge || !(bridge as any).connected) {
+          return { ok: false, error: 'Pi is not connected. Start the simulation and wait for boot first.' };
+        }
+
+        const vfs = useVfsStore.getState();
+        const files = vfs.serializeForUpload(boardId);
+        if (files.length === 0) {
+          return { ok: true, payload: { boardId, filesUploaded: 0 } };
+        }
+
+        const enc = new TextEncoder();
+        const send = (text: string) =>
+          (bridge as any).sendSerialBytes(Array.from(enc.encode(text)));
+
+        // Ensure shell has a clean prompt and rootfs is writable
+        send('\n');
+        await new Promise((r) => setTimeout(r, 200));
+        send('mount -o remount,rw / 2>/dev/null; true\n');
+        await new Promise((r) => setTimeout(r, 400));
+
+        for (const { path, content } of files) {
+          const dir = path.substring(0, path.lastIndexOf('/'));
+          if (dir) {
+            send(`mkdir -p ${dir}\n`);
+            await new Promise((r) => setTimeout(r, 150));
+          }
+          const delim = `VIST_${Math.random().toString(36).slice(2, 10).toUpperCase()}`;
+          const normalized = content.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+          send(`cat > ${path} << '${delim}'\n${normalized}\n${delim}\n`);
+          await new Promise((r) => setTimeout(r, 400));
+          if (path.endsWith('.py') || path.endsWith('.sh')) {
+            send(`chmod +x ${path}\n`);
+            await new Promise((r) => setTimeout(r, 100));
+          }
+        }
+
+        return { ok: true, payload: { boardId, filesUploaded: files.length } };
+      }
+
+      case 'pi_run_command': {
+        // Send a shell command to the Pi's serial terminal (ttyAMA0).
+        // payload: { boardId, command }
+        const boardId = getBoardIdFromPayload(payload) ?? sim.activeBoardId;
+        const command = typeof payload?.command === 'string' ? payload.command : null;
+        if (!boardId) return { ok: false, error: 'boardId is required' };
+        if (!command) return { ok: false, error: 'command is required' };
+
+        const bridge = getBoardBridge(boardId);
+        if (!bridge || !(bridge as any).connected) {
+          return { ok: false, error: 'Pi is not connected. Start the simulation and wait for boot first.' };
+        }
+
+        const enc = new TextEncoder();
+        const bytes = Array.from(enc.encode(command.endsWith('\n') ? command : command + '\n'));
+        (bridge as any).sendSerialBytes(bytes);
+        return { ok: true, payload: { boardId, command, bytesSent: bytes.length } };
+      }
+
       default:
         return { ok: false, error: `Unknown action: ${action}` };
     }

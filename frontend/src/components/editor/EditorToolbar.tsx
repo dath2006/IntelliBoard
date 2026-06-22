@@ -36,6 +36,7 @@ interface EditorToolbarProps {
   onZoomIn?: () => void;
   onZoomOut?: () => void;
   onResetView?: () => void;
+  onAutoArrange?: () => void;
   componentCount?: number;
   explorerOpen: boolean;
   setExplorerOpen: (open: boolean | ((v: boolean) => boolean)) => void;
@@ -90,13 +91,21 @@ export const EditorToolbar = ({
   onZoomIn,
   onZoomOut,
   onResetView,
+  onAutoArrange,
   componentCount = 0,
   explorerOpen,
   setExplorerOpen,
 }: EditorToolbarProps) => {
   const { files, markCompiled } = useEditorStore();
-  const { boards, activeBoardId, compileBoardProgram, setBoardLanguageMode, updateBoard } =
-    useSimulatorStore();
+  const {
+    boards,
+    activeBoardId,
+    compileBoardProgram,
+    setBoardLanguageMode,
+    updateBoard,
+    wiresVisible,
+    setWiresVisible,
+  } = useSimulatorStore();
 
   const activeBoard = boards.find((b) => b.id === activeBoardId) ?? boards[0];
   const isRunning = activeBoard?.running ?? false;
@@ -728,6 +737,53 @@ export const EditorToolbar = ({
                 <polyline points="2 14 6 8 10 14 14 6 18 14 22 10" />
               </svg>
               <span className="tb-btn-label">Scope</span>
+            </button>
+
+            {/* Wires visibility toggle */}
+            <button
+              onClick={() => setWiresVisible(!wiresVisible)}
+              className={`tb-btn tb-btn-canvas${wiresVisible ? ' tb-btn-canvas-active' : ''}`}
+              title="Toggle Wires Visibility"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M4 12c4-4 8 4 12 0s4-4 8 0" />
+                <path d="M4 18c4-4 8 4 12 0s4-4 8 0" opacity="0.6" />
+              </svg>
+              <span className="tb-btn-label">Wires: {wiresVisible ? 'On' : 'Off'}</span>
+            </button>
+
+            {/* Tidy Layout button */}
+            <button
+              onClick={onAutoArrange}
+              disabled={!onAutoArrange}
+              className="tb-btn tb-btn-canvas"
+              title="Auto-arrange components to prevent overlap"
+            >
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <rect x="3" y="3" width="7" height="7" />
+                <rect x="14" y="3" width="7" height="7" />
+                <rect x="14" y="14" width="7" height="7" />
+                <rect x="3" y="14" width="7" height="7" />
+              </svg>
+              <span className="tb-btn-label">Tidy</span>
             </button>
 
             <div className="tb-divider" />

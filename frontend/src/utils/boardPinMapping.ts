@@ -256,6 +256,8 @@ const BOARD_COMPONENT_ALIASES: Record<string, string> = {
 export function isBoardComponent(componentId: string): boolean {
   const cid = (componentId || '').toLowerCase();
   if (!cid) return false;
+
+  // Direct check first (e.g. "raspberry-pi-3", "attiny85")
   if (BOARD_COMPONENT_IDS.has(cid)) return true;
 
   const aliasTarget = BOARD_COMPONENT_ALIASES[cid];
@@ -266,7 +268,27 @@ export function isBoardComponent(componentId: string): boolean {
   // Accept explicit board-kind style prefixes only when the exact id is known.
   if (cid.startsWith('wokwi-')) {
     const trimmed = cid.slice('wokwi-'.length);
-    return BOARD_COMPONENT_IDS.has(trimmed) || Boolean(BOARD_COMPONENT_ALIASES[cid]);
+    if (BOARD_COMPONENT_IDS.has(trimmed) || Boolean(BOARD_COMPONENT_ALIASES[cid])) {
+      return true;
+    }
+  }
+
+  // Strip trailing instance number (e.g. "arduino-uno-2" -> "arduino-uno", "raspberry-pi-3-2" -> "raspberry-pi-3")
+  const baseCid = cid.replace(/-\d+$/, '');
+  if (baseCid !== cid) {
+    if (BOARD_COMPONENT_IDS.has(baseCid)) return true;
+
+    const baseAliasTarget = BOARD_COMPONENT_ALIASES[baseCid];
+    if (baseAliasTarget && BOARD_COMPONENT_IDS.has(baseAliasTarget)) {
+      return true;
+    }
+
+    if (baseCid.startsWith('wokwi-')) {
+      const trimmedBase = baseCid.slice('wokwi-'.length);
+      if (BOARD_COMPONENT_IDS.has(trimmedBase) || Boolean(BOARD_COMPONENT_ALIASES[baseCid])) {
+        return true;
+      }
+    }
   }
 
   return false;

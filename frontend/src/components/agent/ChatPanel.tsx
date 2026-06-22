@@ -24,6 +24,8 @@ import {
   PromptInputSubmit,
   PromptInputFooter,
   PromptInputTools,
+  usePromptInputAttachments,
+  PromptInputButton,
 } from '../ai-elements/prompt-input';
 import { CompactModelSelector } from './ModelSelector';
 import { Tool, ToolHeader, ToolContent, ToolInput, ToolOutput } from '../ai-elements/tool';
@@ -41,8 +43,9 @@ import {
   ChainOfThoughtContent,
   ChainOfThoughtStep,
 } from '../ai-elements/chain-of-thought';
-import { CheckCircle2Icon, LucideTerminal, CheckIcon, XIcon, RefreshCwIcon } from 'lucide-react';
+import { CheckCircle2Icon, LucideTerminal, CheckIcon, XIcon, RefreshCwIcon, Loader2, Paperclip, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { McqCard } from './McqCard';
 import { useAgentSync, buildSnapshotFromStores } from './useAgentSync';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { nanoid } from 'nanoid';
@@ -207,13 +210,77 @@ interface ChatPanelProps {
   onModelChange: (model: string) => void;
 }
 
+interface ParsedMcq {
+  textBefore: string;
+  mcqData: any | null;
+  textAfter: string;
+  hasMcq: boolean;
+}
+
+function parseMcqText(text: string): ParsedMcq {
+  const match = text.match(/(?:__mcq__|mcq):\s*(\{.*)/si);
+  if (!match) {
+    return { textBefore: text, mcqData: null, textAfter: '', hasMcq: false };
+  }
+
+  const index = match.index ?? 0;
+  const textBefore = text.slice(0, index).trim();
+  const jsonCandidate = match[1];
+
+  let braceCount = 0;
+  let endOfJsonIndex = -1;
+  let inString = false;
+  let escape = false;
+
+  for (let i = 0; i < jsonCandidate.length; i++) {
+    const char = jsonCandidate[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') {
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0) {
+          endOfJsonIndex = i + 1;
+          break;
+        }
+      }
+    }
+  }
+
+  if (endOfJsonIndex !== -1) {
+    const jsonStr = jsonCandidate.slice(0, endOfJsonIndex);
+    const textAfter = jsonCandidate.slice(endOfJsonIndex).trim();
+    try {
+      const mcqData = JSON.parse(jsonStr);
+      return { textBefore, mcqData, textAfter, hasMcq: true };
+    } catch {
+      return { textBefore, mcqData: null, textAfter: '', hasMcq: true };
+    }
+  } else {
+    return { textBefore, mcqData: null, textAfter: '', hasMcq: true };
+  }
+}
+
 interface ChatMessageProps {
   message: UIMessage;
   isBusy: boolean;
+  onMcqSubmit: (text: string) => void;
 }
 
 /** Memoized message component to prevent re-renders of stable messages during streaming */
-const ChatMessage = React.memo(function ChatMessage({ message, isBusy }: ChatMessageProps) {
+const ChatMessage = React.memo(function ChatMessage({ message, isBusy, onMcqSubmit }: ChatMessageProps) {
   const isUser = message.role === 'user';
 
   return (
@@ -298,9 +365,68 @@ const ChatMessage = React.memo(function ChatMessage({ message, isBusy }: ChatMes
                 );
               }
             }
+            if (part.text.includes('__mcq__:') || part.text.match(/(?:__mcq__|mcq):\s*\{/i)) {
+              const parsed = parseMcqText(part.text);
+              if (parsed.hasMcq) {
+                return (
+                  <div key={`${message.id}-mcq-container-${pi}`} className="space-y-3.5 w-full">
+                    {parsed.textBefore && (
+                      <div className="max-w-none">
+                        <MessageResponse>{parsed.textBefore}</MessageResponse>
+                      </div>
+                    )}
+
+                    {parsed.mcqData ? (
+                      <McqCard
+                        messageId={message.id}
+                        mcqData={parsed.mcqData}
+                        onSubmit={onMcqSubmit}
+                      />
+                    ) : (
+                      <div className="w-full p-4 border border-dashed rounded-xl bg-muted/20 animate-pulse text-xs text-muted-foreground flex items-center gap-2">
+                        <Loader2 className="size-3.5 animate-spin" />
+                        Generating question clarification...
+                      </div>
+                    )}
+
+                    {parsed.textAfter && (
+                      <div className="max-w-none">
+                        <MessageResponse>{parsed.textAfter}</MessageResponse>
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+            }
+
             return (
-              <div key={`${message.id}-t-${pi}`} className={cn('max-w-none', pi > 0 && 'mt-3')}>
-                <MessageResponse>{part.text}</MessageResponse>
+              <MessageResponse key={`${message.id}-t-${pi}`}>
+                {part.text}
+              </MessageResponse>
+            );
+          }
+          if (part.type === 'file') {
+            const isImage = part.mediaType.startsWith('image/');
+            if (isImage) {
+              return (
+                <div key={`${message.id}-f-${pi}`} className="mt-2 shrink-0">
+                  <img
+                    src={part.url}
+                    alt={part.filename}
+                    className="max-w-xs max-h-48 rounded-lg border border-border/50 object-contain shadow-sm bg-background"
+                  />
+                </div>
+              );
+            }
+            return (
+              <div key={`${message.id}-f-${pi}`} className="mt-2 flex items-center gap-2.5 p-2 rounded-lg bg-card/50 border border-border/50 max-w-sm shrink-0">
+                <div className="p-1.5 rounded bg-muted text-muted-foreground">
+                  <FileText className="size-4" />
+                </div>
+                <div className="flex-1 min-w-0 text-left">
+                  <p className="text-xs font-medium text-foreground truncate">{part.filename}</p>
+                  <p className="text-[10px] text-muted-foreground uppercase">{part.mediaType.split('/')[1] || 'file'}</p>
+                </div>
               </div>
             );
           }
@@ -378,6 +504,81 @@ function ChatRequestError({ message }: { message: string }) {
   }
   return <p className="whitespace-pre-wrap break-words">{message}</p>;
 }
+
+const ComposerAttachments = () => {
+  const { files, remove } = usePromptInputAttachments();
+  if (files.length === 0) return null;
+
+  return (
+    <div className="flex flex-wrap gap-2 px-4 pt-3 pb-1 border-b border-border/30 bg-muted/10 shrink-0">
+      {files.map((file) => {
+        const isImage = file.mediaType.startsWith('image/');
+        return (
+          <div
+            key={file.id}
+            className="group relative flex items-center gap-2 p-1.5 pr-8 rounded-lg bg-card border border-border/80 text-xs max-w-[200px]"
+          >
+            {isImage ? (
+              <img
+                src={file.url}
+                alt={file.filename}
+                className="size-8 rounded object-cover border border-border/50"
+              />
+            ) : (
+              <div className="p-1 rounded bg-muted text-muted-foreground shrink-0">
+                <FileText className="size-4" />
+              </div>
+            )}
+            <span className="truncate font-medium text-foreground">{file.filename}</span>
+            <button
+              type="button"
+              onClick={() => remove(file.id)}
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+            >
+              <XIcon className="size-3.5" />
+            </button>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const AttachmentButton = ({ disabled }: { disabled?: boolean }) => {
+  const { openFileDialog } = usePromptInputAttachments();
+  return (
+    <PromptInputButton
+      tooltip="Attach images or documents"
+      onClick={openFileDialog}
+      size="icon-sm"
+      disabled={disabled}
+    >
+      <Paperclip className="size-4" />
+    </PromptInputButton>
+  );
+};
+
+const ComposerSubmitButton = ({
+  isBusy,
+  status,
+  onStop,
+  textInput,
+}: {
+  isBusy: boolean;
+  status: any;
+  onStop: () => void;
+  textInput: string;
+}) => {
+  const { files } = usePromptInputAttachments();
+  const hasContent = textInput.trim().length > 0 || files.length > 0;
+  return (
+    <PromptInputSubmit
+      status={isBusy ? status : undefined}
+      onStop={onStop}
+      disabled={!hasContent && !isBusy}
+    />
+  );
+};
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({
   sessionId,
@@ -528,7 +729,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             )}
 
             {memoizedMessages.map((message) => (
-              <ChatMessage key={message.id} message={message} isBusy={isBusy} />
+              <ChatMessage
+                key={message.id}
+                message={message}
+                isBusy={isBusy}
+                onMcqSubmit={(text) => sendMessage({ text })}
+              />
             ))}
 
             {isBusy && messages[messages.length - 1]?.role === 'user' && (
@@ -556,6 +762,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           <div className="max-w-3xl mx-auto">
             <PromptInput
               className="bg-background border border-border shadow-sm rounded-xl"
+              accept="image/*,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/msword"
+              multiple={true}
               onSubmit={async (msg, ev) => {
                 if (ev) ev.preventDefault();
                 const raw = typeof msg?.text === 'string' ? msg.text : '';
@@ -572,6 +780,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                 setInputUi('');
               }}
             >
+              <ComposerAttachments />
               <PromptInputTextarea
                 placeholder="Describe the circuit or code change…"
                 value={inputUi}
@@ -584,7 +793,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
               />
               <PromptInputFooter className="px-3 pb-2.5 pt-2 flex flex-wrap items-center justify-between gap-2 border-t border-border/50">
                 <PromptInputTools className="flex items-center gap-1.5">
-                  <div className="flex items-center gap-1.5 min-w-0 text-[10px] text-muted-foreground font-mono">
+                  <div className="flex items-center gap-1.5 min-w-0 text-[10px] text-muted-foreground font-mono mr-1">
                     <LucideTerminal size={11} aria-hidden />
                     <span className="truncate capitalize">
                       {streamStatus === 'open' ? 'live sync' : streamStatus}
@@ -597,13 +806,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                     open={modelSelectorOpen}
                     onOpenChange={setModelSelectorOpen}
                   />
+
+                  <AttachmentButton disabled={isBusy} />
                 </PromptInputTools>
 
                 <div className="flex items-center shrink-0">
-                  <PromptInputSubmit
-                    status={isBusy ? status : undefined}
+                  <ComposerSubmitButton
+                    isBusy={isBusy}
+                    status={status}
                     onStop={() => stop()}
-                    disabled={!inputUi.trim() && !isBusy}
+                    textInput={inputUi}
                   />
                 </div>
               </PromptInputFooter>

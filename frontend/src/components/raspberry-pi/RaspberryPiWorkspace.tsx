@@ -28,6 +28,7 @@ export const RaspberryPiWorkspace: React.FC<RaspberryPiWorkspaceProps> = ({ boar
   const [activePane, setActivePane] = useState<'terminal' | string>('terminal'); // string = nodeId
   const [openFiles, setOpenFiles] = useState<OpenFile[]>([]);
   const [bridgeConnected, setBridgeConnected] = useState(false);
+  const [shellReady, setShellReady] = useState(false);
 
   const board = useSimulatorStore((s) => s.boards.find((b) => b.id === boardId));
   const startBoard = useSimulatorStore((s) => s.startBoard);
@@ -38,6 +39,7 @@ export const RaspberryPiWorkspace: React.FC<RaspberryPiWorkspaceProps> = ({ boar
   useEffect(() => {
     if (!board?.running) {
       setBridgeConnected(false);
+      setShellReady(false);
       return;
     }
     // Small delay to let the bridge WebSocket establish after QEMU starts
@@ -47,15 +49,17 @@ export const RaspberryPiWorkspace: React.FC<RaspberryPiWorkspaceProps> = ({ boar
         bridge.connect();
       }
       setBridgeConnected(bridge?.connected ?? false);
+      setShellReady(bridge?.shellReady ?? false);
     }, 800);
     return () => clearTimeout(timer);
   }, [board?.running, boardId]);
 
-  // Poll bridge.connected state to reflect it in toolbar
+  // Poll bridge.connected + bridge.shellReady every second
   useEffect(() => {
     const interval = setInterval(() => {
       const bridge = getBoardBridge(boardId);
       setBridgeConnected(bridge?.connected ?? false);
+      setShellReady(bridge?.shellReady ?? false);
     }, 1000);
     return () => clearInterval(interval);
   }, [boardId]);
@@ -98,7 +102,7 @@ export const RaspberryPiWorkspace: React.FC<RaspberryPiWorkspaceProps> = ({ boar
     <div style={styles.container}>
       {/* Left: VFS explorer */}
       <div style={styles.sidebar}>
-        <VirtualFileSystem boardId={boardId} onFileSelect={handleFileSelect} />
+        <VirtualFileSystem boardId={boardId} onFileSelect={handleFileSelect} shellReady={shellReady} />
       </div>
 
       {/* Right: terminal or file editor */}
@@ -111,11 +115,23 @@ export const RaspberryPiWorkspace: React.FC<RaspberryPiWorkspaceProps> = ({ boar
             <span
               style={{
                 ...styles.statusDot,
-                background: board?.running ? (bridgeConnected ? '#4caf50' : '#f59e0b') : '#6b7280',
+                background: board?.running
+                  ? shellReady
+                    ? '#4caf50'
+                    : bridgeConnected
+                      ? '#f59e0b'
+                      : '#ff7043'
+                  : '#6b7280',
               }}
             />
             <span style={styles.statusLabel}>
-              {board?.running ? (bridgeConnected ? 'Connected' : 'Starting…') : 'Offline'}
+              {board?.running
+                ? shellReady
+                  ? 'Shell ready'
+                  : bridgeConnected
+                    ? 'Booting…'
+                    : 'Connecting…'
+                : 'Offline'}
             </span>
 
             {!board?.running ? (

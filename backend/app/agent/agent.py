@@ -235,7 +235,12 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "- When writing MicroPython:\n"
         "    - Use machine.Pin, machine.I2C, machine.SPI with the exact GPIO numbers "
         "matching the board's pin mapping for the connected pins.\n"
-        "    - Add a main loop with utime.sleep() to prevent busy-spinning.\n\n"
+        "    - Add a main loop with utime.sleep() to prevent busy-spinning.\n"
+        "- When writing code for Raspberry Pi 3B:\n"
+        "    - The Pi runs REAL Linux (Raspbian) in QEMU — no compilation step.\n"
+        "    - Use write_pi_file(board_id, '/home/pi/script.py', content) to stage files.\n"
+        "    - Files support Python 3 and standard shell scripts.\n"
+        "    - Do NOT use create_file() for Pi code. Use write_pi_file() only.\n\n"
 
         "════════════════════════════════════════════\n"
         "SECTION 6 — COMPILATION & DEBUG LOOP\n"
@@ -260,7 +265,16 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "     e. Report success with a summary of: board, components wired, firmware behavior, "
         "and serial output observed.\n"
         "  5. If the user says 'fix the error' without context, call get_last_compile_result()\n"
-        "     to retrieve the cached error log — avoids an unnecessary recompile.\n\n"
+        "     to retrieve the cached error log — avoids an unnecessary recompile.\n"
+        "  6. RASPBERRY PI 3B — Special Protocol (no compilation, runs real Linux):\n"
+        "     a. Stage files:  write_pi_file(board_id, '/home/pi/main.py', code)\n"
+        "     b. Start QEMU:   run_pi_simulation(board_id)  [boots Raspbian, ~60s]\n"
+        "     c. Wait for boot: wait_for_serial_output('login', timeout_seconds=120)\n"
+        "        Do NOT use wait_seconds — boot time varies.\n"
+        "     d. Upload files:  upload_pi_files(board_id)  [sends via serial heredoc]\n"
+        "     e. Run script:    run_pi_command(board_id, 'python3 /home/pi/main.py')\n"
+        "     f. Read output:   wait_for_serial_output(expected_pattern, timeout_seconds=15)\n"
+        "     g. Use run_pi_command for any shell interaction (ls, cat, kill, etc.)\n\n"
 
         "════════════════════════════════════════════\n"
         "SECTION 7 — GLOBAL CATALOG DISCOVERY & BROAD QUESTIONS\n"
@@ -301,10 +315,13 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         "  for every wire before placing any of them.\n"
         "- When you encounter an error from any tool, do not silently retry. "
         "Report the error, explain your diagnosis, and state your fix strategy.\n"
-        "- Do not ask the user clarifying questions unless a decision genuinely cannot be "
-        "made from the available project context. Make reasonable embedded engineering "
-        "assumptions and state them explicitly (e.g., 'Assuming common-cathode LED. "
-        "Connecting cathode to GND and anode through 220Ω resistor to digital pin.').\n"
+        "- Do not ask the user plain text clarifying questions unless a decision genuinely cannot be "
+        "made from the available project context. If you MUST ask a clarifying question "
+        "(e.g., to select a board, clarify a component choice, or pick a programming language), "
+        "you MUST call the `ask_clarifying_mcq` tool to generate an interactive multiple-choice question "
+        "and append its exact return value to your final output text message. This renders a visual choice card "
+        "in the user interface. Otherwise, make reasonable embedded engineering assumptions and state them explicitly "
+        "(e.g., 'Assuming common-cathode LED. Connecting cathode to GND and anode through 220Ω resistor to digital pin.').\n"
         "- End every completed task with a summary block:\n"
         "    ✅ Circuit: [what was wired]\n"
         "    ✅ Firmware: [what the code does]\n"
@@ -1219,7 +1236,17 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
     async def compile_board(ctx: RunContext[AgentDeps], board_id: str) -> dict[str, Any]:
         """Compile via the backend arduino-cli. Prefer compile_in_frontend for richer errors."""
         ctx.deps.guard_tool_call()
-        return await _safe_tool_call(ctx, "compile_board", lambda: agent_tools.compile_board(ctx.deps.snapshot, board_id=board_id))
+        async def _compile_board_action() -> dict[str, Any]:
+            result = await agent_tools.compile_board(ctx.deps.snapshot, board_id=board_id)
+            sanitized = _sanitize_hex_content(result)
+            if isinstance(sanitized, dict):
+                # Truncate stdout and stderr if they are too long to prevent token bloat
+                for field in ("stdout", "stderr"):
+                    val = sanitized.get(field)
+                    if isinstance(val, str) and len(val) > 1500:
+                        sanitized[field] = val[:1500] + "\n... [truncated for token safety]"
+            return sanitized
+        return await _safe_tool_call(ctx, "compile_board", _compile_board_action)
 
     @agent.tool
     async def compile_in_frontend(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
@@ -1354,7 +1381,11 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
 
     @agent.tool
     async def run_simulation(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
-        """Start the simulation in the UI. Compile must succeed first."""
+        """Start the simulation in the UI. Compile must succeed first.
+
+        For Raspberry Pi 3B boards, use run_pi_simulation() instead — it sets the
+        correct 3-minute timeout for QEMU boot time.
+        """
         ctx.deps.guard_tool_call()
         return await _safe_tool_call(
             ctx,
@@ -1366,6 +1397,126 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
                 timeout_ms=180000,
             ),
         )
+
+    # ── Raspberry Pi 3B tools ─────────────────────────────────────────────────
+
+    @agent.tool
+    async def write_pi_file(
+        ctx: RunContext[AgentDeps],
+        board_id: str,
+        file_path: str,
+        content: str,
+    ) -> dict[str, Any]:
+        """Write (or overwrite) a file in the Raspberry Pi 3B Virtual File System.
+
+        board_id: the Pi board instance ID (from get_project_outline).
+        file_path: absolute Unix path on the Pi, e.g. '/home/pi/main.py'.
+        content: the file content as a plain string.
+
+        Call this BEFORE run_pi_simulation to stage files.
+        After the Pi boots, call upload_pi_files to transfer them.
+
+        Example workflow:
+          1. write_pi_file(board_id, '/home/pi/main.py', 'print("Hello Pi!")')
+          2. run_pi_simulation(board_id)
+          3. wait_for_serial_output('login', timeout_seconds=120)
+          4. upload_pi_files(board_id)
+          5. run_pi_command(board_id, 'python3 /home/pi/main.py')
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "write_pi_file",
+            lambda: _run_frontend_action(
+                ctx,
+                "pi_write_file",
+                {"boardId": board_id, "filePath": file_path, "content": content},
+            ),
+        )
+
+    @agent.tool
+    async def upload_pi_files(ctx: RunContext[AgentDeps], board_id: str) -> dict[str, Any]:
+        """Upload all staged VFS files to the running Raspberry Pi via serial.
+
+        board_id: the Pi board instance ID.
+
+        IMPORTANT: The Pi must be fully booted and at a shell prompt before calling
+        this. Wait for the 'booted' system event or use wait_for_serial_output
+        to detect the login prompt. This tool writes each file via serial heredoc.
+
+        Returns: { filesUploaded: int }
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "upload_pi_files",
+            lambda: _run_frontend_action(
+                ctx,
+                "pi_upload_files",
+                {"boardId": board_id},
+                timeout_ms=60000,
+            ),
+        )
+
+    @agent.tool
+    async def run_pi_command(
+        ctx: RunContext[AgentDeps],
+        board_id: str,
+        command: str,
+    ) -> dict[str, Any]:
+        """Send a shell command to the Raspberry Pi's serial terminal (ttyAMA0).
+
+        board_id: the Pi board instance ID.
+        command: any shell command string, e.g. 'python3 /home/pi/main.py'
+                 or 'ls /home/pi'. A newline is appended automatically.
+
+        IMPORTANT: The Pi must be at a shell prompt. After upload_pi_files,
+        use wait_for_serial_output('#', 5) to confirm prompt is ready.
+
+        Returns: { bytesSent: int }
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "run_pi_command",
+            lambda: _run_frontend_action(
+                ctx,
+                "pi_run_command",
+                {"boardId": board_id, "command": command},
+            ),
+        )
+
+    @agent.tool
+    async def run_pi_simulation(
+        ctx: RunContext[AgentDeps],
+        board_id: str,
+    ) -> dict[str, Any]:
+        """Start the Raspberry Pi 3B QEMU simulation.
+
+        board_id: the Pi board instance ID (from get_project_outline → boards).
+
+        This boots a real Raspbian Linux in QEMU (ARM64, raspi3b machine).
+        Boot takes approximately 30-90 seconds. After calling this tool:
+          1. Use wait_for_serial_output('login', timeout_seconds=120) to wait for boot.
+             Do NOT hardcode wait_seconds(60) — Pi boot time varies.
+          2. Once booted, call upload_pi_files(board_id) to send your Python files.
+          3. Call run_pi_command(board_id, 'python3 /home/pi/main.py') to run.
+          4. Use wait_for_serial_output(pattern, timeout_seconds=10) to read output.
+
+        Returns: { ok: bool, boardId: str, ran: bool }
+        """
+        ctx.deps.guard_tool_call()
+        return await _safe_tool_call(
+            ctx,
+            "run_pi_simulation",
+            lambda: _run_frontend_action(
+                ctx,
+                "sim_run",
+                {"boardId": board_id},
+                timeout_ms=300000,  # 5 minutes — Pi boot is slow
+            ),
+        )
+
 
     @agent.tool
     async def pause_simulation(ctx: RunContext[AgentDeps], board_id: str | None = None) -> dict[str, Any]:
@@ -1595,7 +1746,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         """Wait until serial output contains a specific pattern (substring match).
 
         pattern: text to search for in serial output (case-sensitive substring).
-        timeout_seconds: max wait time (1-30s, default 10s).
+        timeout_seconds: max wait time (1-180s, default 10s).
         board_id: optional, defaults to active board.
 
         Returns: {matched: bool, output: str, elapsed_seconds: float}
@@ -1604,7 +1755,7 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         """
         ctx.deps.guard_tool_call()
         import time
-        timeout_seconds = max(1.0, min(timeout_seconds, 30.0))
+        timeout_seconds = max(1.0, min(timeout_seconds, 180.0))
         start = time.monotonic()
         poll_interval = 0.5
         last_output = ""
@@ -1638,6 +1789,36 @@ def build_agent(model_name: Any | None = None, *, defer_model_check: bool = Fals
         duration = max(0.1, min(seconds, 10.0))
         await asyncio.sleep(duration)
         return {"ok": True, "seconds": duration}
+
+    @agent.tool
+    async def ask_clarifying_mcq(
+        ctx: RunContext[AgentDeps],
+        question: str,
+        options: list[str],
+        multiselect: bool = False,
+    ) -> str:
+        """Present a multiple-choice question (MCQ) to the user to clarify requirements or choices.
+
+        Use this tool when you need the user's input/decision to proceed (e.g. choosing a board,
+        deciding which sensors to connect, selecting pins, or specifying a programming language).
+        The return value is a formatted MCQ payload string that you MUST output in your final response.
+
+        Args:
+            question: The clarification question to display (e.g., "Which MCU board would you like to use?").
+            options: A list of string options for the user to choose from (at least 2 options).
+            multiselect: Whether the user can select multiple options.
+
+        Returns:
+            The raw MCQ layout payload. Append this string exactly to your final chat output response text.
+        """
+        ctx.deps.guard_tool_call()
+        import json
+        mcq_payload = {
+            "question": question,
+            "multiselect": multiselect,
+            "options": [{"id": f"opt_{i}", "label": opt} for i, opt in enumerate(options)]
+        }
+        return f"\n__mcq__:{json.dumps(mcq_payload)}"
 
     @agent.tool
     async def announce_plan(

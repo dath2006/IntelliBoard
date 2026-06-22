@@ -54,6 +54,7 @@ export const WireLayer: React.FC<WireLayerProps> = React.memo(({
 }) => {
   const wireInProgress = useSimulatorStore((s) => s.wireInProgress);
   const selectedWireId = useSimulatorStore((s) => s.selectedWireId);
+  const wiresVisible = useSimulatorStore((s) => s.wiresVisible);
 
   return (
     <svg
@@ -69,7 +70,7 @@ export const WireLayer: React.FC<WireLayerProps> = React.memo(({
         zIndex: 35,
       }}
     >
-      {wires.map((wire) => (
+      {wiresVisible && wires.map((wire) => (
         <MemoizedWireRenderer
           key={wire.id}
           wire={wire}
@@ -82,7 +83,7 @@ export const WireLayer: React.FC<WireLayerProps> = React.memo(({
       ))}
 
       {/* Segment handles for the selected wire */}
-      {segmentHandles.map((handle) => (
+      {wiresVisible && segmentHandles.map((handle) => (
         <circle
           key={handle.segIndex}
           cx={handle.mx}

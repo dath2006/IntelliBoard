@@ -195,16 +195,15 @@ export function calculateWireOffsets(wires: Wire[]): Map<string, number> {
 
   // Calculate offsets for each group
   groups.forEach((group) => {
-    const numWires = group.segments.length;
-
     // Get unique wire IDs in this group
     const wireIds = [...new Set(group.segments.map((seg) => seg.wireId))];
+    const numUniqueWires = wireIds.length;
 
     // Calculate offset for each wire
     wireIds.forEach((wireId, index) => {
       // Distribute offsets symmetrically around center
-      // For n wires: offsets are [-spacing*(n-1)/2, ..., 0, ..., +spacing*(n-1)/2]
-      const offset = (index - (numWires - 1) / 2) * WIRE_SPACING;
+      // For n unique wires: offsets are [-spacing*(n-1)/2, ..., 0, ..., +spacing*(n-1)/2]
+      const offset = (index - (numUniqueWires - 1) / 2) * WIRE_SPACING;
 
       // Store the maximum absolute offset for this wire
       // (in case wire participates in multiple groups)
@@ -234,58 +233,99 @@ export function calculateWireOffsets(wires: Wire[]): Map<string, number> {
 export function applyOffsetToWire(wire: Wire, offset: number): Wire {
   if (offset === 0) return wire;
 
-  // Determine primary direction from the first segment of the path
-  const firstWaypointOrEnd =
-    wire.waypoints && wire.waypoints.length > 0 ? wire.waypoints[0] : wire.end;
-
-  const isHorizontalFirst =
-    Math.abs(firstWaypointOrEnd.x - wire.start.x) >= Math.abs(firstWaypointOrEnd.y - wire.start.y);
-
-  // True pin positions (never moved)
+  const waypoints = wire.waypoints || [];
   const pinStart = { x: wire.start.x, y: wire.start.y };
   const pinEnd = { x: wire.end.x, y: wire.end.y };
 
-  // Offset intermediate points perpendicular to the primary direction
-  const shiftedWaypoints = (wire.waypoints || []).map((wp) => ({
-    ...wp,
-    x: isHorizontalFirst ? wp.x : wp.x + offset,
-    y: isHorizontalFirst ? wp.y + offset : wp.y,
-  }));
+  const points = [
+    { ...pinStart },
+    ...waypoints.map((wp) => ({ ...wp })),
+    { ...pinEnd },
+  ];
 
-  // Compute where the offset path actually starts/ends
-  // (the point on the parallel track immediately after the pin stub)
+  const N = points.length;
+  if (N < 2) return wire;
+
+  // Determine direction of first segment
+  const dxFirst = Math.abs(points[1].x - points[0].x);
+  const dyFirst = Math.abs(points[1].y - points[0].y);
+  const isHorizontalFirst = dxFirst >= dyFirst;
+
+  // Determine direction of last segment
+  const dxLast = Math.abs(points[N - 1].x - points[N - 2].x);
+  const dyLast = Math.abs(points[N - 1].y - points[N - 2].y);
+  const isHorizontalLast = dxLast >= dyLast;
+
+  // Offset intermediate waypoints based on their connected segments
+  const shiftedWaypoints = waypoints.map((wp, idx) => {
+    const i = idx + 1;
+    const prev = points[i - 1];
+    const next = points[i + 1];
+
+    const dxPrev = Math.abs(points[i].x - prev.x);
+    const dyPrev = Math.abs(points[i].y - prev.y);
+    const dxNext = Math.abs(next.x - points[i].x);
+    const dyNext = Math.abs(next.y - points[i].y);
+
+    const isHorizontalPrev = dxPrev >= dyPrev;
+    const isHorizontalNext = dxNext >= dyNext;
+
+    const hasHorizontal = isHorizontalPrev || isHorizontalNext;
+    const hasVertical = !isHorizontalPrev || !isHorizontalNext;
+
+    return {
+      x: hasVertical ? wp.x + offset : wp.x,
+      y: hasHorizontal ? wp.y + offset : wp.y,
+    };
+  });
+
+  // Start and end stub points
   const offsetStart = isHorizontalFirst
     ? { x: pinStart.x, y: pinStart.y + offset }
     : { x: pinStart.x + offset, y: pinStart.y };
 
-  const offsetEnd = isHorizontalFirst
+  const offsetEnd = isHorizontalLast
     ? { x: pinEnd.x, y: pinEnd.y + offset }
     : { x: pinEnd.x + offset, y: pinEnd.y };
 
-  // Build new waypoints:
-  //   stub from pinStart → offsetStart, then the shifted intermediates, then stub from offsetEnd → pinEnd
-  // We only need to add extra stubs when they are non-zero length.
-  const newWaypoints: typeof wire.waypoints = [];
+  const newWaypoints: { x: number; y: number }[] = [];
 
-  // Leading stub end-point (where the offset path begins)
+  // Add leading stub if it has non-zero length
   if (offsetStart.x !== pinStart.x || offsetStart.y !== pinStart.y) {
     newWaypoints.push({ ...offsetStart });
   }
 
-  // Shifted original waypoints
+  // Add shifted intermediates
   for (const wp of shiftedWaypoints) {
     newWaypoints.push(wp);
   }
 
-  // Trailing stub start-point (where the offset path rejoins the pin)
+  // Add trailing stub if it has non-zero length
   if (offsetEnd.x !== pinEnd.x || offsetEnd.y !== pinEnd.y) {
     newWaypoints.push({ ...offsetEnd });
+  }
+
+  // Collapse consecutive identical points and filter out duplicates at start/end
+  const finalWaypoints: { x: number; y: number }[] = [];
+  let lastPt = pinStart;
+  for (const wp of newWaypoints) {
+    if (Math.abs(wp.x - lastPt.x) > 0.01 || Math.abs(wp.y - lastPt.y) > 0.01) {
+      finalWaypoints.push(wp);
+      lastPt = wp;
+    }
+  }
+
+  if (finalWaypoints.length > 0) {
+    const lastWp = finalWaypoints[finalWaypoints.length - 1];
+    if (Math.abs(lastWp.x - pinEnd.x) < 0.01 && Math.abs(lastWp.y - pinEnd.y) < 0.01) {
+      finalWaypoints.pop();
+    }
   }
 
   return {
     ...wire,
     start: { ...wire.start, x: pinStart.x, y: pinStart.y },
     end: { ...wire.end, x: pinEnd.x, y: pinEnd.y },
-    waypoints: newWaypoints,
+    waypoints: finalWaypoints,
   };
 }

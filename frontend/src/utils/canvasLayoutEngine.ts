@@ -35,11 +35,11 @@ const BOARD_SIZE: Record<string, { w: number; h: number }> = {
 };
 
 /** Gap between the board edge and the first placed component (px) */
-const BOARD_MARGIN = 40;
+const BOARD_MARGIN = 120;
 /** Horizontal gap between consecutive components in the same column (px) */
-const COMP_GAP_X = 20;
+const COMP_GAP_X = 65;
 /** Vertical gap between rows of components (px) */
-const COMP_GAP_Y = 16;
+const COMP_GAP_Y = 55;
 /** Default component size when DOM measurement is unavailable */
 const DEFAULT_COMP_W = 60;
 const DEFAULT_COMP_H = 60;
@@ -95,13 +95,73 @@ export interface RouteResult {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Calculate current zoom scale factor from DOM CSS transform */
+function getCanvasScale(): number {
+  if (typeof document === 'undefined') return 1;
+  const worldEl = document.querySelector('.canvas-world');
+  if (worldEl) {
+    const style = window.getComputedStyle(worldEl);
+    const transform = style.transform || style.webkitTransform;
+    if (transform && transform !== 'none') {
+      const match = transform.match(/^matrix\(([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+),\s*([^,]+)\)$/);
+      if (match) {
+        const scale = parseFloat(match[1]);
+        if (!isNaN(scale) && scale > 0) return scale;
+      }
+    }
+  }
+  return 1;
+}
+
+const COMPONENT_SIZE: Record<string, { w: number; h: number }> = {
+  dht11: { w: 60, h: 100 },
+  dht22: { w: 60, h: 100 },
+  ssd1306: { w: 128, h: 110 },
+  potentiometer: { w: 70, h: 80 },
+  buzzer: { w: 80, h: 80 },
+  speaker: { w: 80, h: 80 },
+  led: { w: 40, h: 70 },
+  resistor: { w: 75, h: 30 },
+  pushbutton: { w: 50, h: 50 },
+  'slide-switch': { w: 60, h: 40 },
+  lcd1602: { w: 260, h: 120 },
+  neopixel: { w: 80, h: 80 },
+  'neopixel-ring': { w: 120, h: 120 },
+  'neopixel-matrix': { w: 120, h: 120 },
+  servo: { w: 90, h: 60 },
+  pir: { w: 80, h: 90 },
+  'hc-sr501': { w: 80, h: 90 },
+  ultrasonic: { w: 100, h: 70 },
+  'hc-sr04': { w: 100, h: 70 },
+  hcsr04: { w: 100, h: 70 },
+  relay: { w: 70, h: 60 },
+  ds1307: { w: 80, h: 80 },
+};
+
 /** Read the rendered pixel size of a component from the DOM, with fallback. */
 function getComponentSize(id: string): { w: number; h: number } {
-  const el = typeof document !== 'undefined' ? document.getElementById(id) : null;
-  if (el) {
-    const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) return { w: r.width, h: r.height };
+  // 1. Try static metadata lookup based on prefix matching
+  const normId = id.toLowerCase().replace(/^wokwi-/, '');
+  const keys = Object.keys(COMPONENT_SIZE).sort((a, b) => b.length - a.length);
+  const matchedKey = keys.find((key) => normId.startsWith(key));
+  if (matchedKey) {
+    return { ...COMPONENT_SIZE[matchedKey] };
   }
+
+  // 2. Try DOM measurement of the absolute wrapper element if available
+  if (typeof document !== 'undefined') {
+    const el = document.querySelector(`[data-component-id="${id}"], [data-board-id="${id}"]`) ||
+               document.getElementById(id);
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 20 && r.height > 20) {
+        const scale = getCanvasScale();
+        return { w: r.width / scale, h: r.height / scale };
+      }
+    }
+  }
+
+  // 3. Fallback
   return { w: DEFAULT_COMP_W, h: DEFAULT_COMP_H };
 }
 
@@ -110,7 +170,10 @@ function getBoardSize(boardKind: string, boardId: string): { w: number; h: numbe
   const el = typeof document !== 'undefined' ? document.getElementById(boardId) : null;
   if (el) {
     const r = el.getBoundingClientRect();
-    if (r.width > 0 && r.height > 0) return { w: r.width, h: r.height };
+    if (r.width > 0 && r.height > 0) {
+      const scale = getCanvasScale();
+      return { w: r.width / scale, h: r.height / scale };
+    }
   }
   return BOARD_SIZE[boardKind] ?? { w: 300, h: 200 };
 }
@@ -183,8 +246,8 @@ function overlapsAny(
 }
 
 /**
- * Find a free canvas position starting from (startX, startY) scanning downward
- * in rows, skipping occupied rectangles.
+ * Find a free canvas position starting from (startX, startY) scanning
+ * in rows/columns, wrapping away from the board and skipping occupied rectangles.
  */
 function findFreePosition(
   startX: number,
@@ -192,18 +255,38 @@ function findFreePosition(
   compW: number,
   compH: number,
   occupied: Array<{ x: number; y: number; w: number; h: number }>,
+  side: 'right' | 'left' | 'top' | 'bottom',
 ): { x: number; y: number } {
   let x = startX;
   let y = startY;
-  const maxAttempts = 50;
+  const maxAttempts = 100;
   for (let i = 0; i < maxAttempts; i++) {
     if (!overlapsAny({ x, y, w: compW, h: compH }, occupied)) {
       return { x, y };
     }
-    y += compH + COMP_GAP_Y;
-    if (y > startY + 800) {
-      y = startY;
-      x += compW + COMP_GAP_X + 20;
+    
+    if (side === 'right' || side === 'left') {
+      // Stack vertically down
+      y += compH + COMP_GAP_Y;
+      if (y > startY + 600) {
+        y = startY;
+        if (side === 'right') {
+          x += compW + COMP_GAP_X;
+        } else {
+          x -= (compW + COMP_GAP_X);
+        }
+      }
+    } else {
+      // Stack horizontally right
+      x += compW + COMP_GAP_X;
+      if (x > startX + 800) {
+        x = startX;
+        if (side === 'bottom') {
+          y += compH + COMP_GAP_Y;
+        } else {
+          y -= (compH + COMP_GAP_Y);
+        }
+      }
     }
   }
   return { x, y };
@@ -219,7 +302,7 @@ function findFreePosition(
  * 2. For each requested component, determine the preferred board side based on
  *    the connectsToBoardPin hint (or fall back to 'right').
  * 3. Assign a start anchor just outside that board edge.
- * 4. Pack components into free slots, scanning downward, skipping existing rects.
+ * 4. Pack components into free slots, scanning downward/sideways, wrapping away from board.
  * 5. Return {id, x, y, side} for each requested component.
  */
 export function suggestPlacements(
@@ -235,19 +318,20 @@ export function suggestPlacements(
   const occupied = computeOccupiedRects(existingComponents, boards);
   const results: PlacementResult[] = [];
 
-  // Track per-side placement cursors so components on the same side stack cleanly
+  // Track per-side placement cursors.
+  // We specify initial baseline anchors; for left/top we will subtract the actual component sizes.
   const sideCursors: Record<string, { x: number; y: number }> = {
     right: {
       x: primaryBoard.x + boardSize.w + BOARD_MARGIN,
       y: primaryBoard.y,
     },
     left: {
-      x: primaryBoard.x - BOARD_MARGIN - DEFAULT_COMP_W,
+      x: primaryBoard.x - BOARD_MARGIN,
       y: primaryBoard.y,
     },
     top: {
       x: primaryBoard.x,
-      y: primaryBoard.y - BOARD_MARGIN - DEFAULT_COMP_H,
+      y: primaryBoard.y - BOARD_MARGIN,
     },
     bottom: {
       x: primaryBoard.x,
@@ -263,9 +347,18 @@ export function suggestPlacements(
     }
 
     const cursor = sideCursors[side];
-    const compSize = { w: DEFAULT_COMP_W, h: DEFAULT_COMP_H };
+    const compSize = getComponentSize(req.id);
 
-    const pos = findFreePosition(cursor.x, cursor.y, compSize.w, compSize.h, occupied);
+    let startX = cursor.x;
+    let startY = cursor.y;
+
+    if (side === 'left') {
+      startX = cursor.x - compSize.w;
+    } else if (side === 'top') {
+      startY = cursor.y - compSize.h;
+    }
+
+    const pos = findFreePosition(startX, startY, compSize.w, compSize.h, occupied, side);
 
     results.push({ id: req.id, x: pos.x, y: pos.y, side });
 

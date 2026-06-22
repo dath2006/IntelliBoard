@@ -6,7 +6,6 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useVfsStore } from '../../store/useVfsStore';
-import type { VfsNode } from '../../store/useVfsStore';
 import { getBoardBridge } from '../../store/useSimulatorStore';
 
 // ── Icons ─────────────────────────────────────────
@@ -80,14 +79,14 @@ interface NodeRowProps {
   onContext: (e: React.MouseEvent, nodeId: string, isDir: boolean) => void;
   renamingId: string | null;
   renameValue: string;
-  renameInputRef: React.RefObject<HTMLInputElement>;
+  renameInputRef: React.RefObject<HTMLInputElement | null>;
   onRenameChange: (v: string) => void;
   onRenameCommit: () => void;
   onRenameCancel: () => void;
   creatingIn: string | null;
   newNodeName: string;
   newNodeType: 'file' | 'directory';
-  newNodeInputRef: React.RefObject<HTMLInputElement>;
+  newNodeInputRef: React.RefObject<HTMLInputElement | null>;
   onNewNameChange: (v: string) => void;
   onNewNameCommit: () => void;
   onNewNameCancel: () => void;
@@ -226,9 +225,10 @@ const NodeRow: React.FC<NodeRowProps> = ({
 interface VirtualFileSystemProps {
   boardId: string;
   onFileSelect: (nodeId: string, content: string, filename: string) => void;
+  shellReady?: boolean;
 }
 
-export const VirtualFileSystem: React.FC<VirtualFileSystemProps> = ({ boardId, onFileSelect }) => {
+export const VirtualFileSystem: React.FC<VirtualFileSystemProps> = ({ boardId, onFileSelect, shellReady = false }) => {
   const {
     initBoardVfs,
     getRootId,
@@ -332,7 +332,11 @@ export const VirtualFileSystem: React.FC<VirtualFileSystemProps> = ({ boardId, o
   const handleUpload = async () => {
     const bridge = getBoardBridge(boardId);
     if (!bridge || !bridge.connected) {
-      alert('Pi is not connected. Start the simulation first.');
+      alert('Pi is not connected. Click "Start Pi" first.');
+      return;
+    }
+    if (!shellReady) {
+      alert('Pi is still booting. Wait for the "Shell ready" status (green dot) before uploading.');
       return;
     }
     const files = serializeForUpload(boardId);
@@ -396,12 +400,19 @@ export const VirtualFileSystem: React.FC<VirtualFileSystemProps> = ({ boardId, o
                     ? '#ef5350'
                     : uploadStatus === 'uploading'
                       ? '#f59e0b'
-                      : '#4fc3f7',
-              opacity: uploadStatus === 'uploading' ? 0.7 : 1,
+                      : shellReady
+                        ? '#4fc3f7'
+                        : '#555',
+              opacity: uploadStatus === 'uploading' || !shellReady ? 0.5 : 1,
+              cursor: shellReady ? 'pointer' : 'not-allowed',
             }}
             onClick={handleUpload}
             disabled={uploadStatus === 'uploading'}
-            title="Upload all files to the running Pi via serial"
+            title={
+              shellReady
+                ? 'Upload all files to the running Pi via serial'
+                : 'Waiting for Pi shell to be ready…'
+            }
           >
             <IcoUpload />
             <span style={{ marginLeft: 4, fontSize: 10 }}>
